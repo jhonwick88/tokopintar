@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "259323413654",
+    "project_id": "tokopintarfc",
+    "storage_bucket": "tokopintarfc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:259323413654:android:f34946e6422fee698b6eb7",
+        "android_client_info": {
+          "package_name": "com.labspintar.tokopintar"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "259323413654-slera8esr4me9qfpp2ngtnb01kck8rgt.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDwPlH7dX0hb4QoDHgYp49AfJG0AR4kg5g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "259323413654-slera8esr4me9qfpp2ngtnb01kck8rgt.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
