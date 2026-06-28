@@ -132,7 +132,7 @@ class DashboardScreen extends ConsumerWidget {
                                 'Penjualan Hari Ini',
                                 _formatRupiah(todayRevenue),
                                 Icons.monetization_on_rounded,
-                                Colors.emerald,
+                                Colors.teal,
                               ),
                               _buildStatCard(
                                 context,
@@ -266,7 +266,7 @@ class DashboardScreen extends ConsumerWidget {
                                 final idx = val.toInt();
                                 if (idx >= 0 && idx < entries.length) {
                                   return Padding(
-                                    padding: const EdgeInsets.top(8.0),
+                                    padding: const EdgeInsets.only(top: 8.0),
                                     child: Text(
                                       'Tgl ${entries[idx].key}',
                                       style: TextStyle(

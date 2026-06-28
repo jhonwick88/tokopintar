@@ -3,12 +3,16 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../domain/services/barcode_service.dart';
+import '../../data/models/item_model.dart';
 import '../providers/items_provider.dart';
 import '../providers/pos_provider.dart';
 import '../providers/sales_history_provider.dart';
 import '../widgets/camera_scanner_dialog.dart';
 import '../widgets/main_layout.dart';
 import '../widgets/payment_modal.dart';
+import 'mobile_cart_screen.dart';
+import '../providers/quick_items_provider.dart';
+import 'quick_add_item_settings_screen.dart';
 
 class PosScreen extends ConsumerStatefulWidget {
   const PosScreen({super.key});
@@ -110,6 +114,16 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       _showErrorToast('Keranjang belanja kosong!');
       return;
     }
+    
+    final width = MediaQuery.of(context).size.width;
+    final isLargeScreen = width >= 900;
+    if (!isLargeScreen) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (context) => const MobileCartScreen()),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -124,6 +138,200 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     } else {
       _showErrorToast('Gagal cetak ulang. Riwayat transaksi kosong!');
     }
+  }
+
+  void _openQuickItemsBottomSheet() {
+    ref.read(quickItemsNotifierProvider.notifier).loadQuickItems();
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+      builder: (context) {
+        return Consumer(
+          builder: (context, ref, child) {
+            final quickItems = ref.watch(quickItemsNotifierProvider);
+            final activeItems = quickItems.where((item) => item.isActive).toList();
+
+            return Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Quick Add Item',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      if (activeItems.isNotEmpty)
+                        Text(
+                          '${activeItems.length} Shortcut',
+                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (activeItems.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 32.0),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.bolt, size: 48, color: Colors.grey),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Belum ada Quick Item aktif.',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                            const SizedBox(height: 12),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => const QuickAddItemSettingsScreen(),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.settings),
+                              label: const Text('Konfigurasi Sekarang'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    Flexible(
+                      child: GridView.builder(
+                        shrinkWrap: true,
+                        itemCount: activeItems.length,
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          mainAxisSpacing: 10,
+                          crossAxisSpacing: 10,
+                          childAspectRatio: 1.1,
+                        ),
+                        itemBuilder: (context, index) {
+                          final item = activeItems[index];
+                          final iconData = quickItemIconsMap[item.iconName] ?? Icons.bolt;
+                          final cardColor = item.colorHex != null 
+                              ? Color(int.parse(item.colorHex!)) 
+                              : Colors.teal;
+
+                          return Card(
+                            elevation: 1,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(color: cardColor.withOpacity(0.2), width: 1),
+                            ),
+                            color: Theme.of(context).cardColor,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () async {
+                                final itemsState = ref.read(itemsNotifierProvider);
+                                ItemModel? matchedItem;
+                                
+                                for (var it in itemsState.items) {
+                                  if (it.itemNo == item.itemNo) {
+                                    matchedItem = it;
+                                    break;
+                                  }
+                                }
+
+                                if (matchedItem == null) {
+                                  matchedItem = await ref.read(itemsNotifierProvider.notifier).fetchItemByBarcode(item.itemNo);
+                                }
+
+                                if (matchedItem != null) {
+                                  ref.read(posNotifierProvider.notifier).addToCart(matchedItem);
+                                  
+                                  ScaffoldMessenger.of(context).clearSnackBars();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      duration: const Duration(seconds: 1),
+                                      behavior: SnackBarBehavior.floating,
+                                      margin: const EdgeInsets.only(bottom: 80, left: 24, right: 24),
+                                      content: Row(
+                                        children: [
+                                          Icon(iconData, color: Colors.white, size: 18),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text('${item.itemName} ditambahkan ke keranjang'),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Produk ${item.itemName} (${item.itemNo}) tidak ditemukan di server'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: cardColor.withOpacity(0.12),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        iconData,
+                                        color: cardColor,
+                                        size: 24,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      item.itemName,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   void _voidCurrentCart() {
@@ -409,23 +617,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                       ),
                     ],
                   )
-                : Column(
-                    children: [
-                      // Simple toggle cart count header for mobile
-                      ListTile(
-                        tileColor: Theme.of(context).colorScheme.primary.withOpacity(0.08),
-                        title: Text('${posState.cartItems.length} Item di Keranjang'),
-                        subtitle: Text('Total: ${_formatRupiah(posState.grandTotal)}'),
-                        trailing: ElevatedButton(
-                          onPressed: _openPaymentCheckout,
-                          child: const Text('Bayar'),
-                        ),
-                      ),
-                      Expanded(
-                        child: _buildCatalogSection(itemsState),
-                      ),
-                    ],
-                  ),
+                : _buildCatalogSection(itemsState),
           ),
         ),
       ),
@@ -433,27 +625,37 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   }
 
   Widget _buildCatalogSection(ItemsState state) {
+    final width = MediaQuery.of(context).size.width;
+    final isLargeScreen = width >= 900;
+
     return Padding(
       padding: const EdgeInsets.all(20.0),
       child: Column(
         children: [
-          // Row 1: Search & Barcode Buttons
           Row(
             children: [
-              Expanded(
-                child: TextField(
-                  focusNode: _searchFocusNode,
-                  controller: _searchController,
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.search),
-                    hintText: 'Cari produk berdasarkan nama... (F3)',
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16),
+              if (isLargeScreen)
+                Expanded(
+                  child: TextField(
+                    focusNode: _searchFocusNode,
+                    controller: _searchController,
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search),
+                      hintText: 'Cari produk berdasarkan nama... (F3)',
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                    ),
+                    onChanged: (val) {
+                      ref.read(itemsNotifierProvider.notifier).search(val.trim());
+                    },
                   ),
-                  onChanged: (val) {
-                    ref.read(itemsNotifierProvider.notifier).search(val.trim());
-                  },
+                )
+              else
+                const Expanded(
+                  child: Text(
+                    'Katalog Produk',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
                 ),
-              ),
               const SizedBox(width: 12),
               IconButton.filled(
                 style: IconButton.styleFrom(
@@ -474,6 +676,17 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 icon: const Icon(Icons.hourglass_empty_rounded),
                 onPressed: _openResumeDialog,
                 tooltip: 'Lanjutkan Transaksi Ditahan',
+              ),
+              const SizedBox(width: 8),
+              IconButton.filled(
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.teal,
+                  padding: const EdgeInsets.all(16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.bolt),
+                onPressed: _openQuickItemsBottomSheet,
+                tooltip: 'Quick Add Item',
               ),
             ],
           ),
@@ -508,7 +721,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           ),
           const SizedBox(height: 16),
           
-          // Row 3: Product Grid Catalog
+          // Row 3: Product Grid/List Catalog
           Expanded(
             child: state.items.isEmpty
                 ? Center(
@@ -516,83 +729,149 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                         ? const CircularProgressIndicator()
                         : const Text('Tidak ada produk ditemukan'),
                   )
-                : GridView.builder(
-                    controller: _catalogScrollController,
-                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 180,
-                      childAspectRatio: 0.82,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                    ),
-                    itemCount: state.items.length + (state.isLoading ? 6 : 0),
-                    itemBuilder: (context, index) {
-                      if (index >= state.items.length) {
-                        return const Card(child: Center(child: CircularProgressIndicator()));
-                      }
-                      final product = state.items[index];
-                      return InkWell(
-                        onTap: () {
-                          ref.read(posNotifierProvider.notifier).addToCart(product);
-                        },
-                        borderRadius: BorderRadius.circular(16),
-                        child: Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(12.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Mock Image / Initials Placeholder
-                                Container(
-                                  width: double.infinity,
-                                  height: 80,
-                                  decoration: BoxDecoration(
-                                    color: Theme.of(context).colorScheme.primary.withOpacity(0.05),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Text(
-                                    product.itemName[0].toUpperCase(),
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 24,
-                                      color: Theme.of(context).colorScheme.primary.withOpacity(0.6),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        product.itemName,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                : isLargeScreen
+                    ? GridView.builder(
+                        controller: _catalogScrollController,
+                        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 180,
+                          childAspectRatio: 0.82,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                        ),
+                        itemCount: state.items.length + (state.isLoading ? 6 : 0),
+                        itemBuilder: (context, index) {
+                          if (index >= state.items.length) {
+                            return const Card(child: Center(child: CircularProgressIndicator()));
+                          }
+                          final product = state.items[index];
+                          return InkWell(
+                            onTap: () {
+                              ref.read(posNotifierProvider.notifier).addToCart(product);
+                            },
+                            borderRadius: BorderRadius.circular(16),
+                            child: Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(12.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Mock Image / Initials Placeholder
+                                    Container(
+                                      width: double.infinity,
+                                      height: 80,
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context).colorScheme.primary.withOpacity(0.05),
+                                        borderRadius: BorderRadius.circular(8),
                                       ),
-                                      Text(
-                                        'UPC: ${product.itemUPC}',
-                                        style: const TextStyle(fontSize: 10, color: Colors.grey),
-                                      ),
-                                      const Spacer(),
-                                      Text(
-                                        _formatRupiah(product.price),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        product.itemName[0].toUpperCase(),
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
-                                          fontSize: 13,
-                                          color: Theme.of(context).colorScheme.primary,
+                                          fontSize: 24,
+                                          color: Theme.of(context).colorScheme.primary.withOpacity(0.6),
                                         ),
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            product.itemName,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                          ),
+                                          Text(
+                                            'UPC: ${product.itemUPC}',
+                                            style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                          ),
+                                          const Spacer(),
+                                          Text(
+                                            _formatRupiah(product.price),
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                              color: Theme.of(context).colorScheme.primary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                          );
+                        },
+                      )
+                    : ListView.separated(
+                        controller: _catalogScrollController,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        itemCount: state.items.length + (state.isLoading ? 3 : 0),
+                        separatorBuilder: (context, index) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) {
+                          if (index >= state.items.length) {
+                            return const Card(
+                              child: Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: Center(child: CircularProgressIndicator()),
+                              ),
+                            );
+                          }
+                          final product = state.items[index];
+                          return Card(
+                            child: InkWell(
+                              onTap: () {
+                                ref.read(posNotifierProvider.notifier).addToCart(product);
+                                _showSuccessToast('${product.itemName} ditambahkan');
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12.0),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            product.itemName,
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'UPC: ${product.itemUPC}',
+                                            style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            _formatRupiah(product.price),
+                                            style: TextStyle(
+                                              color: Theme.of(context).colorScheme.primary,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Icon(
+                                      Icons.add_shopping_cart,
+                                      color: Theme.of(context).colorScheme.primary,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
           ),
         ],
       ),
