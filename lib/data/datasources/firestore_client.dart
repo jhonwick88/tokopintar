@@ -6,6 +6,7 @@ import '../models/sale_model.dart';
 import '../models/user_model.dart';
 import '../models/audit_log_model.dart';
 import '../models/settings_model.dart';
+import '../models/quick_item_model.dart';
 
 class FirestoreClient {
   bool get isFirebaseInitialized {
@@ -34,6 +35,7 @@ class FirestoreClient {
     'kasir': UserModel(uid: 'u_kasir', username: 'kasir', fullname: 'Kasir Utama', role: 'cashier', pin: '0000'),
   };
   final List<AuditLogModel> _mockLogs = [];
+  final Map<String, QuickItemModel> _mockQuickItems = {};
   SettingsModel _mockSettings = SettingsModel();
 
   // --- SALES METHODS ---
@@ -289,5 +291,67 @@ class FirestoreClient {
       }
     }
     return List.from(_mockLogs..sort((a, b) => b.timestamp.compareTo(a.timestamp)));
+  }
+
+  // --- QUICK ITEMS METHODS ---
+  Future<List<QuickItemModel>> getQuickItems() async {
+    final firestore = _firestore;
+    if (firestore != null) {
+      try {
+        final snap = await firestore.collection('quick_items').orderBy('display_order').get();
+        return snap.docs.map((doc) => QuickItemModel.fromJson(doc.data())).toList();
+      } catch (e) {
+        dev.log('Firestore error in getQuickItems: $e. Falling back to memory.');
+      }
+    }
+    final list = _mockQuickItems.values.toList();
+    list.sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
+    return list;
+  }
+
+  Future<void> saveQuickItem(QuickItemModel item) async {
+    final firestore = _firestore;
+    if (firestore != null) {
+      try {
+        await firestore.collection('quick_items').doc(item.id).set(item.toJson());
+        return;
+      } catch (e) {
+        dev.log('Firestore error in saveQuickItem: $e');
+      }
+    }
+    _mockQuickItems[item.id] = item;
+  }
+
+  Future<void> deleteQuickItem(String id) async {
+    final firestore = _firestore;
+    if (firestore != null) {
+      try {
+        await firestore.collection('quick_items').doc(id).delete();
+        return;
+      } catch (e) {
+        dev.log('Firestore error in deleteQuickItem: $e');
+      }
+    }
+    _mockQuickItems.remove(id);
+  }
+
+  Future<void> saveQuickItemsBatch(List<QuickItemModel> items) async {
+    final firestore = _firestore;
+    if (firestore != null) {
+      try {
+        final batch = firestore.batch();
+        for (var item in items) {
+          final docRef = firestore.collection('quick_items').doc(item.id);
+          batch.set(docRef, item.toJson());
+        }
+        await batch.commit();
+        return;
+      } catch (e) {
+        dev.log('Firestore error in saveQuickItemsBatch: $e');
+      }
+    }
+    for (var item in items) {
+      _mockQuickItems[item.id] = item;
+    }
   }
 }
