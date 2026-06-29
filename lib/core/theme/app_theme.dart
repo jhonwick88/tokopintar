@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
@@ -15,7 +16,7 @@ class AppTheme {
         surfaceContainerHigh: Colors.white,
       ),
       textTheme: GoogleFonts.outfitTextTheme(ThemeData.light().textTheme),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -55,7 +56,7 @@ class AppTheme {
         surfaceContainerHigh: const Color(0xFF1E1E1E),
       ),
       textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: const Color(0xFF1E1E1E),
         elevation: 0,
         shape: RoundedRectangleBorder(

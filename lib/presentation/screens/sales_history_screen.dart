@@ -253,7 +253,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
       currentRoute: '/history',
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Riwayat Penjualan', style: TextStyle(fontWeight: FontWeight.bold)),
+          title: const Text('Riwayat', style: TextStyle(fontWeight: FontWeight.bold)),
           centerTitle: false,
           actions: [
             IconButton(

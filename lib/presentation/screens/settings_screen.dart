@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
+import '../../core/theme/app_theme.dart';
 import '../../data/models/settings_model.dart';
 import '../../domain/services/printer_service.dart';
 import '../providers/auth_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/main_layout.dart';
+import 'quick_add_item_settings_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -28,6 +31,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   String _printerType = 'LAN';
   bool _isEditingUnlocked = false;
+  bool _isTestingConnection = false;
+  String? _connectionStatus;
 
   @override
   void initState() {
@@ -141,6 +146,84 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  Future<void> _testApiConnection() async {
+    setState(() {
+      _isTestingConnection = true;
+      _connectionStatus = null;
+    });
+    final url = _apiUrlController.text.trim();
+    try {
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 3),
+        receiveTimeout: const Duration(seconds: 3),
+      ));
+      final response = await dio.get('$url/api/categories');
+      if (response.statusCode == 200) {
+        setState(() {
+          _connectionStatus = 'connected';
+        });
+      } else {
+        setState(() {
+          _connectionStatus = 'error';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _connectionStatus = 'disconnected';
+      });
+    } finally {
+      setState(() {
+        _isTestingConnection = false;
+      });
+    }
+  }
+
+  Widget _buildConnectionStatusFeedback() {
+    Color color;
+    IconData icon;
+    String text;
+
+    switch (_connectionStatus) {
+      case 'connected':
+        color = Colors.green;
+        icon = Icons.check_circle;
+        text = 'Koneksi Berhasil! Terhubung ke server REST API Golang.';
+        break;
+      case 'error':
+        color = Colors.orange;
+        icon = Icons.warning;
+        text = 'Respon Invalid: Server terjangkau tetapi mengembalikan error status code.';
+        break;
+      case 'disconnected':
+      default:
+        color = Colors.red;
+        icon = Icons.error;
+        text = 'Koneksi Gagal: Server REST API tidak terjangkau. Periksa alamat IP / port.';
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _printTestPage() async {
     final builder = EscPosBuilder();
     builder.initialize();
@@ -181,13 +264,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  void _confirmAndLogout(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Konfirmasi Keluar'),
+          content: const Text('Apakah Anda yakin ingin keluar dari akun kasir saat ini?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: () {
+                Navigator.of(context).pop();
+                ref.read(authNotifierProvider.notifier).logout();
+              },
+              child: const Text('Keluar', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final themeMode = ref.watch(themeModeProvider);
+    final width = MediaQuery.of(context).size.width;
+    final isDesktop = width >= 900;
     return MainLayout(
       currentRoute: '/settings',
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Pengaturan Sistem', style: TextStyle(fontWeight: FontWeight.bold)),
+          title: const Text('Pengaturan', style: TextStyle(fontWeight: FontWeight.bold)),
           centerTitle: false,
           actions: [
             if (!_isEditingUnlocked)
@@ -302,15 +414,44 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
                 // Section 2: REST API
                 _buildCardSection(
-                  title: 'Koneksi REST API Backend',
-                  icon: Icons.api_rounded,
+                  title: 'Koneksi Server',
+                  icon: _isTestingConnection
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        )
+                      : Icons.api_rounded,
                   children: [
-                    _buildTextField(
-                      controller: _apiUrlController,
-                      label: 'Base URL API Golang',
-                      hint: 'http://localhost:8080',
-                      validator: (val) => val!.isEmpty ? 'URL REST API wajib diisi' : null,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: _buildTextField(
+                            controller: _apiUrlController,
+                            label: 'Base URL API Golang',
+                            hint: 'http://localhost:8080',
+                            validator: (val) => val!.isEmpty ? 'URL REST API wajib diisi' : null,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: (_isTestingConnection || !_isEditingUnlocked) ? null : _testApiConnection,
+                          label: const Text('Tes'),
+                        ),
+                      ],
                     ),
+                    if (_connectionStatus != null) ...[
+                      const SizedBox(height: 16),
+                      _buildConnectionStatusFeedback(),
+                    ]
                   ],
                 ),
                 const SizedBox(height: 24),
@@ -323,6 +464,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     Row(
                       children: [
                         Expanded(
+                          flex: isDesktop ? 3 : 3,
                           child: DropdownButtonFormField<String>(
                             value: _printerType,
                             decoration: const InputDecoration(labelText: 'Tipe Koneksi Printer'),
@@ -342,9 +484,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                         const SizedBox(width: 16),
                         Expanded(
+                          flex: isDesktop ? 1 : 2,
                           child: _buildTextField(
                             controller: _printerPortController,
-                            label: 'Port Printer (Default 9100)',
+                            label: 'Port',
+                            hint: '9100',
                             keyboardType: TextInputType.number,
                           ),
                         ),
@@ -354,9 +498,48 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     if (_printerType == 'LAN')
                       _buildTextField(
                         controller: _printerIpController,
-                        label: 'IP Address Printer LAN',
+                        label: 'IP Address Printer',
                         hint: '192.168.1.100',
                       ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // Section 4: Aplikasi & Sistem
+                _buildCardSection(
+                  title: 'Aplikasi & Sistem',
+                  icon: Icons.settings_display_rounded,
+                  children: [
+                    ListTile(
+                      leading: Icon(themeMode == ThemeMode.dark ? Icons.dark_mode : Icons.light_mode),
+                      title: Text(themeMode == ThemeMode.dark ? 'Mode Gelap Aktif' : 'Mode Terang Aktif'),
+                      trailing: Switch(
+                        value: themeMode == ThemeMode.dark,
+                        onChanged: (val) {
+                          ref.read(themeModeProvider.notifier).state =
+                              val ? ThemeMode.dark : ThemeMode.light;
+                        },
+                      ),
+                    ),
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.bolt, color: Colors.amber),
+                      title: const Text('Kelola Quick Add Item', style: TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: const Text('Konfigurasi tombol cepat untuk produk kasir'),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (context) => const QuickAddItemSettingsScreen()),
+                        );
+                      },
+                    ),
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.logout, color: Colors.red),
+                      title: const Text('Keluar dari Akun (Logout)', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                      subtitle: const Text('Mengakhiri sesi kasir aktif saat ini'),
+                      onTap: () => _confirmAndLogout(context),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 32),
@@ -372,7 +555,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                       onPressed: _printTestPage,
                       icon: const Icon(Icons.receipt_long_rounded),
-                      label: const Text('Cetak Halaman Uji'),
+                      label: const Text('Cetak Hal Uji'),
                     ),
                     const SizedBox(width: 16),
                     ElevatedButton.icon(
@@ -382,7 +565,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                       onPressed: _isEditingUnlocked ? _saveSettings : null,
                       icon: const Icon(Icons.save),
-                      label: const Text('Simpan Konfigurasi'),
+                      label: const Text('Simpan'),
                     ),
                   ],
                 ),
@@ -396,7 +579,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Widget _buildCardSection({
     required String title,
-    required IconData icon,
+    required dynamic icon,
     required List<Widget> children,
   }) {
     return Card(
@@ -407,7 +590,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           children: [
             Row(
               children: [
-                Icon(icon, color: Theme.of(context).colorScheme.primary),
+                if (icon is IconData)
+                  Icon(icon, color: Theme.of(context).colorScheme.primary)
+                else if (icon is Widget)
+                  icon,
                 const SizedBox(width: 12),
                 Text(
                   title,
