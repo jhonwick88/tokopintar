@@ -351,3 +351,5 @@ class PosNotifier extends StateNotifier<PosState> {
 final posNotifierProvider = StateNotifierProvider<PosNotifier, PosState>((ref) {
   return PosNotifier(ref);
 });
+
+final scannedBarcodeProvider = StateProvider<String?>((ref) => null);

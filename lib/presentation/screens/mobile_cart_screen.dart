@@ -313,86 +313,122 @@ class _MobileCartScreenState extends ConsumerState<MobileCartScreen> {
                     separatorBuilder: (c, i) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
                       final cartItem = posState.cartItems[index];
-                      return Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                      return Dismissible(
+                        key: Key('mobile-cart-${cartItem.item.itemNo}'),
+                        direction: DismissDirection.endToStart,
+                        background: Container(
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.delete, color: Colors.white),
+                        ),
+                        onDismissed: (direction) {
+                          ref.read(posNotifierProvider.notifier).removeFromCart(cartItem.item.itemNo);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${cartItem.item.itemName} dihapus dari keranjang'),
+                              duration: const Duration(seconds: 1),
+                            ),
+                          );
+                        },
+                        child: Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            cartItem.item.itemName,
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            _formatRupiah(cartItem.price),
+                                            style: TextStyle(
+                                              color: Theme.of(context).colorScheme.primary,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          if (cartItem.discount > 0)
+                                            Text(
+                                              'Disc: -${_formatRupiah(cartItem.discount)}',
+                                              style: const TextStyle(color: Colors.red, fontSize: 11),
+                                            ),
+                                          if (cartItem.note.isNotEmpty)
+                                            Text(
+                                              '* Note: ${cartItem.note}',
+                                              style: const TextStyle(color: Colors.grey, fontSize: 11, fontStyle: FontStyle.italic),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.edit_note),
+                                      onPressed: () => _openItemNoteAndDiscountDialog(cartItem),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Sub: ${_formatRupiah(cartItem.subtotal)}',
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                    Row(
                                       children: [
-                                        Text(
-                                          cartItem.item.itemName,
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
+                                        IconButton(
+                                          icon: const Icon(Icons.remove_circle_outline, size: 24),
+                                          onPressed: () {
+                                            ref.read(posNotifierProvider.notifier).updateQty(
+                                                  cartItem.item.itemNo,
+                                                  cartItem.qty - 1,
+                                                );
+                                          },
                                         ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          _formatRupiah(cartItem.price),
-                                          style: TextStyle(
-                                            color: Theme.of(context).colorScheme.primary,
-                                            fontWeight: FontWeight.w500,
+                                        InkWell(
+                                          onTap: () => _showEditQtyDialog(cartItem),
+                                          borderRadius: BorderRadius.circular(4),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              '${cartItem.qty}',
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                            ),
                                           ),
                                         ),
-                                        if (cartItem.discount > 0)
-                                          Text(
-                                            'Disc: -${_formatRupiah(cartItem.discount)}',
-                                            style: const TextStyle(color: Colors.red, fontSize: 11),
-                                          ),
-                                        if (cartItem.note.isNotEmpty)
-                                          Text(
-                                            '* Note: ${cartItem.note}',
-                                            style: const TextStyle(color: Colors.grey, fontSize: 11, fontStyle: FontStyle.italic),
-                                          ),
+                                        IconButton(
+                                          icon: const Icon(Icons.add_circle_outline, size: 24),
+                                          onPressed: () {
+                                            ref.read(posNotifierProvider.notifier).updateQty(
+                                                  cartItem.item.itemNo,
+                                                  cartItem.qty + 1,
+                                                );
+                                          },
+                                        ),
                                       ],
                                     ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.edit_note),
-                                    onPressed: () => _openItemNoteAndDiscountDialog(cartItem),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Sub: ${_formatRupiah(cartItem.subtotal)}',
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                  Row(
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.remove_circle_outline, size: 24),
-                                        onPressed: () {
-                                          ref.read(posNotifierProvider.notifier).updateQty(
-                                                cartItem.item.itemNo,
-                                                cartItem.qty - 1,
-                                              );
-                                        },
-                                      ),
-                                      Text('${cartItem.qty}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                                      IconButton(
-                                        icon: const Icon(Icons.add_circle_outline, size: 24),
-                                        onPressed: () {
-                                          ref.read(posNotifierProvider.notifier).updateQty(
-                                                cartItem.item.itemNo,
-                                                cartItem.qty + 1,
-                                              );
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ],
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       );
@@ -666,5 +702,48 @@ class _MobileCartScreenState extends ConsumerState<MobileCartScreen> {
   String _formatRupiah(double val) {
     final formatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
     return formatter.format(val);
+  }
+
+  void _showEditQtyDialog(CartItem cartItem) {
+    final controller = TextEditingController(text: '${cartItem.qty}');
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Edit Jumlah'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            decoration: const InputDecoration(
+              suffixText: 'pcs',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final qty = int.tryParse(controller.text) ?? 0;
+                if (qty > 0) {
+                  ref.read(posNotifierProvider.notifier).updateQty(
+                    cartItem.item.itemNo,
+                    qty,
+                  );
+                } else if (qty <= 0) {
+                  ref.read(posNotifierProvider.notifier).removeFromCart(
+                    cartItem.item.itemNo,
+                  );
+                }
+                Navigator.of(context).pop();
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        );
+      },
+    );
   }
 }

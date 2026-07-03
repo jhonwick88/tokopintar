@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:audioplayers/audioplayers.dart';
 import '../../domain/services/barcode_service.dart';
 import '../../data/models/item_model.dart';
 import '../providers/items_provider.dart';
@@ -25,6 +26,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   final FocusNode _searchFocusNode = FocusNode();
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _catalogScrollController = ScrollController();
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   @override
   void initState() {
@@ -37,6 +39,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     _searchFocusNode.dispose();
     _searchController.dispose();
     _catalogScrollController.dispose();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -50,6 +53,12 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
   // Handle barcode scanned globally via Keyboard listener or camera
   void _onBarcodeScanned(String barcode) async {
+    try {
+      await _audioPlayer.play(AssetSource('sounds/scanner-beep.mp3'));
+    } catch (e) {
+      debugPrint('Gagal memutar suara scan: $e');
+    }
+
     final item = await ref.read(itemsNotifierProvider.notifier).fetchItemByBarcode(barcode);
     if (item != null) {
       ref.read(posNotifierProvider.notifier).addToCart(item);
@@ -586,6 +595,13 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     final itemsState = ref.watch(itemsNotifierProvider);
     final posState = ref.watch(posNotifierProvider);
 
+    ref.listen<String?>(scannedBarcodeProvider, (previous, next) {
+      if (next != null) {
+        _onBarcodeScanned(next);
+        ref.read(scannedBarcodeProvider.notifier).state = null;
+      }
+    });
+
     final width = MediaQuery.of(context).size.width;
     final isLargeScreen = width >= 900;
 
@@ -726,7 +742,25 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 ? Center(
                     child: state.isLoading
                         ? const CircularProgressIndicator()
-                        : const Text('Tidak ada produk ditemukan'),
+                        : Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.search_off_rounded, size: 64, color: Colors.grey),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'Tidak ada produk ditemukan',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                              const SizedBox(height: 12),
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  _openAddProductPage(itemName: state.searchQuery);
+                                },
+                                icon: const Icon(Icons.add),
+                                label: const Text('Tambah Produk Baru'),
+                              ),
+                            ],
+                          ),
                   )
                 : isLargeScreen
                     ? GridView.builder(
@@ -747,6 +781,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                             onTap: () {
                               ref.read(posNotifierProvider.notifier).addToCart(product);
                             },
+                            onLongPress: () => _showEditProductDialog(product),
                             borderRadius: BorderRadius.circular(16),
                             child: Card(
                               child: Padding(
@@ -783,9 +818,18 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                             overflow: TextOverflow.ellipsis,
                                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                           ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'SKU: ${product.itemNo}',
+                                            style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                           Text(
                                             'UPC: ${product.itemUPC}',
                                             style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
                                           const Spacer(),
                                           Text(
@@ -827,6 +871,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                 ref.read(posNotifierProvider.notifier).addToCart(product);
                                 _showSuccessToast('${product.itemName} ditambahkan');
                               },
+                              onLongPress: () => _showEditProductDialog(product),
                               borderRadius: BorderRadius.circular(12),
                               child: Padding(
                                 padding: const EdgeInsets.all(12.0),
@@ -844,8 +889,10 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
-                                            'UPC: ${product.itemUPC}',
+                                            'SKU: ${product.itemNo}  |  UPC: ${product.itemUPC}',
                                             style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
                                           const SizedBox(height: 6),
                                           Text(
@@ -916,87 +963,118 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   separatorBuilder: (c, i) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final cartItem = state.cartItems[index];
-                    return Card(
-                      color: Theme.of(context).cardColor,
-                      child: Padding(
-                        padding: const EdgeInsets.all(10.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                    return Dismissible(
+                      key: Key('desktop-cart-${cartItem.item.itemNo}'),
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.delete, color: Colors.white),
+                      ),
+                      onDismissed: (direction) {
+                        ref.read(posNotifierProvider.notifier).removeFromCart(cartItem.item.itemNo);
+                        _showSuccessToast('${cartItem.item.itemName} dihapus dari keranjang');
+                      },
+                      child: Card(
+                        color: Theme.of(context).cardColor,
+                        child: Padding(
+                          padding: const EdgeInsets.all(10.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          cartItem.item.itemName,
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          _formatRupiah(cartItem.price),
+                                          style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 11),
+                                        ),
+                                        if (cartItem.discount > 0)
+                                          Text(
+                                            'Disc: -${_formatRupiah(cartItem.discount)}',
+                                            style: const TextStyle(color: Colors.red, fontSize: 10),
+                                          ),
+                                        if (cartItem.note.isNotEmpty)
+                                          Text(
+                                            '* Note: ${cartItem.note}',
+                                            style: const TextStyle(color: Colors.grey, fontSize: 10, fontStyle: FontStyle.italic),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_note, size: 20),
+                                    onPressed: () => _openItemNoteAndDiscountDialog(cartItem),
+                                    tooltip: 'Edit Catatan & Diskon',
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Sub: ${_formatRupiah(cartItem.subtotal)}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                  ),
+                                  Row(
                                     children: [
-                                      Text(
-                                        cartItem.item.itemName,
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        icon: const Icon(Icons.remove_circle_outline, size: 22),
+                                        onPressed: () {
+                                          ref.read(posNotifierProvider.notifier).updateQty(
+                                                cartItem.item.itemNo,
+                                                cartItem.qty - 1,
+                                              );
+                                        },
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        _formatRupiah(cartItem.price),
-                                        style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 11),
+                                      InkWell(
+                                        onTap: () => _showEditQtyDialog(cartItem),
+                                        borderRadius: BorderRadius.circular(4),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            '${cartItem.qty}',
+                                            style: const TextStyle(fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
                                       ),
-                                      if (cartItem.discount > 0)
-                                        Text(
-                                          'Disc: -${_formatRupiah(cartItem.discount)}',
-                                          style: const TextStyle(color: Colors.red, fontSize: 10),
-                                        ),
-                                      if (cartItem.note.isNotEmpty)
-                                        Text(
-                                          '* Note: ${cartItem.note}',
-                                          style: const TextStyle(color: Colors.grey, fontSize: 10, fontStyle: FontStyle.italic),
-                                        ),
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        icon: const Icon(Icons.add_circle_outline, size: 22),
+                                        onPressed: () {
+                                          ref.read(posNotifierProvider.notifier).updateQty(
+                                                cartItem.item.itemNo,
+                                                cartItem.qty + 1,
+                                              );
+                                        },
+                                      ),
                                     ],
                                   ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.edit_note, size: 20),
-                                  onPressed: () => _openItemNoteAndDiscountDialog(cartItem),
-                                  tooltip: 'Edit Catatan & Diskon',
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Sub: ${_formatRupiah(cartItem.subtotal)}',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                                ),
-                                Row(
-                                  children: [
-                                    IconButton(
-                                      visualDensity: VisualDensity.compact,
-                                      icon: const Icon(Icons.remove_circle_outline, size: 22),
-                                      onPressed: () {
-                                        ref.read(posNotifierProvider.notifier).updateQty(
-                                              cartItem.item.itemNo,
-                                              cartItem.qty - 1,
-                                            );
-                                      },
-                                    ),
-                                    Text('${cartItem.qty}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                    IconButton(
-                                      visualDensity: VisualDensity.compact,
-                                      icon: const Icon(Icons.add_circle_outline, size: 22),
-                                      onPressed: () {
-                                        ref.read(posNotifierProvider.notifier).updateQty(
-                                              cartItem.item.itemNo,
-                                              cartItem.qty + 1,
-                                            );
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ],
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     );
@@ -1125,19 +1203,26 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             ],
           ),
           content: Text(
-            'Barcode "$barcode" belum terdaftar di sistem.\n\nApakah Anda ingin memetakan/menghubungkan barcode ini ke produk yang sudah ada?',
+            'Barcode "$barcode" belum terdaftar di sistem.\n\nPilih tindakan yang ingin Anda lakukan:',
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Batal'),
             ),
-            ElevatedButton(
+            OutlinedButton(
               onPressed: () {
                 Navigator.of(context).pop();
                 _openQuickMappingWizard(barcode);
               },
-              child: const Text('Ya, Petakan'),
+              child: const Text('Petakan ke Produk'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _openAddProductPage(barcode: barcode);
+              },
+              child: const Text('Tambah Baru'),
             ),
           ],
         );
@@ -1217,6 +1302,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                     originalItemNo: product.itemNo,
                     newItemNo: newSKU,
                     itemUPC: newBarcode,
+                    price: product.price,
                   );
 
                   ref.read(posNotifierProvider.notifier).addToCart(updatedItem);
@@ -1224,7 +1310,163 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   _showSuccessToast('Pemetaan berhasil. Produk ditambahkan ke keranjang.');
                 } catch (e) {
                   _showErrorToast('Gagal memetakan barcode: $e');
+                  debugPrint('Gagal memetakan barcode: $e');
                 }
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showEditProductDialog(ItemModel product) {
+    final barcodeController = TextEditingController(text: product.itemUPC);
+    final skuController = TextEditingController(text: product.itemNo);
+    final priceController = TextEditingController(text: product.price.toStringAsFixed(0));
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.edit, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 8),
+              const Text('Edit Produk'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.itemName,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: barcodeController,
+                  decoration: const InputDecoration(
+                    labelText: 'Barcode / UPC (itemUPC)',
+                    prefixIcon: Icon(Icons.qr_code),
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: skuController,
+                  decoration: const InputDecoration(
+                    labelText: 'SKU / Kode Item (itemNo)',
+                    prefixIcon: Icon(Icons.inventory_2),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: priceController,
+                  decoration: const InputDecoration(
+                    labelText: 'Harga (price)',
+                    prefixIcon: Icon(Icons.monetization_on),
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final newBarcode = barcodeController.text.trim();
+                final newSKU = skuController.text.trim();
+                final priceText = priceController.text.trim();
+                final newPrice = double.tryParse(priceText) ?? 0.0;
+
+                if (newBarcode.isEmpty || newSKU.isEmpty || priceText.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Semua field harus diisi')),
+                  );
+                  return;
+                }
+
+                Navigator.of(context).pop();
+
+                try {
+                  await ref.read(itemsNotifierProvider.notifier).updateItemKeys(
+                    originalItemNo: product.itemNo,
+                    newItemNo: newSKU,
+                    itemUPC: newBarcode,
+                    price: newPrice,
+                  );
+                  _showSuccessToast('Produk berhasil diperbarui');
+                } catch (e) {
+                  _showErrorToast('Gagal memperbarui produk: $e');
+                }
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _openAddProductPage({String? barcode, String? itemName}) {
+    Navigator.of(context).push(
+      MaterialPageRoute<ItemModel>(
+        fullscreenDialog: true,
+        builder: (context) => _AddProductDialog(
+          initialBarcode: barcode,
+          initialItemName: itemName,
+        ),
+      ),
+    ).then((newItem) {
+      if (newItem != null) {
+        ref.read(posNotifierProvider.notifier).addToCart(newItem);
+        _showSuccessToast('Produk ${newItem.itemName} ditambahkan ke keranjang');
+      }
+    });
+  }
+
+  void _showEditQtyDialog(CartItem cartItem) {
+    final controller = TextEditingController(text: '${cartItem.qty}');
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Edit Jumlah'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            decoration: const InputDecoration(
+              suffixText: 'pcs',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final qty = int.tryParse(controller.text) ?? 0;
+                if (qty > 0) {
+                  ref.read(posNotifierProvider.notifier).updateQty(
+                    cartItem.item.itemNo,
+                    qty,
+                  );
+                } else if (qty <= 0) {
+                  ref.read(posNotifierProvider.notifier).removeFromCart(
+                    cartItem.item.itemNo,
+                  );
+                }
+                Navigator.of(context).pop();
               },
               child: const Text('Simpan'),
             ),
@@ -1315,3 +1557,217 @@ class _QuickMappingSearchDialogState extends State<_QuickMappingSearchDialog> {
     );
   }
 }
+
+class _AddProductDialog extends ConsumerStatefulWidget {
+  final String? initialBarcode;
+  final String? initialItemName;
+
+  const _AddProductDialog({
+    this.initialBarcode,
+    this.initialItemName,
+  });
+
+  @override
+  ConsumerState<_AddProductDialog> createState() => _AddProductDialogState();
+}
+
+class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _barcodeController;
+  late TextEditingController _skuController;
+  late TextEditingController _nameController;
+  late TextEditingController _priceController;
+  int? _selectedCategoryId;
+
+  @override
+  void initState() {
+    super.initState();
+    _barcodeController = TextEditingController(text: widget.initialBarcode ?? '');
+    _skuController = TextEditingController(text: '');
+    _nameController = TextEditingController(text: widget.initialItemName ?? '');
+    _priceController = TextEditingController(text: '');
+
+    // Attempt to set a default generated SKU
+    _skuController.text = 'SKU-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+  }
+
+  @override
+  void dispose() {
+    _barcodeController.dispose();
+    _skuController.dispose();
+    _nameController.dispose();
+    _priceController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final categories = ref.watch(itemsNotifierProvider).categories;
+    if (_selectedCategoryId == null && categories.isNotEmpty) {
+      _selectedCategoryId = categories.first.id;
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Tambah Produk Baru', style: TextStyle(fontWeight: FontWeight.bold)),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Informasi Produk',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              const SizedBox(height: 20),
+              
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Nama Produk *',
+                  prefixIcon: Icon(Icons.shopping_bag_outlined),
+                  hintText: 'Contoh: Aqua Botol 600ml',
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return 'Nama produk tidak boleh kosong';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              TextFormField(
+                controller: _skuController,
+                decoration: const InputDecoration(
+                  labelText: 'SKU / Kode Item *',
+                  prefixIcon: Icon(Icons.inventory_2_outlined),
+                  hintText: 'Contoh: AQUA-600',
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return 'SKU tidak boleh kosong';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              TextFormField(
+                controller: _barcodeController,
+                decoration: const InputDecoration(
+                  labelText: 'Barcode / UPC',
+                  prefixIcon: Icon(Icons.qr_code_scanner_outlined),
+                  hintText: 'Scan atau ketik barcode',
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              DropdownButtonFormField<int>(
+                value: _selectedCategoryId,
+                decoration: const InputDecoration(
+                  labelText: 'Kategori Produk *',
+                  prefixIcon: Icon(Icons.category_outlined),
+                ),
+                items: categories.map((cat) {
+                  return DropdownMenuItem<int>(
+                    value: cat.id,
+                    child: Text(cat.name),
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  setState(() {
+                    _selectedCategoryId = val;
+                  });
+                },
+                validator: (val) => val == null ? 'Kategori wajib dipilih' : null,
+              ),
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: _priceController,
+                decoration: const InputDecoration(
+                  labelText: 'Harga Jual (Price) *',
+                  prefixIcon: Icon(Icons.monetization_on_outlined),
+                  prefixText: 'Rp ',
+                ),
+                keyboardType: TextInputType.number,
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return 'Harga jual wajib diisi';
+                  }
+                  if (double.tryParse(val) == null) {
+                    return 'Format harga tidak valid';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 32),
+              
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () async {
+                    if (!_formKey.currentState!.validate()) return;
+
+                    final name = _nameController.text.trim();
+                    final sku = _skuController.text.trim();
+                    final barcode = _barcodeController.text.trim();
+                    final price = double.parse(_priceController.text.trim());
+                    final catId = _selectedCategoryId!;
+
+                    try {
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) => const Center(child: CircularProgressIndicator()),
+                      );
+
+                      final newItem = await ref.read(itemsNotifierProvider.notifier).createItem(
+                        itemNo: sku,
+                        itemName: name,
+                        itemUPC: barcode,
+                        categoryId: catId,
+                        price: price,
+                      );
+
+                      Navigator.of(context).pop(); // Dismiss loading
+                      Navigator.of(context).pop(newItem); // Return created item
+                    } catch (e) {
+                      Navigator.of(context).pop(); // Dismiss loading
+                      debugPrint('Gagal menyimpan produk: $e');
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Gagal menyimpan produk: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text(
+                    'Simpan Produk',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+

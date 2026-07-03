@@ -38,11 +38,30 @@ class ItemsRepositoryImpl implements ItemsRepository {
     required String originalItemNo,
     required String newItemNo,
     required String itemUPC,
+    required double price,
   }) {
     return _apiClient.updateItemKeys(
       originalItemNo: originalItemNo,
       newItemNo: newItemNo,
       itemUPC: itemUPC,
+      price: price,
+    );
+  }
+
+  @override
+  Future<ItemModel> createItem({
+    required String itemNo,
+    required String itemName,
+    required String itemUPC,
+    required int categoryId,
+    required double price,
+  }) {
+    return _apiClient.createItem(
+      itemNo: itemNo,
+      itemName: itemName,
+      itemUPC: itemUPC,
+      categoryId: categoryId,
+      price: price,
     );
   }
 }

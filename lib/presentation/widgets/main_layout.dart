@@ -25,26 +25,7 @@ class MainLayout extends ConsumerWidget {
       builder: (context) => const CameraScannerDialog(),
     );
     if (barcode != null) {
-      final item = await ref.read(itemsNotifierProvider.notifier).fetchItemByBarcode(barcode);
-      if (item != null) {
-        ref.read(posNotifierProvider.notifier).addToCart(item);
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Produk ${item.itemName} ditambahkan ke keranjang'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 1),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Produk dengan barcode $barcode tidak ditemukan'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      ref.read(scannedBarcodeProvider.notifier).state = barcode;
     }
   }
 

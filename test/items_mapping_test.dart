@@ -41,6 +41,7 @@ class MockItemsRepository implements ItemsRepository {
     required String originalItemNo,
     required String newItemNo,
     required String itemUPC,
+    required double price,
   }) async {
     final idx = db.indexWhere((it) => it.itemNo == originalItemNo);
     if (idx < 0) {
@@ -52,10 +53,29 @@ class MockItemsRepository implements ItemsRepository {
       itemUPC: itemUPC,
       itemName: existing.itemName,
       categoryId: existing.categoryId,
-      price: existing.price,
+      price: price,
     );
     db[idx] = updated;
     return updated;
+  }
+
+  @override
+  Future<ItemModel> createItem({
+    required String itemNo,
+    required String itemName,
+    required String itemUPC,
+    required int categoryId,
+    required double price,
+  }) async {
+    final newItem = ItemModel(
+      itemNo: itemNo,
+      itemName: itemName,
+      itemUPC: itemUPC,
+      categoryId: categoryId,
+      price: price,
+    );
+    db.add(newItem);
+    return newItem;
   }
 }
 
@@ -92,6 +112,7 @@ void main() {
         originalItemNo: 'SKU_1',
         newItemNo: 'SKU_1_NEW',
         itemUPC: '8991111',
+        price: 15000,
       );
 
       expect(result.itemNo, 'SKU_1_NEW');
@@ -104,6 +125,27 @@ void main() {
       final updatedItem = notifier.state.items.firstWhere((it) => it.itemName == 'Item Satu');
       expect(updatedItem.itemNo, 'SKU_1_NEW');
       expect(updatedItem.itemUPC, '8991111');
+    });
+
+    test('createItem successfully registers a new item in repository and local cache state', () async {
+      notifier.state = notifier.state.copyWith(items: mockRepo.db);
+
+      final result = await notifier.createItem(
+        itemNo: 'SKU_NEW_PROD',
+        itemName: 'Item Baru',
+        itemUPC: '8993333',
+        categoryId: 2,
+        price: 35000,
+      );
+
+      expect(result.itemNo, 'SKU_NEW_PROD');
+      expect(result.itemName, 'Item Baru');
+      expect(result.itemUPC, '8993333');
+      expect(result.categoryId, 2);
+      expect(result.price, 35000);
+
+      expect(mockRepo.db.any((it) => it.itemNo == 'SKU_NEW_PROD'), isTrue);
+      expect(notifier.state.items.any((it) => it.itemNo == 'SKU_NEW_PROD'), isTrue);
     });
   });
 }

@@ -149,11 +149,13 @@ class ApiClient {
     required String originalItemNo,
     required String newItemNo,
     required String itemUPC,
+    required double price,
   }) async {
     try {
       final response = await _dio.put('/api/items/$originalItemNo', data: {
         'new_itemno': newItemNo,
         'itemupc': itemUPC,
+        'price': price,
       });
       if (response.statusCode == 200 && response.data != null) {
         final success = response.data['success'] as bool? ?? false;
@@ -167,6 +169,37 @@ class ApiClient {
       throw Exception(response.data?['message'] ?? 'Gagal memperbarui barcode dan SKU produk');
     } catch (e) {
       dev.log('Error in updateItemKeys: $e');
+      rethrow;
+    }
+  }
+
+  Future<ItemModel> createItem({
+    required String itemNo,
+    required String itemName,
+    required String itemUPC,
+    required int categoryId,
+    required double price,
+  }) async {
+    try {
+      final response = await _dio.post('/api/items', data: {
+        'itemno': itemNo,
+        'itemname': itemName,
+        'itemupc': itemUPC,
+        'categoryid': categoryId,
+        'price': price,
+      });
+      if (response.statusCode == 200 && response.data != null) {
+        final success = response.data['success'] as bool? ?? false;
+        if (success) {
+          final data = response.data['data'];
+          if (data != null && data is Map<String, dynamic>) {
+            return ItemModel.fromJson(data);
+          }
+        }
+      }
+      throw Exception(response.data?['message'] ?? 'Gagal menambahkan produk baru');
+    } catch (e) {
+      dev.log('Error in createItem: $e');
       rethrow;
     }
   }

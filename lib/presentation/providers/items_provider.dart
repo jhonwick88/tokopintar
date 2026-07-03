@@ -148,11 +148,13 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
     required String originalItemNo,
     required String newItemNo,
     required String itemUPC,
+    required double price,
   }) async {
     final updated = await _itemsRepository.updateItemKeys(
       originalItemNo: originalItemNo,
       newItemNo: newItemNo,
       itemUPC: itemUPC,
+      price: price,
     );
 
     final updatedList = state.items.map((item) {
@@ -164,6 +166,26 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
 
     state = state.copyWith(items: updatedList);
     return updated;
+  }
+
+  Future<ItemModel> createItem({
+    required String itemNo,
+    required String itemName,
+    required String itemUPC,
+    required int categoryId,
+    required double price,
+  }) async {
+    final newItem = await _itemsRepository.createItem(
+      itemNo: itemNo,
+      itemName: itemName,
+      itemUPC: itemUPC,
+      categoryId: categoryId,
+      price: price,
+    );
+
+    final newList = [...state.items, newItem];
+    state = state.copyWith(items: newList);
+    return newItem;
   }
 }
 
