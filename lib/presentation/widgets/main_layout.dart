@@ -3,7 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
+import '../providers/items_provider.dart';
+import '../providers/pos_provider.dart';
 import '../providers/settings_provider.dart';
+import '../screens/mobile_cart_screen.dart';
+import '../widgets/camera_scanner_dialog.dart';
 
 class MainLayout extends ConsumerWidget {
   final Widget child;
@@ -15,6 +19,99 @@ class MainLayout extends ConsumerWidget {
     required this.currentRoute,
   });
 
+  void _openCameraScanner(BuildContext context, WidgetRef ref) async {
+    final barcode = await showDialog<String>(
+      context: context,
+      builder: (context) => const CameraScannerDialog(),
+    );
+    if (barcode != null) {
+      final item = await ref.read(itemsNotifierProvider.notifier).fetchItemByBarcode(barcode);
+      if (item != null) {
+        ref.read(posNotifierProvider.notifier).addToCart(item);
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Produk ${item.itemName} ditambahkan ke keranjang'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Produk dengan barcode $barcode tidak ditemukan'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _openResumeDialog(BuildContext context, WidgetRef ref) {
+    final posState = ref.read(posNotifierProvider);
+    if (posState.heldCarts.isEmpty) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tidak ada transaksi yang ditangguhkan.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Daftar Transaksi Ditahan (Resume)'),
+          content: SizedBox(
+            width: 450,
+            height: 300,
+            child: ListView.builder(
+              itemCount: posState.heldCarts.length,
+              itemBuilder: (context, index) {
+                final held = posState.heldCarts[index];
+                return ListTile(
+                  title: Text(held.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text('Items: ${held.cartItems.length}'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () {
+                          ref.read(posNotifierProvider.notifier).voidHeldTransaction(held.id);
+                          Navigator.of(context).pop();
+                          ScaffoldMessenger.of(context).clearSnackBars();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Transaksi ditangguhkan dihapus'),
+                              backgroundColor: Colors.green,
+                              duration: Duration(seconds: 1),
+                            ),
+                          );
+                        },
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          ref.read(posNotifierProvider.notifier).resumeHeldTransaction(held.id);
+                          Navigator.of(context).pop();
+                        },
+                        child: const Text('Lanjutkan'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final width = MediaQuery.of(context).size.width;
@@ -23,13 +120,39 @@ class MainLayout extends ConsumerWidget {
     final settings = ref.watch(settingsNotifierProvider);
     final themeMode = ref.watch(themeModeProvider);
 
+    void confirmLogout(BuildContext context) {
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Konfirmasi Keluar'),
+            content: const Text('Apakah Anda yakin ingin keluar dari akun kasir saat ini?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Batal'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  ref.read(authNotifierProvider.notifier).logout();
+                },
+                child: const Text('Keluar', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        },
+      );
+    }
+
     final cashierName = authState.currentUser?.fullname ?? 'Admin';
     final cashierRole = authState.currentUser?.role.toUpperCase() ?? 'ADMIN';
 
     final navItems = [
       _NavItem(icon: Icons.point_of_sale, label: 'POS Kasir', route: '/pos'),
       _NavItem(icon: Icons.dashboard, label: 'Dashboard', route: '/dashboard'),
-      _NavItem(icon: Icons.history, label: 'Riwayat Penjualan', route: '/history'),
+      _NavItem(icon: Icons.history, label: 'Riwayat', route: '/history'),
       _NavItem(icon: Icons.settings, label: 'Pengaturan', route: '/settings'),
     ];
 
@@ -191,9 +314,7 @@ class MainLayout extends ConsumerWidget {
                               ),
                             ),
                             IconButton(
-                              onPressed: () {
-                                ref.read(authNotifierProvider.notifier).logout();
-                              },
+                              onPressed: () => confirmLogout(context),
                               icon: const Icon(Icons.logout, size: 20),
                               tooltip: 'Keluar',
                             ),
@@ -216,25 +337,62 @@ class MainLayout extends ConsumerWidget {
       int activeIndex = navItems.indexWhere((i) => currentRoute == i.route);
       if (activeIndex < 0) activeIndex = 0;
 
+      final showOuterAppBar = currentRoute == '/pos';
+
       return Scaffold(
-        appBar: AppBar(
-          title: Text(settings.shopName),
-          actions: [
-            IconButton(
-              onPressed: () {
-                ref.read(themeModeProvider.notifier).state =
-                    themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
-              },
-              icon: Icon(themeMode == ThemeMode.dark ? Icons.dark_mode : Icons.light_mode),
-            ),
-            IconButton(
-              onPressed: () {
-                ref.read(authNotifierProvider.notifier).logout();
-              },
-              icon: const Icon(Icons.logout),
-            ),
-          ],
-        ),
+        appBar: showOuterAppBar
+            ? AppBar(
+                title: TextField(
+                  style: const TextStyle(fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Cari produk... (F3)',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.qr_code_scanner, size: 20),
+                      onPressed: () => _openCameraScanner(context, ref),
+                    ),
+                    filled: true,
+                    fillColor: Theme.of(context).colorScheme.surfaceContainer,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(30),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  onChanged: (val) {
+                    ref.read(itemsNotifierProvider.notifier).search(val.trim());
+                  },
+                ),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.hourglass_empty_rounded, color: Colors.orange),
+                    onPressed: () => _openResumeDialog(context, ref),
+                    tooltip: 'Lanjutkan Transaksi Ditahan',
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12.0),
+                    child: Consumer(
+                      builder: (context, ref, child) {
+                        final posState = ref.watch(posNotifierProvider);
+                        final itemCount = posState.cartItems.fold<int>(0, (sum, item) => sum + item.qty);
+                        return Badge(
+                          label: Text('$itemCount'),
+                          isLabelVisible: itemCount > 0,
+                          child: IconButton(
+                            icon: const Icon(Icons.shopping_cart),
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(builder: (context) => const MobileCartScreen()),
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              )
+            : null,
         body: child,
         bottomNavigationBar: NavigationBar(
           selectedIndex: activeIndex,

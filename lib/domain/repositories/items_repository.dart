@@ -7,4 +7,9 @@ abstract class ItemsRepository {
   Future<ItemModel?> getItemByNo(String itemNo);
   Future<List<ItemModel>> searchItems(String query, {required int page, int limit = 50});
   Future<List<ItemModel>> getItemsByCategory(int categoryId, {required int page, int limit = 50});
+  Future<ItemModel> updateItemKeys({
+    required String originalItemNo,
+    required String newItemNo,
+    required String itemUPC,
+  });
 }

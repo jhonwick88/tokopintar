@@ -55,7 +55,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       ref.read(posNotifierProvider.notifier).addToCart(item);
       _showSuccessToast('Produk ${item.itemName} ditambahkan');
     } else {
-      _showErrorToast('Produk dengan barcode "$barcode" tidak ditemukan');
+      _showUnregisteredBarcodeDialog(barcode);
     }
   }
 
@@ -648,55 +648,54 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                       ref.read(itemsNotifierProvider.notifier).search(val.trim());
                     },
                   ),
-                )
-              else
-                const Expanded(
-                  child: Text(
-                    'Katalog Produk',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              if (isLargeScreen) ...[
+                const SizedBox(width: 12),
+                IconButton.filled(
+                  style: IconButton.styleFrom(
+                    padding: const EdgeInsets.all(16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
+                  icon: const Icon(Icons.qr_code_scanner),
+                  onPressed: _openCameraScanner,
+                  tooltip: 'Scan Barcode Kamera (F2)',
                 ),
-              const SizedBox(width: 12),
-              IconButton.filled(
-                style: IconButton.styleFrom(
-                  padding: const EdgeInsets.all(16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ],
+              if (isLargeScreen) ...[
+                const SizedBox(width: 12),
+                IconButton.filled(
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    padding: const EdgeInsets.all(16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.hourglass_empty_rounded),
+                  onPressed: _openResumeDialog,
+                  tooltip: 'Lanjutkan Transaksi Ditahan',
                 ),
-                icon: const Icon(Icons.qr_code_scanner),
-                onPressed: _openCameraScanner,
-                tooltip: 'Scan Barcode Kamera (F2)',
-              ),
-              const SizedBox(width: 8),
-              IconButton.filled(
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  padding: const EdgeInsets.all(16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                icon: const Icon(Icons.hourglass_empty_rounded),
-                onPressed: _openResumeDialog,
-                tooltip: 'Lanjutkan Transaksi Ditahan',
-              ),
-              const SizedBox(width: 8),
-              IconButton.filled(
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.teal,
-                  padding: const EdgeInsets.all(16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                icon: const Icon(Icons.bolt),
-                onPressed: _openQuickItemsBottomSheet,
-                tooltip: 'Quick Add Item',
-              ),
+              ],
+              
+
             ],
           ),
-          const SizedBox(height: 16),
+         // const SizedBox(height: 16),
           
           // Row 2: Categories filter
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
+                ActionChip(
+                  avatar: const Icon(Icons.bolt, color: Colors.teal, size: 18),
+                  label: const Text(
+                    'Quick Add',
+                    style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold),
+                  ),
+                  backgroundColor: Colors.teal.withOpacity(0.08),
+                  side: BorderSide(color: Colors.teal.withOpacity(0.3)),
+                  onPressed: _openQuickItemsBottomSheet,
+                ),
+                const SizedBox(width: 8),
                 ChoiceChip(
                   label: const Text('Semua Produk'),
                   selected: state.selectedCategoryId == null,
@@ -1111,5 +1110,208 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   String _formatRupiah(double val) {
     final formatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
     return formatter.format(val);
+  }
+
+  void _showUnregisteredBarcodeDialog(String barcode) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('Barcode Tidak Terdaftar'),
+            ],
+          ),
+          content: Text(
+            'Barcode "$barcode" belum terdaftar di sistem.\n\nApakah Anda ingin memetakan/menghubungkan barcode ini ke produk yang sudah ada?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _openQuickMappingWizard(barcode);
+              },
+              child: const Text('Ya, Petakan'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _openQuickMappingWizard(String barcode) async {
+    final allItems = ref.read(itemsNotifierProvider).items;
+
+    final selectedProduct = await showDialog<ItemModel>(
+      context: context,
+      builder: (context) => _QuickMappingSearchDialog(allItems: allItems),
+    );
+
+    if (selectedProduct == null) return;
+
+    _showMappingConfirmationDialog(selectedProduct, barcode);
+  }
+
+  void _showMappingConfirmationDialog(ItemModel product, String barcode) {
+    final barcodeController = TextEditingController(text: barcode);
+    final skuController = TextEditingController(text: product.itemNo);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Konfirmasi Pemetaan Barcode'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Produk: ${product.itemName}',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: barcodeController,
+                decoration: const InputDecoration(
+                  labelText: 'Barcode / UPC (itemUPC)',
+                  hintText: 'Masukkan Barcode',
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: skuController,
+                decoration: const InputDecoration(
+                  labelText: 'SKU / Kode Item (itemNo)',
+                  hintText: 'Masukkan SKU',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final newBarcode = barcodeController.text.trim();
+                final newSKU = skuController.text.trim();
+
+                if (newBarcode.isEmpty || newSKU.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Barcode dan SKU tidak boleh kosong')),
+                  );
+                  return;
+                }
+
+                Navigator.of(context).pop();
+
+                try {
+                  final updatedItem = await ref.read(itemsNotifierProvider.notifier).updateItemKeys(
+                    originalItemNo: product.itemNo,
+                    newItemNo: newSKU,
+                    itemUPC: newBarcode,
+                  );
+
+                  ref.read(posNotifierProvider.notifier).addToCart(updatedItem);
+
+                  _showSuccessToast('Pemetaan berhasil. Produk ditambahkan ke keranjang.');
+                } catch (e) {
+                  _showErrorToast('Gagal memetakan barcode: $e');
+                }
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _QuickMappingSearchDialog extends StatefulWidget {
+  final List<ItemModel> allItems;
+  const _QuickMappingSearchDialog({required this.allItems});
+
+  @override
+  State<_QuickMappingSearchDialog> createState() => _QuickMappingSearchDialogState();
+}
+
+class _QuickMappingSearchDialogState extends State<_QuickMappingSearchDialog> {
+  String _searchQuery = '';
+  late List<ItemModel> _filteredItems;
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredItems = widget.allItems;
+  }
+
+  void _filter(String val) {
+    setState(() {
+      _searchQuery = val.trim().toLowerCase();
+      if (_searchQuery.isEmpty) {
+        _filteredItems = widget.allItems;
+      } else {
+        _filteredItems = widget.allItems
+            .where((item) =>
+                item.itemName.toLowerCase().contains(_searchQuery) ||
+                item.itemNo.toLowerCase().contains(_searchQuery) ||
+                item.itemUPC.toLowerCase().contains(_searchQuery))
+            .toList();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Pilih Produk untuk Barcode'),
+      content: SizedBox(
+        width: double.maxFinite,
+        height: 400,
+        child: Column(
+          children: [
+            TextField(
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: 'Cari nama atau kode produk...',
+                prefixIcon: Icon(Icons.search),
+              ),
+              onChanged: _filter,
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: _filteredItems.isEmpty
+                  ? const Center(child: Text('Produk tidak ditemukan'))
+                  : ListView.builder(
+                      itemCount: _filteredItems.length,
+                      itemBuilder: (context, index) {
+                        final item = _filteredItems[index];
+                        return ListTile(
+                          title: Text(item.itemName),
+                          subtitle: Text('SKU: ${item.itemNo}'),
+                          trailing: Text('Rp ${item.price.toStringAsFixed(0)}'),
+                          onTap: () => Navigator.of(context).pop(item),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Batal'),
+        ),
+      ],
+    );
   }
 }

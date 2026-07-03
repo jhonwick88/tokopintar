@@ -32,4 +32,17 @@ class ItemsRepositoryImpl implements ItemsRepository {
   Future<List<ItemModel>> getItemsByCategory(int categoryId, {required int page, int limit = 50}) {
     return _apiClient.getItemsByCategory(categoryId, page: page, limit: limit);
   }
+
+  @override
+  Future<ItemModel> updateItemKeys({
+    required String originalItemNo,
+    required String newItemNo,
+    required String itemUPC,
+  }) {
+    return _apiClient.updateItemKeys(
+      originalItemNo: originalItemNo,
+      newItemNo: newItemNo,
+      itemUPC: itemUPC,
+    );
+  }
 }

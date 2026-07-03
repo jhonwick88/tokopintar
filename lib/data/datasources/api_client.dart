@@ -144,4 +144,30 @@ class ApiClient {
       rethrow;
     }
   }
+
+  Future<ItemModel> updateItemKeys({
+    required String originalItemNo,
+    required String newItemNo,
+    required String itemUPC,
+  }) async {
+    try {
+      final response = await _dio.put('/api/items/$originalItemNo', data: {
+        'new_itemno': newItemNo,
+        'itemupc': itemUPC,
+      });
+      if (response.statusCode == 200 && response.data != null) {
+        final success = response.data['success'] as bool? ?? false;
+        if (success) {
+          final data = response.data['data'];
+          if (data != null && data is Map<String, dynamic>) {
+            return ItemModel.fromJson(data);
+          }
+        }
+      }
+      throw Exception(response.data?['message'] ?? 'Gagal memperbarui barcode dan SKU produk');
+    } catch (e) {
+      dev.log('Error in updateItemKeys: $e');
+      rethrow;
+    }
+  }
 }

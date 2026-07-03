@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/router.dart';
 import 'dart:developer' as dev;
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,7 +13,9 @@ void main() async {
   // Attempts to load credentials, falling back to local mock databases
   // if files/keys are not yet configured in the workspace.
   try {
-    await Firebase.initializeApp();
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
     dev.log('Firebase initialized successfully.');
   } catch (e) {
     dev.log('Firebase initialization failed: $e. Operating in Mock Offline Mode.');
