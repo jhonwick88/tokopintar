@@ -9,6 +9,16 @@ class SettingsModel {
   final int printerPort;
   final String printerType; // LAN, Bluetooth, USB, Browser
   final String printerMacAddress;
+  
+  // Professional additions
+  final String adminPin;
+  final bool enableTax;
+  final double taxPercentage;
+  final bool enableServiceCharge;
+  final double serviceChargePercentage;
+  final int printerPaperSize; // 58 or 80
+  final int printReceiptCopies;
+  final bool autoPrintOnCheckout;
 
   SettingsModel({
     this.shopName = 'Toko Pintar',
@@ -21,6 +31,14 @@ class SettingsModel {
     this.printerPort = 9100,
     this.printerType = 'LAN',
     this.printerMacAddress = '',
+    this.adminPin = '1234',
+    this.enableTax = false,
+    this.taxPercentage = 0.0,
+    this.enableServiceCharge = false,
+    this.serviceChargePercentage = 0.0,
+    this.printerPaperSize = 58,
+    this.printReceiptCopies = 1,
+    this.autoPrintOnCheckout = false,
   });
 
   factory SettingsModel.fromJson(Map<String, dynamic> json) {
@@ -35,6 +53,14 @@ class SettingsModel {
       printerPort: json['printer_port'] as int? ?? 9100,
       printerType: json['printer_type'] as String? ?? 'LAN',
       printerMacAddress: json['printer_mac_address'] as String? ?? '',
+      adminPin: json['admin_pin'] as String? ?? '1234',
+      enableTax: json['enable_tax'] as bool? ?? false,
+      taxPercentage: (json['tax_percentage'] as num?)?.toDouble() ?? 0.0,
+      enableServiceCharge: json['enable_service_charge'] as bool? ?? false,
+      serviceChargePercentage: (json['service_charge_percentage'] as num?)?.toDouble() ?? 0.0,
+      printerPaperSize: json['printer_paper_size'] as int? ?? 58,
+      printReceiptCopies: json['print_receipt_copies'] as int? ?? 1,
+      autoPrintOnCheckout: json['auto_print_on_checkout'] as bool? ?? false,
     );
   }
 
@@ -50,6 +76,14 @@ class SettingsModel {
       'printer_port': printerPort,
       'printer_type': printerType,
       'printer_mac_address': printerMacAddress,
+      'admin_pin': adminPin,
+      'enable_tax': enableTax,
+      'tax_percentage': taxPercentage,
+      'enable_service_charge': enableServiceCharge,
+      'service_charge_percentage': serviceChargePercentage,
+      'printer_paper_size': printerPaperSize,
+      'print_receipt_copies': printReceiptCopies,
+      'auto_print_on_checkout': autoPrintOnCheckout,
     };
   }
 
@@ -64,6 +98,14 @@ class SettingsModel {
     int? printerPort,
     String? printerType,
     String? printerMacAddress,
+    String? adminPin,
+    bool? enableTax,
+    double? taxPercentage,
+    bool? enableServiceCharge,
+    double? serviceChargePercentage,
+    int? printerPaperSize,
+    int? printReceiptCopies,
+    bool? autoPrintOnCheckout,
   }) {
     return SettingsModel(
       shopName: shopName ?? this.shopName,
@@ -76,6 +118,14 @@ class SettingsModel {
       printerPort: printerPort ?? this.printerPort,
       printerType: printerType ?? this.printerType,
       printerMacAddress: printerMacAddress ?? this.printerMacAddress,
+      adminPin: adminPin ?? this.adminPin,
+      enableTax: enableTax ?? this.enableTax,
+      taxPercentage: taxPercentage ?? this.taxPercentage,
+      enableServiceCharge: enableServiceCharge ?? this.enableServiceCharge,
+      serviceChargePercentage: serviceChargePercentage ?? this.serviceChargePercentage,
+      printerPaperSize: printerPaperSize ?? this.printerPaperSize,
+      printReceiptCopies: printReceiptCopies ?? this.printReceiptCopies,
+      autoPrintOnCheckout: autoPrintOnCheckout ?? this.autoPrintOnCheckout,
     );
   }
 }

@@ -11,50 +11,37 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final salesState = ref.watch(salesHistoryNotifierProvider);
-
-    // Calculate Dashboard Stats
     final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day);
-    final monthStart = DateTime(now.year, now.month, 1);
 
-    double todayRevenue = 0.0;
-    int todayTxCount = 0;
-    double monthRevenue = 0.0;
+    final completedSales = salesState.sales.where((s) => s.status == 'completed').toList();
 
-    // Map to group sold items for popular items leaderboard
+    // 1. Calculate stats based on currently loaded sales (which respect active date filters)
+    double totalRevenue = 0.0;
+    int totalTransactions = completedSales.length;
+    double totalDiscounts = 0.0;
+    double cashTotal = 0.0;
+    double qrisTotal = 0.0;
+    double bankTotal = 0.0;
+
+    // Leaderboard map
     final Map<String, _TopItem> itemLeaderboard = {};
 
-    // Map to group daily sales for chart
-    final Map<int, double> dailySalesChartData = {};
-    // Pre-populate last 7 days with 0.0
-    for (int i = 6; i >= 0; i--) {
-      final dayKey = now.subtract(Duration(days: i)).day;
-      dailySalesChartData[dayKey] = 0.0;
-    }
-
-    final completedSales = salesState.sales.where((s) => s.status == 'completed');
-
     for (var sale in completedSales) {
-      final isToday = sale.date.isAfter(todayStart) || sale.date.isAtSameMomentAs(todayStart);
-      final isThisMonth = sale.date.isAfter(monthStart) || sale.date.isAtSameMomentAs(monthStart);
-
-      if (isToday) {
-        todayRevenue += sale.grandTotal;
-        todayTxCount++;
+      totalRevenue += sale.grandTotal;
+      totalDiscounts += sale.discount;
+      
+      // Payment grouping
+      if (sale.paymentMethod == 'cash') {
+        cashTotal += sale.grandTotal;
+      } else if (sale.paymentMethod == 'qris') {
+        qrisTotal += sale.grandTotal;
+      } else if (sale.paymentMethod == 'bank') {
+        bankTotal += sale.grandTotal;
       }
 
-      if (isThisMonth) {
-        monthRevenue += sale.grandTotal;
-      }
-
-      // Populate chart data (aggregate sales matching last 7 days range)
-      final saleDay = sale.date.day;
-      if (dailySalesChartData.containsKey(saleDay)) {
-        dailySalesChartData[saleDay] = (dailySalesChartData[saleDay] ?? 0.0) + sale.grandTotal;
-      }
-
-      // Group for leaderboard
+      // Group items for leaderboard
       for (var item in sale.items) {
+        totalDiscounts += item.discount;
         if (itemLeaderboard.containsKey(item.itemNo)) {
           final existing = itemLeaderboard[item.itemNo]!;
           itemLeaderboard[item.itemNo] = _TopItem(
@@ -72,26 +59,113 @@ class DashboardScreen extends ConsumerWidget {
       }
     }
 
+    final double averageBasket = totalTransactions > 0 ? totalRevenue / totalTransactions : 0.0;
+
     // Sort leaderboard by quantity sold
     final topItems = itemLeaderboard.values.toList()
       ..sort((a, b) => b.qty.compareTo(a.qty));
     final leaderboardLimit = topItems.length > 5 ? topItems.sublist(0, 5) : topItems;
 
-    // Prepare chart spots
-    final chartEntries = dailySalesChartData.entries.toList();
+    // 2. Generate dynamic line chart spots based on active range
+    final start = salesState.startDate ?? (completedSales.isEmpty ? now.subtract(const Duration(days: 30)) : completedSales.last.date);
+    final end = salesState.endDate ?? now;
+    final diffDays = end.difference(start).inDays;
+
+    final Map<String, double> chartData = {};
+
+    if (diffDays <= 1) {
+      // Group by hours (e.g. 0-23 in steps of 2)
+      for (int h = 0; h < 24; h += 2) {
+        chartData['${h.toString().padLeft(2, '0')}:00'] = 0.0;
+      }
+      for (var sale in completedSales) {
+        final hour = (sale.date.hour ~/ 2) * 2;
+        final key = '${hour.toString().padLeft(2, '0')}:00';
+        if (chartData.containsKey(key)) {
+          chartData[key] = chartData[key]! + sale.grandTotal;
+        }
+      }
+    } else if (diffDays <= 7) {
+      // Group by date (DD/MM)
+      for (int i = diffDays; i >= 0; i--) {
+        final d = end.subtract(Duration(days: i));
+        final key = DateFormat('dd/MM').format(d);
+        chartData[key] = 0.0;
+      }
+      for (var sale in completedSales) {
+        final key = DateFormat('dd/MM').format(sale.date);
+        if (chartData.containsKey(key)) {
+          chartData[key] = chartData[key]! + sale.grandTotal;
+        }
+      }
+    } else if (diffDays <= 31) {
+      // Group by date (DD/MM) with step of 2 or 1
+      final step = diffDays > 15 ? 2 : 1;
+      for (int i = diffDays; i >= 0; i -= step) {
+        final d = end.subtract(Duration(days: i));
+        final key = DateFormat('dd/MM').format(d);
+        chartData[key] = 0.0;
+      }
+      for (var sale in completedSales) {
+        final key = DateFormat('dd/MM').format(sale.date);
+        String? closestKey;
+        int minDiff = 999999;
+        for (var k in chartData.keys) {
+          final parts = k.split('/');
+          final kDay = int.parse(parts[0]);
+          final diff = (sale.date.day - kDay).abs();
+          if (diff < minDiff) {
+            minDiff = diff;
+            closestKey = k;
+          }
+        }
+        if (closestKey != null) {
+          chartData[closestKey] = chartData[closestKey]! + sale.grandTotal;
+        }
+      }
+    } else {
+      // Group by month
+      for (int i = 5; i >= 0; i--) {
+        final d = DateTime(now.year, now.month - i, 1);
+        final key = DateFormat('MMM yy').format(d);
+        chartData[key] = 0.0;
+      }
+      for (var sale in completedSales) {
+        final key = DateFormat('MMM yy').format(sale.date);
+        if (chartData.containsKey(key)) {
+          chartData[key] = chartData[key]! + sale.grandTotal;
+        }
+      }
+    }
+
+    final chartEntries = chartData.entries.toList();
     final List<FlSpot> spots = [];
     for (int i = 0; i < chartEntries.length; i++) {
       spots.add(FlSpot(i.toDouble(), chartEntries[i].value));
     }
 
-    final double maxVal = dailySalesChartData.values.fold(100000.0, (prev, val) => val > prev ? val : prev);
+    final double maxVal = chartData.values.fold(100000.0, (prev, val) => val > prev ? val : prev);
+
+    String dateRangeStr = 'Semua Waktu';
+    if (salesState.startDate != null && salesState.endDate != null) {
+      dateRangeStr = '${DateFormat('dd MMM yyyy').format(salesState.startDate!)} - ${DateFormat('dd MMM yyyy').format(salesState.endDate!)}';
+    }
 
     return MainLayout(
       currentRoute: '/dashboard',
       child: Scaffold(
         backgroundColor: Theme.of(context).colorScheme.surface,
         appBar: AppBar(
-          title: const Text('Dashboard Analitik', style: TextStyle(fontWeight: FontWeight.bold)),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Dashboard Analitik', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                dateRangeStr,
+                style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+              ),
+            ],
+          ),
           centerTitle: false,
           actions: [
             IconButton(
@@ -111,42 +185,57 @@ class DashboardScreen extends ConsumerWidget {
                 },
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Date range selectors (Chips)
+                      _buildFilterChips(context, ref, salesState),
+                      const SizedBox(height: 16),
+
                       // Stats Row
                       LayoutBuilder(
                         builder: (context, constraints) {
-                          final count = constraints.maxWidth < 700 ? 1 : 3;
+                          final count = constraints.maxWidth < 600
+                              ? 1
+                              : constraints.maxWidth < 900
+                                  ? 2
+                                  : 4;
                           return GridView.count(
                             crossAxisCount: count,
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             crossAxisSpacing: 16,
                             mainAxisSpacing: 16,
-                            childAspectRatio: 2.3,
+                            childAspectRatio: constraints.maxWidth < 600 ? 3.0 : 1.8,
                             children: [
                               _buildStatCard(
                                 context,
-                                'Penjualan Hari Ini',
-                                _formatRupiah(todayRevenue),
+                                'Pendapatan Kotor',
+                                _formatRupiah(totalRevenue),
                                 Icons.monetization_on_rounded,
                                 Colors.teal,
                               ),
                               _buildStatCard(
                                 context,
-                                'Transaksi Hari Ini',
-                                '$todayTxCount Transaksi',
+                                'Jumlah Transaksi',
+                                '$totalTransactions Transaksi',
                                 Icons.shopping_basket_rounded,
                                 Colors.orange,
                               ),
                               _buildStatCard(
                                 context,
-                                'Pendapatan Bulan Ini',
-                                _formatRupiah(monthRevenue),
-                                Icons.account_balance_wallet_rounded,
+                                'Rata-rata Belanja',
+                                _formatRupiah(averageBasket),
+                                Icons.trending_up_rounded,
                                 Colors.indigo,
+                              ),
+                              _buildStatCard(
+                                context,
+                                'Diskon Terpakai',
+                                _formatRupiah(totalDiscounts),
+                                Icons.percent_rounded,
+                                Colors.pink,
                               ),
                             ],
                           );
@@ -154,13 +243,15 @@ class DashboardScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 24),
                       
-                      // Chart and Leaderboard row
+                      // Chart, Payment distribution and Leaderboard rows
                       LayoutBuilder(
                         builder: (context, constraints) {
                           if (constraints.maxWidth < 1000) {
                             return Column(
                               children: [
-                                _buildChartCard(context, spots, chartEntries, maxVal),
+                                _buildChartCard(context, spots, chartEntries, maxVal, dateRangeStr),
+                                const SizedBox(height: 24),
+                                _buildPaymentDistributionCard(context, cashTotal, qrisTotal, bankTotal),
                                 const SizedBox(height: 24),
                                 _buildLeaderboardCard(context, leaderboardLimit),
                               ],
@@ -171,7 +262,13 @@ class DashboardScreen extends ConsumerWidget {
                               children: [
                                 Expanded(
                                   flex: 2,
-                                  child: _buildChartCard(context, spots, chartEntries, maxVal),
+                                  child: Column(
+                                    children: [
+                                      _buildChartCard(context, spots, chartEntries, maxVal, dateRangeStr),
+                                      const SizedBox(height: 24),
+                                      _buildPaymentDistributionCard(context, cashTotal, qrisTotal, bankTotal),
+                                    ],
+                                  ),
                                 ),
                                 const SizedBox(width: 24),
                                 Expanded(
@@ -190,21 +287,139 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildFilterChips(BuildContext context, WidgetRef ref, SalesHistoryState salesState) {
+    final notifier = ref.read(salesHistoryNotifierProvider.notifier);
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    
+    String activeFilter = 'all';
+    if (salesState.startDate != null && salesState.endDate != null) {
+      final start = salesState.startDate!;
+      final end = salesState.endDate!;
+      if (start.year == todayStart.year && start.month == todayStart.month && start.day == todayStart.day) {
+        activeFilter = 'today';
+      } else if (end.difference(start).inDays == 6 && end.day == now.day) {
+        activeFilter = '7days';
+      } else if (end.difference(start).inDays == 29 && end.day == now.day) {
+        activeFilter = '30days';
+      } else if (start.year == now.year && start.month == now.month && start.day == 1) {
+        activeFilter = 'month';
+      } else {
+        activeFilter = 'custom';
+      }
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          FilterChip(
+            label: const Text('Semua'),
+            selected: activeFilter == 'all',
+            onSelected: (selected) {
+              if (selected) notifier.updateDateFilter(null, null);
+            },
+          ),
+          const SizedBox(width: 8),
+          FilterChip(
+            label: const Text('Hari Ini'),
+            selected: activeFilter == 'today',
+            onSelected: (selected) {
+              if (selected) {
+                final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
+                notifier.updateDateFilter(todayStart, end);
+              }
+            },
+          ),
+          const SizedBox(width: 8),
+          FilterChip(
+            label: const Text('7 Hari Terakhir'),
+            selected: activeFilter == '7days',
+            onSelected: (selected) {
+              if (selected) {
+                final start = todayStart.subtract(const Duration(days: 6));
+                final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
+                notifier.updateDateFilter(start, end);
+              }
+            },
+          ),
+          const SizedBox(width: 8),
+          FilterChip(
+            label: const Text('30 Hari Terakhir'),
+            selected: activeFilter == '30days',
+            onSelected: (selected) {
+              if (selected) {
+                final start = todayStart.subtract(const Duration(days: 29));
+                final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
+                notifier.updateDateFilter(start, end);
+              }
+            },
+          ),
+          const SizedBox(width: 8),
+          FilterChip(
+            label: const Text('Bulan Ini'),
+            selected: activeFilter == 'month',
+            onSelected: (selected) {
+              if (selected) {
+                final start = DateTime(now.year, now.month, 1);
+                final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
+                notifier.updateDateFilter(start, end);
+              }
+            },
+          ),
+          const SizedBox(width: 8),
+          FilterChip(
+            label: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.date_range, size: 14),
+                const SizedBox(width: 4),
+                Text(activeFilter == 'custom' 
+                    ? '${DateFormat('dd/MM').format(salesState.startDate!)} - ${DateFormat('dd/MM').format(salesState.endDate!)}'
+                    : 'Kustom'),
+              ],
+            ),
+            selected: activeFilter == 'custom',
+            onSelected: (selected) async {
+              final picked = await showDateRangePicker(
+                context: context,
+                firstDate: DateTime(2025),
+                lastDate: DateTime(2030),
+                initialDateRange: salesState.startDate != null && salesState.endDate != null
+                    ? DateTimeRange(start: salesState.startDate!, end: salesState.endDate!)
+                    : null,
+              );
+              if (picked != null) {
+                final end = DateTime(picked.end.year, picked.end.month, picked.end.day, 23, 59, 59);
+                notifier.updateDateFilter(picked.start, end);
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatCard(BuildContext context, String title, String value, IconData icon, Color color) {
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.all(16.0),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+                color: color.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(icon, color: color, size: 28),
+              child: Icon(icon, color: color, size: 24),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -213,16 +428,18 @@ class DashboardScreen extends ConsumerWidget {
                   Text(
                     title,
                     style: TextStyle(
-                      fontSize: 13,
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.55),
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     value,
                     style: const TextStyle(
-                      fontSize: 20,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
+                      letterSpacing: -0.5,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -236,25 +453,55 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildChartCard(BuildContext context, List<FlSpot> spots, List<MapEntry<int, double>> entries, double maxVal) {
+  Widget _buildChartCard(BuildContext context, List<FlSpot> spots, List<MapEntry<String, double>> entries, double maxVal, String titleRange) {
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Grafik Penjualan 7 Hari Terakhir',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Tren Penjualan',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    titleRange,
+                    style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
             SizedBox(
-              height: 250,
+              height: 220,
               child: spots.isEmpty
                   ? const Center(child: Text('Tidak ada data penjualan'))
                   : LineChart(
                       LineChartData(
-                        gridData: const FlGridData(show: false),
+                        gridData: FlGridData(
+                          show: true,
+                          drawVerticalLine: false,
+                          getDrawingHorizontalLine: (value) {
+                            return FlLine(
+                              color: Colors.grey.shade100,
+                              strokeWidth: 1.5,
+                            );
+                          },
+                        ),
                         titlesData: FlTitlesData(
                           rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                           topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -268,9 +515,9 @@ class DashboardScreen extends ConsumerWidget {
                                   return Padding(
                                     padding: const EdgeInsets.only(top: 8.0),
                                     child: Text(
-                                      'Tgl ${entries[idx].key}',
+                                      entries[idx].key,
                                       style: TextStyle(
-                                        fontSize: 10,
+                                        fontSize: 9,
                                         color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                                       ),
                                     ),
@@ -287,18 +534,18 @@ class DashboardScreen extends ConsumerWidget {
                             spots: spots,
                             isCurved: true,
                             color: Theme.of(context).colorScheme.primary,
-                            barWidth: 4,
+                            barWidth: 3.5,
                             dotData: const FlDotData(show: true),
                             belowBarData: BarAreaData(
                               show: true,
-                              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                              color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
                             ),
                           ),
                         ],
                         minX: 0,
                         maxX: spots.length - 1.toDouble(),
                         minY: 0,
-                        maxY: maxVal * 1.1,
+                        maxY: maxVal * 1.15,
                       ),
                     ),
             ),
@@ -308,21 +555,136 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildLeaderboardCard(BuildContext context, List<_TopItem> topItems) {
+  Widget _buildPaymentDistributionCard(BuildContext context, double cash, double qris, double bank) {
+    final total = cash + qris + bank;
+    final hasData = total > 0;
+    
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Metode Pembayaran Terpilih',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: SizedBox(
+                    height: 130,
+                    child: !hasData
+                        ? const Center(child: Text('Tidak ada data metode pembayaran'))
+                        : PieChart(
+                            PieChartData(
+                              sectionsSpace: 3,
+                              centerSpaceRadius: 36,
+                              sections: [
+                                if (cash > 0)
+                                  PieChartSectionData(
+                                    color: Colors.teal,
+                                    value: cash,
+                                    title: '${(cash / total * 100).toStringAsFixed(0)}%',
+                                    radius: 16,
+                                    titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                                  ),
+                                if (qris > 0)
+                                  PieChartSectionData(
+                                    color: Colors.purple,
+                                    value: qris,
+                                    title: '${(qris / total * 100).toStringAsFixed(0)}%',
+                                    radius: 16,
+                                    titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                                  ),
+                                if (bank > 0)
+                                  PieChartSectionData(
+                                    color: Colors.blue,
+                                    value: bank,
+                                    title: '${(bank / total * 100).toStringAsFixed(0)}%',
+                                    radius: 16,
+                                    titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                                  ),
+                              ],
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildLegendItem('Tunai', Colors.teal, cash, total),
+                      const SizedBox(height: 8),
+                      _buildLegendItem('QRIS', Colors.purple, qris, total),
+                      const SizedBox(height: 8),
+                      _buildLegendItem('Card/EDC', Colors.blue, bank, total),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(String label, Color color, double amount, double total) {
+    final percent = total > 0 ? (amount / total * 100).toStringAsFixed(1) : '0.0';
+    return Row(
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              Text('$percent% (${_formatRupiah(amount)})', style: const TextStyle(fontSize: 9, color: Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLeaderboardCard(BuildContext context, List<_TopItem> topItems) {
+    final double maxRevenue = topItems.isNotEmpty ? topItems.first.revenue : 1.0;
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
               'Produk Terlaris',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             if (topItems.isEmpty)
               const SizedBox(
-                height: 200,
+                height: 180,
                 child: Center(child: Text('Belum ada transaksi')),
               )
             else
@@ -330,17 +692,17 @@ class DashboardScreen extends ConsumerWidget {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: topItems.length,
-                separatorBuilder: (c, i) => const Divider(height: 16, indent: 48),
+                separatorBuilder: (c, i) => const Divider(height: 20, indent: 44),
                 itemBuilder: (context, index) {
                   final item = topItems[index];
                   return Row(
                     children: [
                       Container(
-                        width: 32,
-                        height: 32,
+                        width: 28,
+                        height: 28,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                          color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
                           shape: BoxShape.circle,
                         ),
                         child: Text(
@@ -348,34 +710,46 @@ class DashboardScreen extends ConsumerWidget {
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.primary,
                             fontWeight: FontWeight.bold,
-                            fontSize: 12,
+                            fontSize: 11,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               item.name,
-                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
+                            const SizedBox(height: 4),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(2),
+                              child: LinearProgressIndicator(
+                                value: maxRevenue > 0 ? item.revenue / maxRevenue : 0.0,
+                                backgroundColor: Colors.grey.shade100,
+                                color: Theme.of(context).colorScheme.primary,
+                                minHeight: 4,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
                             Text(
                               'Terjual ${item.qty} item',
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 10,
                                 color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                               ),
                             ),
                           ],
                         ),
                       ),
+                      const SizedBox(width: 12),
                       Text(
                         _formatRupiah(item.revenue),
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                       ),
                     ],
                   );

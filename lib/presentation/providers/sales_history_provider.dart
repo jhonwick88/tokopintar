@@ -11,6 +11,8 @@ class SalesHistoryState {
   final DateTime? startDate;
   final DateTime? endDate;
   final String searchQuery;
+  final String selectedPaymentMethod;
+  final String selectedStatus;
   final bool isLoading;
   final String? errorMessage;
 
@@ -19,15 +21,25 @@ class SalesHistoryState {
     this.startDate,
     this.endDate,
     this.searchQuery = '',
+    this.selectedPaymentMethod = 'all',
+    this.selectedStatus = 'all',
     this.isLoading = false,
     this.errorMessage,
   });
 
   List<SaleModel> get filteredSales {
-    if (searchQuery.isEmpty) return sales;
-    return sales
-        .where((s) => s.invoiceNo.toLowerCase().contains(searchQuery.toLowerCase()))
-        .toList();
+    return sales.where((s) {
+      final matchesQuery = searchQuery.isEmpty || 
+          s.invoiceNo.toLowerCase().contains(searchQuery.toLowerCase());
+      
+      final matchesPayment = selectedPaymentMethod == 'all' || 
+          s.paymentMethod.toLowerCase() == selectedPaymentMethod.toLowerCase();
+          
+      final matchesStatus = selectedStatus == 'all' || 
+          s.status.toLowerCase() == selectedStatus.toLowerCase();
+          
+      return matchesQuery && matchesPayment && matchesStatus;
+    }).toList();
   }
 
   SalesHistoryState copyWith({
@@ -36,6 +48,8 @@ class SalesHistoryState {
     DateTime? endDate,
     bool clearDates = false,
     String? searchQuery,
+    String? selectedPaymentMethod,
+    String? selectedStatus,
     bool? isLoading,
     String? errorMessage,
     bool clearError = false,
@@ -45,6 +59,8 @@ class SalesHistoryState {
       startDate: clearDates ? null : (startDate ?? this.startDate),
       endDate: clearDates ? null : (endDate ?? this.endDate),
       searchQuery: searchQuery ?? this.searchQuery,
+      selectedPaymentMethod: selectedPaymentMethod ?? this.selectedPaymentMethod,
+      selectedStatus: selectedStatus ?? this.selectedStatus,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );
@@ -86,6 +102,14 @@ class SalesHistoryNotifier extends StateNotifier<SalesHistoryState> {
 
   void setSearchQuery(String query) {
     state = state.copyWith(searchQuery: query);
+  }
+
+  void setPaymentMethodFilter(String method) {
+    state = state.copyWith(selectedPaymentMethod: method);
+  }
+
+  void setStatusFilter(String status) {
+    state = state.copyWith(selectedStatus: status);
   }
 
   Future<bool> voidTransaction(String invoiceNo, String reason) async {
@@ -159,11 +183,13 @@ class SalesHistoryNotifier extends StateNotifier<SalesHistoryState> {
           settings.printerIp,
           settings.printerPort,
           printBytes,
+          copies: settings.printReceiptCopies,
         );
       } else if (settings.printerType == 'Bluetooth') {
         return await PrinterService.instance.printToBluetooth(
           settings.printerMacAddress,
           printBytes,
+          copies: settings.printReceiptCopies,
         );
       } else {
         dev.log('Mock print: Invoice $invoiceNo reprinted.');

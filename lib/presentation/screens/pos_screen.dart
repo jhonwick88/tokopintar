@@ -1162,6 +1162,14 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   ),
                 ],
               ),
+              if (state.enableServiceCharge && state.serviceCharge > 0) ...[
+                const SizedBox(height: 4),
+                _buildSummaryRow('Service Charge (${state.serviceChargePercentage.toInt()}%)', _formatRupiah(state.serviceCharge)),
+              ],
+              if (state.enableTax && state.tax > 0) ...[
+                const SizedBox(height: 4),
+                _buildSummaryRow('Pajak PPN (${state.taxPercentage.toInt()}%)', _formatRupiah(state.tax)),
+              ],
               const SizedBox(height: 8),
               const Divider(),
               const SizedBox(height: 8),

@@ -7,6 +7,8 @@ class SaleModel {
   final double subtotal;
   final double discount;
   final double grandTotal;
+  final double tax;
+  final double serviceCharge;
   final String paymentMethod; // cash, qris, bank, ewallet, split
   final double paidAmount;
   final double changeAmount;
@@ -26,6 +28,8 @@ class SaleModel {
     required this.subtotal,
     required this.discount,
     required this.grandTotal,
+    this.tax = 0.0,
+    this.serviceCharge = 0.0,
     required this.paymentMethod,
     required this.paidAmount,
     required this.changeAmount,
@@ -54,6 +58,8 @@ class SaleModel {
       subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0.0,
       discount: (json['discount'] as num?)?.toDouble() ?? 0.0,
       grandTotal: (json['grand_total'] as num?)?.toDouble() ?? 0.0,
+      tax: (json['tax'] as num?)?.toDouble() ?? 0.0,
+      serviceCharge: (json['service_charge'] as num?)?.toDouble() ?? 0.0,
       paymentMethod: json['payment_method'] as String? ?? 'cash',
       paidAmount: (json['paid_amount'] as num?)?.toDouble() ?? 0.0,
       changeAmount: (json['change_amount'] as num?)?.toDouble() ?? 0.0,
@@ -76,6 +82,8 @@ class SaleModel {
       'subtotal': subtotal,
       'discount': discount,
       'grand_total': grandTotal,
+      'tax': tax,
+      'service_charge': serviceCharge,
       'payment_method': paymentMethod,
       'paid_amount': paidAmount,
       'change_amount': changeAmount,

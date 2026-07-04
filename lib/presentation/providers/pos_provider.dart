@@ -65,12 +65,22 @@ class PosState {
   final String discountType; // 'none', 'nominal', 'percent'
   final double discountValue;
   final List<HeldCart> heldCarts;
+  
+  // Professional settings addition
+  final bool enableTax;
+  final double taxPercentage;
+  final bool enableServiceCharge;
+  final double serviceChargePercentage;
 
   PosState({
     this.cartItems = const [],
     this.discountType = 'none',
     this.discountValue = 0.0,
     this.heldCarts = const [],
+    this.enableTax = false,
+    this.taxPercentage = 0.0,
+    this.enableServiceCharge = false,
+    this.serviceChargePercentage = 0.0,
   });
 
   double get subtotal {
@@ -93,8 +103,22 @@ class PosState {
 
   double get totalDiscount => itemDiscountsTotal + transactionDiscount;
 
+  double get serviceCharge {
+    if (!enableServiceCharge) return 0.0;
+    final netSub = subtotal - totalDiscount;
+    return netSub > 0 ? netSub * (serviceChargePercentage / 100) : 0.0;
+  }
+
+  double get tax {
+    if (!enableTax) return 0.0;
+    final netSub = subtotal - totalDiscount;
+    final totalWithService = netSub + serviceCharge;
+    return totalWithService > 0 ? totalWithService * (taxPercentage / 100) : 0.0;
+  }
+
   double get grandTotal {
-    final total = subtotal - totalDiscount;
+    final netSub = subtotal - totalDiscount;
+    final total = netSub + serviceCharge + tax;
     return total > 0 ? total : 0.0;
   }
 
@@ -103,12 +127,20 @@ class PosState {
     String? discountType,
     double? discountValue,
     List<HeldCart>? heldCarts,
+    bool? enableTax,
+    double? taxPercentage,
+    bool? enableServiceCharge,
+    double? serviceChargePercentage,
   }) {
     return PosState(
       cartItems: cartItems ?? this.cartItems,
       discountType: discountType ?? this.discountType,
       discountValue: discountValue ?? this.discountValue,
       heldCarts: heldCarts ?? this.heldCarts,
+      enableTax: enableTax ?? this.enableTax,
+      taxPercentage: taxPercentage ?? this.taxPercentage,
+      enableServiceCharge: enableServiceCharge ?? this.enableServiceCharge,
+      serviceChargePercentage: serviceChargePercentage ?? this.serviceChargePercentage,
     );
   }
 }
@@ -303,6 +335,8 @@ class PosNotifier extends StateNotifier<PosState> {
       cashier: cashierName,
       subtotal: state.subtotal,
       discount: state.totalDiscount,
+      tax: state.tax,
+      serviceCharge: state.serviceCharge,
       grandTotal: state.grandTotal,
       paymentMethod: paymentMethod,
       paidAmount: paidAmount,
@@ -324,13 +358,15 @@ class PosNotifier extends StateNotifier<PosState> {
       );
 
       // 3. Print Receipt
-      final printBytes = PrinterService.instance.generateReceiptBytes(sale, settings);
-      if (settings.printerType == 'LAN') {
-        PrinterService.instance.printToLan(settings.printerIp, settings.printerPort, printBytes);
-      } else if (settings.printerType == 'Bluetooth') {
-        PrinterService.instance.printToBluetooth(settings.printerMacAddress, printBytes);
-      } else {
-        dev.log('Print Job generated. Receipt printed to output pipeline.');
+      if (settings.autoPrintOnCheckout) {
+        final printBytes = PrinterService.instance.generateReceiptBytes(sale, settings);
+        if (settings.printerType == 'LAN') {
+          PrinterService.instance.printToLan(settings.printerIp, settings.printerPort, printBytes, copies: settings.printReceiptCopies);
+        } else if (settings.printerType == 'Bluetooth') {
+          PrinterService.instance.printToBluetooth(settings.printerMacAddress, printBytes, copies: settings.printReceiptCopies);
+        } else {
+          dev.log('Print Job generated. Receipt printed to output pipeline.');
+        }
       }
 
       // 4. Clear active cart
@@ -342,6 +378,15 @@ class PosNotifier extends StateNotifier<PosState> {
     }
   }
 
+  void _syncSettings(SettingsModel settings) {
+    state = state.copyWith(
+      enableTax: settings.enableTax,
+      taxPercentage: settings.taxPercentage,
+      enableServiceCharge: settings.enableServiceCharge,
+      serviceChargePercentage: settings.serviceChargePercentage,
+    );
+  }
+
   String _formatCurrency(double amount) {
     final value = amount.toInt();
     final str = value.toString();
@@ -351,7 +396,12 @@ class PosNotifier extends StateNotifier<PosState> {
 }
 
 final posNotifierProvider = StateNotifierProvider<PosNotifier, PosState>((ref) {
-  return PosNotifier(ref);
+  final notifier = PosNotifier(ref);
+  ref.listen<SettingsModel>(settingsNotifierProvider, (prev, next) {
+    notifier._syncSettings(next);
+  });
+  notifier._syncSettings(ref.read(settingsNotifierProvider));
+  return notifier;
 });
 
 final scannedBarcodeProvider = StateProvider<String?>((ref) => null);

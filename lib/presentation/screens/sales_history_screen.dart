@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -116,6 +117,10 @@ class _PosReceiptPreview extends ConsumerWidget {
             _buildReceiptRow('Subtotal:', currencyFormatter.format(sale.subtotal)),
             if (sale.discount > 0)
               _buildReceiptRow('Diskon:', '-${currencyFormatter.format(sale.discount)}'),
+            if (sale.serviceCharge > 0)
+              _buildReceiptRow('Service Charge:', currencyFormatter.format(sale.serviceCharge)),
+            if (sale.tax > 0)
+              _buildReceiptRow('Pajak (PPN):', currencyFormatter.format(sale.tax)),
             const SizedBox(height: 4),
             _buildReceiptRow('TOTAL:', currencyFormatter.format(sale.grandTotal), bold: true),
             const Text('------------------------------------'),
@@ -400,6 +405,15 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
     final isLarge = width >= 900;
     final currencyFormatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
 
+    final activeRevenue = historyState.filteredSales
+        .where((s) => s.status != 'voided')
+        .fold(0.0, (sum, s) => sum + s.grandTotal);
+    final voidedCount = historyState.filteredSales
+        .where((s) => s.status == 'voided')
+        .length;
+    final totalDiscounts = historyState.filteredSales
+        .fold(0.0, (sum, s) => sum + s.discount);
+
     return KeyboardListener(
       focusNode: _keyboardFocusNode,
       autofocus: true,
@@ -411,6 +425,11 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
           title: const Text('Riwayat', style: TextStyle(fontWeight: FontWeight.bold)),
           centerTitle: false,
           actions: [
+            IconButton(
+              icon: const Icon(Icons.download),
+              tooltip: 'Ekspor ke CSV',
+              onPressed: () => _exportToCSV(historyState.filteredSales),
+            ),
             IconButton(
               icon: const Icon(Icons.date_range),
               onPressed: () async {
@@ -448,6 +467,51 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Column(
                   children: [
+                    // Summary Cards Grid
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _buildMetricCard(
+                              title: 'Transaksi',
+                              value: '${historyState.filteredSales.length}',
+                              icon: Icons.receipt_long,
+                              color: Colors.blue,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildMetricCard(
+                              title: 'Omzet',
+                              value: currencyFormatter.format(activeRevenue),
+                              icon: Icons.monetization_on,
+                              color: Colors.green,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildMetricCard(
+                              title: 'Void/Refund',
+                              value: '$voidedCount',
+                              icon: Icons.cancel,
+                              color: Colors.red,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildMetricCard(
+                              title: 'Diskon',
+                              value: currencyFormatter.format(totalDiscounts),
+                              icon: Icons.percent,
+                              color: Colors.purple,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Search Bar
                     TextField(
                       controller: _searchController,
                       decoration: const InputDecoration(
@@ -457,6 +521,54 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                       onChanged: (val) {
                         ref.read(salesHistoryNotifierProvider.notifier).setSearchQuery(val.trim());
                       },
+                    ),
+                    const SizedBox(height: 12),
+                    // Filters row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: historyState.selectedPaymentMethod,
+                            decoration: const InputDecoration(
+                              labelText: 'Metode Bayar',
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 'all', child: Text('Semua Metode')),
+                              DropdownMenuItem(value: 'cash', child: Text('Tunai')),
+                              DropdownMenuItem(value: 'qris', child: Text('QRIS')),
+                              DropdownMenuItem(value: 'bank', child: Text('Bank/Card')),
+                              DropdownMenuItem(value: 'ewallet', child: Text('E-Wallet')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) {
+                                ref.read(salesHistoryNotifierProvider.notifier).setPaymentMethodFilter(val);
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: historyState.selectedStatus,
+                            decoration: const InputDecoration(
+                              labelText: 'Status',
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 'all', child: Text('Semua Status')),
+                              DropdownMenuItem(value: 'completed', child: Text('Completed')),
+                              DropdownMenuItem(value: 'voided', child: Text('Voided')),
+                              DropdownMenuItem(value: 'refunded', child: Text('Refunded')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) {
+                                ref.read(salesHistoryNotifierProvider.notifier).setStatusFilter(val);
+                              }
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     Expanded(
@@ -604,5 +716,88 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
       ),
     ),
   );
+}
+
+  Widget _buildMetricCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(title, style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+                Icon(icon, size: 14, color: color),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportToCSV(List<SaleModel> sales) async {
+    try {
+      final csvBuffer = StringBuffer();
+      // CSV Headers
+      csvBuffer.writeln('Invoice No,Tanggal,Kasir,Subtotal,Diskon,Pajak,Layanan,Total,Metode Pembayaran,Status');
+      
+      for (var sale in sales) {
+        final dateStr = sale.date.toIso8601String();
+        csvBuffer.writeln(
+          '${sale.invoiceNo},'
+          '$dateStr,'
+          '"${sale.cashier}",'
+          '${sale.subtotal},'
+          '${sale.discount},'
+          '${sale.tax},'
+          '${sale.serviceCharge},'
+          '${sale.grandTotal},'
+          '${sale.paymentMethod},'
+          '${sale.status}'
+        );
+      }
+      
+      final downloadsDir = Directory('C:\\Users\\labsPintar\\Downloads');
+      late File file;
+      if (downloadsDir.existsSync()) {
+        file = File('${downloadsDir.path}\\laporan_penjualan_${DateTime.now().millisecondsSinceEpoch}.csv');
+      } else {
+        file = File('laporan_penjualan_${DateTime.now().millisecondsSinceEpoch}.csv');
+      }
+      
+      await file.writeAsString(csvBuffer.toString());
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Laporan berhasil diekspor ke: ${file.path}'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal mengekspor laporan: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 }
 }

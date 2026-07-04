@@ -12,7 +12,7 @@ class PrinterService {
 
   /// Generates the ESC/POS printing bytes for a Sale transaction.
   List<int> generateReceiptBytes(SaleModel sale, SettingsModel settings) {
-    final builder = EscPosBuilder();
+    final builder = EscPosBuilder(paperSize: settings.printerPaperSize);
 
     // 1. Initialize
     builder.initialize();
@@ -59,6 +59,12 @@ class PrinterService {
     if (sale.discount > 0) {
       builder.row('Diskon', '-${_formatCurrency(sale.discount)}');
     }
+    if (sale.serviceCharge > 0) {
+      builder.row('Service Charge', _formatCurrency(sale.serviceCharge));
+    }
+    if (sale.tax > 0) {
+      builder.row('Pajak (PPN)', _formatCurrency(sale.tax));
+    }
     builder.boldOn();
     builder.row('Total', _formatCurrency(sale.grandTotal));
     builder.boldOff();
@@ -82,7 +88,7 @@ class PrinterService {
   }
 
   /// Sends bytes to a Network (LAN) Printer
-  Future<bool> printToLan(String ip, int port, List<int> bytes) async {
+  Future<bool> printToLan(String ip, int port, List<int> bytes, {int copies = 1}) async {
     if (kIsWeb) {
       dev.log('LAN socket printing not supported directly in web browsers.');
       return false;
@@ -90,7 +96,12 @@ class PrinterService {
     try {
       dev.log('Connecting to LAN printer at $ip:$port');
       final socket = await Socket.connect(ip, port, timeout: const Duration(seconds: 3));
-      socket.add(bytes);
+      for (int i = 0; i < copies; i++) {
+        socket.add(bytes);
+        if (i < copies - 1) {
+          socket.add([0x1B, 0x64, 0x03]); // Feed 3 lines between copies
+        }
+      }
       await socket.flush();
       await socket.close();
       dev.log('LAN print sent successfully.');
@@ -102,7 +113,7 @@ class PrinterService {
   }
 
   /// Sends bytes to a Bluetooth Printer
-  Future<bool> printToBluetooth(String macAddress, List<int> bytes) async {
+  Future<bool> printToBluetooth(String macAddress, List<int> bytes, {int copies = 1}) async {
     if (kIsWeb) {
       dev.log('Bluetooth printing not supported in web browsers.');
       return false;
@@ -128,10 +139,14 @@ class PrinterService {
           return false;
         }
       }
-      dev.log('Sending print job to Bluetooth printer...');
-      final bool printResult = await PrintBluetoothThermal.writeBytes(bytes);
-      dev.log('Bluetooth print result: $printResult');
-      return printResult;
+      dev.log('Sending print job to Bluetooth printer (copies: $copies)...');
+      bool allSuccessful = true;
+      for (int i = 0; i < copies; i++) {
+        final bool printResult = await PrintBluetoothThermal.writeBytes(bytes);
+        if (!printResult) allSuccessful = false;
+      }
+      dev.log('Bluetooth print result: $allSuccessful');
+      return allSuccessful;
     } catch (e) {
       dev.log('Bluetooth printing failed: $e');
       return false;
@@ -157,9 +172,13 @@ class PrinterService {
   }
 }
 
-/// Helper class to construct raw ESC/POS byte streams for 80mm printers (48 chars wide).
+/// Helper class to construct raw ESC/POS byte streams supporting 58mm (32 chars) and 80mm (48 chars).
 class EscPosBuilder {
+  final int paperSize;
+  final int totalWidth;
   final List<int> _bytes = [];
+
+  EscPosBuilder({this.paperSize = 58}) : totalWidth = paperSize == 80 ? 48 : 32;
 
   List<int> get bytes => _bytes;
 
@@ -214,12 +233,11 @@ class EscPosBuilder {
   }
 
   void line() {
-    // 80mm printers generally support 48 columns
-    text('------------------------------------------------');
+    text('-' * totalWidth);
   }
 
   /// Aligns leftText to the left, rightText to the right, padding with spaces in between.
-  void row(String leftText, String rightText, {int totalWidth = 48}) {
+  void row(String leftText, String rightText) {
     final leftLength = leftText.length;
     final rightLength = rightText.length;
     

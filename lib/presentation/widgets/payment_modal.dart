@@ -310,11 +310,48 @@ class _PaymentModalState extends ConsumerState<PaymentModal> {
                     
                     const Divider(),
                     const SizedBox(height: 8),
-                    // Grand Total Indicator
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Total Harus Dibayar:', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                        const Text('Subtotal:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        Text(_formatRupiah(posState.subtotal), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                    if (posState.totalDiscount > 0) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Total Diskon:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                          Text('-${_formatRupiah(posState.totalDiscount)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.red)),
+                        ],
+                      ),
+                    ],
+                    if (posState.enableServiceCharge && posState.serviceCharge > 0) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Service Charge (${posState.serviceChargePercentage.toInt()}%):', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                          Text(_formatRupiah(posState.serviceCharge), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                        ],
+                      ),
+                    ],
+                    if (posState.enableTax && posState.tax > 0) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Pajak PPN (${posState.taxPercentage.toInt()}%):', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                          Text(_formatRupiah(posState.tax), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                        ],
+                      ),
+                    ],
+                    const Divider(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Total Harus Dibayar:', style: TextStyle(fontSize: 14, color: Colors.black, fontWeight: FontWeight.bold)),
                         Text(
                           _formatRupiah(grandTotal),
                           style: TextStyle(

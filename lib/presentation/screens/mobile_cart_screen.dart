@@ -280,6 +280,85 @@ class _MobileCartScreenState extends ConsumerState<MobileCartScreen> {
     );
   }
 
+  void _openDiscountDialog() {
+    final posNotifier = ref.read(posNotifierProvider.notifier);
+    final posState = ref.read(posNotifierProvider);
+    final valueController = TextEditingController(text: posState.discountValue.toInt().toString());
+    String tempType = posState.discountType == 'none' ? 'nominal' : posState.discountType;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return AlertDialog(
+              title: const Text('Diskon Transaksi'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Text('Nominal (Rp)'),
+                          selected: tempType == 'nominal',
+                          onSelected: (val) {
+                            if (val) setModalState(() => tempType = 'nominal');
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Text('Persen (%)'),
+                          selected: tempType == 'percent',
+                          onSelected: (val) {
+                            if (val) setModalState(() => tempType = 'percent');
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: valueController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      hintText: tempType == 'nominal' ? 'Masukkan Rupiah' : 'Masukkan Persen',
+                      prefixText: tempType == 'nominal' ? 'Rp ' : null,
+                      suffixText: tempType == 'percent' ? '%' : null,
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    posNotifier.applyTransactionDiscount('none', 0.0);
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Hapus Diskon', style: TextStyle(color: Colors.red)),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Batal'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final val = double.tryParse(valueController.text) ?? 0.0;
+                    posNotifier.applyTransactionDiscount(tempType, val);
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Terapkan'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final posState = ref.watch(posNotifierProvider);
@@ -504,21 +583,76 @@ class _MobileCartScreenState extends ConsumerState<MobileCartScreen> {
                               ),
                             ),
                         
-                            // 2. Total Belanja Row
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            // 2. Billing details (Subtotal, Discount, Grand Total)
+                            Column(
                               children: [
-                                const Text('Total Belanja:', style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w500)),
-                                Text(
-                                  _formatRupiah(grandTotal),
-                                  style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Theme.of(context).colorScheme.primary),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('Subtotal:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                    Text(
+                                      _formatRupiah(posState.subtotal),
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('Diskon Transaksi:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                    InkWell(
+                                      onTap: _openDiscountDialog,
+                                      child: Text(
+                                        posState.totalDiscount > 0
+                                            ? '-${_formatRupiah(posState.totalDiscount)}'
+                                            : 'Tambah Diskon',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: posState.totalDiscount > 0 ? Colors.red : Theme.of(context).colorScheme.primary,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (posState.enableServiceCharge && posState.serviceCharge > 0) ...[
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text('Service Charge (${posState.serviceChargePercentage.toInt()}%):', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                      Text(_formatRupiah(posState.serviceCharge), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                                    ],
+                                  ),
+                                ],
+                                if (posState.enableTax && posState.tax > 0) ...[
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text('Pajak PPN (${posState.taxPercentage.toInt()}%):', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                      Text(_formatRupiah(posState.tax), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                                    ],
+                                  ),
+                                ],
+                                const Divider(height: 12),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('Total Belanja:', style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.bold)),
+                                    Text(
+                                      _formatRupiah(grandTotal),
+                                      style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Theme.of(context).colorScheme.primary),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 12),
                           ],
                         ),
                       ),

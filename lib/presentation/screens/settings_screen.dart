@@ -29,6 +29,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late TextEditingController _apiUrlController;
   late TextEditingController _printerIpController;
   late TextEditingController _printerPortController;
+  
+  // Professional additions
+  late TextEditingController _adminPinController;
+  late TextEditingController _taxPercentageController;
+  late TextEditingController _serviceChargePercentageController;
+  
+  bool _enableTax = false;
+  bool _enableServiceCharge = false;
+  int _printerPaperSize = 58;
+  int _printReceiptCopies = 1;
+  bool _autoPrintOnCheckout = false;
 
   String _printerType = 'LAN';
   String _printerMacAddress = '';
@@ -53,6 +64,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _printerPortController = TextEditingController(text: settings.printerPort.toString());
     _printerType = settings.printerType;
     _printerMacAddress = settings.printerMacAddress;
+    
+    _adminPinController = TextEditingController(text: settings.adminPin);
+    _taxPercentageController = TextEditingController(text: settings.taxPercentage.toString());
+    _serviceChargePercentageController = TextEditingController(text: settings.serviceChargePercentage.toString());
+    _enableTax = settings.enableTax;
+    _enableServiceCharge = settings.enableServiceCharge;
+    _printerPaperSize = settings.printerPaperSize;
+    _printReceiptCopies = settings.printReceiptCopies;
+    _autoPrintOnCheckout = settings.autoPrintOnCheckout;
 
     // Check if the current user is already an Admin to unlock editing
     final currentUser = ref.read(authNotifierProvider).currentUser;
@@ -114,10 +134,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _apiUrlController.dispose();
     _printerIpController.dispose();
     _printerPortController.dispose();
+    _adminPinController.dispose();
+    _taxPercentageController.dispose();
+    _serviceChargePercentageController.dispose();
     super.dispose();
   }
 
   void _requestAdminUnlock() {
+    final settings = ref.read(settingsNotifierProvider);
     final pinController = TextEditingController();
     showDialog(
       context: context,
@@ -130,7 +154,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(
               labelText: 'Masukkan PIN Admin',
-              hintText: 'PIN default: 1234',
+              hintText: 'Masukkan PIN pengelola',
             ),
           ),
           actions: [
@@ -140,7 +164,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             ElevatedButton(
               onPressed: () {
-                if (pinController.text == '1234') {
+                if (pinController.text == settings.adminPin) {
                   setState(() {
                     _isEditingUnlocked = true;
                   });
@@ -176,6 +200,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       printerPort: int.tryParse(_printerPortController.text) ?? 9100,
       printerType: _printerType,
       printerMacAddress: _printerMacAddress,
+      adminPin: _adminPinController.text,
+      enableTax: _enableTax,
+      taxPercentage: double.tryParse(_taxPercentageController.text) ?? 0.0,
+      enableServiceCharge: _enableServiceCharge,
+      serviceChargePercentage: double.tryParse(_serviceChargePercentageController.text) ?? 0.0,
+      printerPaperSize: _printerPaperSize,
+      printReceiptCopies: _printReceiptCopies,
+      autoPrintOnCheckout: _autoPrintOnCheckout,
     );
 
     await ref.read(settingsNotifierProvider.notifier).updateSettings(updated);
@@ -530,6 +562,93 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 const SizedBox(height: 24),
 
+                // Section: Keamanan
+                _buildCardSection(
+                  title: 'Keamanan Akses',
+                  icon: Icons.security,
+                  children: [
+                    _buildTextField(
+                      controller: _adminPinController,
+                      label: 'PIN Otorisasi Admin',
+                      hint: '1234',
+                      obscureText: true,
+                      keyboardType: TextInputType.number,
+                      validator: (val) => val!.isEmpty ? 'PIN wajib diisi' : null,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // Section: Pajak & Layanan
+                _buildCardSection(
+                  title: 'Pajak & Layanan (PPN / Service Charge)',
+                  icon: Icons.receipt_long,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Aktifkan Pajak (PPN)', style: TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: const Text('Terapkan pajak penjualan pada transaksi checkout'),
+                            value: _enableTax,
+                            onChanged: _isEditingUnlocked
+                                ? (val) {
+                                    setState(() {
+                                      _enableTax = val;
+                                    });
+                                  }
+                                : null,
+                          ),
+                        ),
+                        if (_enableTax) ...[
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _taxPercentageController,
+                              label: 'Persentase Pajak (%)',
+                              hint: '11',
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const Divider(),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Aktifkan Biaya Layanan', style: TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: const Text('Terapkan biaya layanan katering / restoran'),
+                            value: _enableServiceCharge,
+                            onChanged: _isEditingUnlocked
+                                ? (val) {
+                                    setState(() {
+                                      _enableServiceCharge = val;
+                                    });
+                                  }
+                                : null,
+                          ),
+                        ),
+                        if (_enableServiceCharge) ...[
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _serviceChargePercentageController,
+                              label: 'Persentase Layanan (%)',
+                              hint: '5',
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
                 // Section 3: ESC/POS Thermal Printer
                 _buildCardSection(
                   title: 'Pengaturan Printer Kasir',
@@ -637,8 +756,69 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                     ],
                   ],
-                ),
-                const SizedBox(height: 24),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<int>(
+                          value: _printerPaperSize,
+                          decoration: const InputDecoration(labelText: 'Lebar Kertas Thermal'),
+                          items: const [
+                            DropdownMenuItem(value: 58, child: Text('58 mm (Kecil)')),
+                            DropdownMenuItem(value: 80, child: Text('80 mm (Standar)')),
+                          ],
+                          onChanged: _isEditingUnlocked
+                              ? (val) {
+                                  if (val != null) {
+                                    setState(() {
+                                      _printerPaperSize = val;
+                                    });
+                                  }
+                                }
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: DropdownButtonFormField<int>(
+                          value: _printReceiptCopies,
+                          decoration: const InputDecoration(labelText: 'Jumlah Cetak Nota (Rangkap)'),
+                          items: const [
+                            DropdownMenuItem(value: 1, child: Text('1 Lembar')),
+                            DropdownMenuItem(value: 2, child: Text('2 Lembar (Kasir + Pelanggan)')),
+                            DropdownMenuItem(value: 3, child: Text('3 Lembar')),
+                          ],
+                          onChanged: _isEditingUnlocked
+                              ? (val) {
+                                  if (val != null) {
+                                    setState(() {
+                                      _printReceiptCopies = val;
+                                    });
+                                  }
+                                }
+                              : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Cetak Nota Otomatis (Auto-Print)', style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Otomatis kirim perintah print setelah transaksi checkout berhasil'),
+                    value: _autoPrintOnCheckout,
+                    onChanged: _isEditingUnlocked
+                        ? (val) {
+                            setState(() {
+                              _autoPrintOnCheckout = val;
+                            });
+                          }
+                        : null,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
 
                 // Section 4: Aplikasi & Sistem
                 _buildCardSection(
