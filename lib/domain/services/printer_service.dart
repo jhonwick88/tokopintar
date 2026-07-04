@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:developer' as dev;
 import 'package:flutter/foundation.dart';
+import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import '../../data/models/sale_model.dart';
 import '../../data/models/settings_model.dart';
 
@@ -96,6 +97,43 @@ class PrinterService {
       return true;
     } catch (e) {
       dev.log('LAN printing failed: $e');
+      return false;
+    }
+  }
+
+  /// Sends bytes to a Bluetooth Printer
+  Future<bool> printToBluetooth(String macAddress, List<int> bytes) async {
+    if (kIsWeb) {
+      dev.log('Bluetooth printing not supported in web browsers.');
+      return false;
+    }
+    if (macAddress.isEmpty) {
+      dev.log('Bluetooth printing failed: Alamat MAC kosong.');
+      return false;
+    }
+    try {
+      final bool isGranted = await PrintBluetoothThermal.isPermissionBluetoothGranted;
+      if (!isGranted) {
+        dev.log('Bluetooth printing failed: Izin Bluetooth tidak diberikan.');
+        return false;
+      }
+
+      dev.log('Checking Bluetooth connection status...');
+      final bool isConnected = await PrintBluetoothThermal.connectionStatus;
+      if (!isConnected) {
+        dev.log('Connecting to Bluetooth printer at $macAddress...');
+        final bool connectResult = await PrintBluetoothThermal.connect(macPrinterAddress: macAddress);
+        if (!connectResult) {
+          dev.log('Failed to connect to Bluetooth printer.');
+          return false;
+        }
+      }
+      dev.log('Sending print job to Bluetooth printer...');
+      final bool printResult = await PrintBluetoothThermal.writeBytes(bytes);
+      dev.log('Bluetooth print result: $printResult');
+      return printResult;
+    } catch (e) {
+      dev.log('Bluetooth printing failed: $e');
       return false;
     }
   }

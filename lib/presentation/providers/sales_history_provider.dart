@@ -160,6 +160,11 @@ class SalesHistoryNotifier extends StateNotifier<SalesHistoryState> {
           settings.printerPort,
           printBytes,
         );
+      } else if (settings.printerType == 'Bluetooth') {
+        return await PrinterService.instance.printToBluetooth(
+          settings.printerMacAddress,
+          printBytes,
+        );
       } else {
         dev.log('Mock print: Invoice $invoiceNo reprinted.');
         return true;

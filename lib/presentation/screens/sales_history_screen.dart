@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../data/models/sale_model.dart';
 import '../providers/sales_history_provider.dart';
+import '../providers/settings_provider.dart';
 import '../widgets/main_layout.dart';
 
 class SalesHistoryScreen extends ConsumerStatefulWidget {
@@ -12,18 +14,19 @@ class SalesHistoryScreen extends ConsumerStatefulWidget {
   ConsumerState<SalesHistoryScreen> createState() => _SalesHistoryScreenState();
 }
 
-class _PosReceiptPreview extends StatelessWidget {
+class _PosReceiptPreview extends ConsumerWidget {
   final SaleModel sale;
 
   const _PosReceiptPreview({required this.sale});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsNotifierProvider);
     final currencyFormatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -47,8 +50,13 @@ class _PosReceiptPreview extends StatelessWidget {
                 children: [
                   const Text('STRUK BELANJA', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 4),
-                  const Text('Toko Pintar Jaya', style: TextStyle(fontWeight: FontWeight.bold)),
-                  const Text('Yogyakarta, Indonesia'),
+                  Text(settings.shopName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(settings.shopAddress),
+                  Text('Telp: ${settings.shopPhone}'),
+                  if (settings.receiptHeader.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(settings.receiptHeader, textAlign: TextAlign.center),
+                  ],
                   const Text('===================================='),
                 ],
               ),
@@ -115,13 +123,15 @@ class _PosReceiptPreview extends StatelessWidget {
             _buildReceiptRow('Kembalian:', currencyFormatter.format(sale.changeAmount)),
             const Text('===================================='),
             const SizedBox(height: 12),
-            const Align(
+            Align(
               alignment: Alignment.center,
               child: Column(
                 children: [
-                  Text('Terima Kasih atas Kunjungan Anda'),
-                  Text('Barang yang sudah dibeli'),
-                  Text('tidak dapat ditukar/dikembalikan'),
+                  if (settings.receiptFooter.isNotEmpty) ...[
+                    Text(settings.receiptFooter, textAlign: TextAlign.center),
+                    const SizedBox(height: 4),
+                  ],
+                  const Text('Terima Kasih'),
                 ],
               ),
             ),
@@ -145,11 +155,40 @@ class _PosReceiptPreview extends StatelessWidget {
 class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
   SaleModel? _selectedSale;
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _keyboardFocusNode = FocusNode();
 
   @override
   void dispose() {
+    _keyboardFocusNode.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _handleRawKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return;
+
+    final key = event.logicalKey;
+
+    if (key == LogicalKeyboardKey.f8) {
+      if (_selectedSale != null) {
+        _reprint(_selectedSale!.invoiceNo);
+      } else {
+        _reprintLastReceipt();
+      }
+    }
+  }
+
+  void _reprintLastReceipt() async {
+    final success = await ref.read(salesHistoryNotifierProvider.notifier).reprintLastReceipt();
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cetak ulang nota terakhir berhasil dikirim'), backgroundColor: Colors.green),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal cetak ulang. Riwayat transaksi kosong!'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   void _showActionDialog(String type, String title, Function(String) onSubmit) {
@@ -242,6 +281,118 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
     }
   }
 
+  void _showReceiptPreviewModal(BuildContext context, SaleModel sale) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Preview History', style: TextStyle(fontWeight: FontWeight.bold)),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          content: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            width: MediaQuery.of(context).size.width * 0.9,
+            child: SingleChildScrollView(
+              child: _PosReceiptPreview(sale: sale),
+            ),
+          ),
+          actionsPadding: const EdgeInsets.all(16),
+          actions: [
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (sale.status == 'completed') ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            _showActionDialog(
+                              'refund',
+                              'Refund Transaksi',
+                              (reason) => _processRefund(sale.invoiceNo, reason),
+                            );
+                          },
+                          icon: const Icon(Icons.assignment_return, color: Colors.orange),
+                          label: const Text('Refund', style: TextStyle(color: Colors.orange)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            _showActionDialog(
+                              'void',
+                              'Void Transaksi',
+                              (reason) => _processVoid(sale.invoiceNo, reason),
+                            );
+                          },
+                          icon: const Icon(Icons.cancel, color: Colors.red),
+                          label: const Text('Void', style: TextStyle(color: Colors.red)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          foregroundColor: Colors.grey.shade700,
+                          side: BorderSide(color: Colors.grey.shade400),
+                        ),
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close),
+                        label: const Text('Tutup'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: () {
+                          _reprint(sale.invoiceNo);
+                          Navigator.of(context).pop();
+                        },
+                        icon: const Icon(Icons.print),
+                        label: const Text('Cetak Ulang'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final historyState = ref.watch(salesHistoryNotifierProvider);
@@ -249,9 +400,13 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
     final isLarge = width >= 900;
     final currencyFormatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
 
-    return MainLayout(
-      currentRoute: '/history',
-      child: Scaffold(
+    return KeyboardListener(
+      focusNode: _keyboardFocusNode,
+      autofocus: true,
+      onKeyEvent: _handleRawKeyEvent,
+      child: MainLayout(
+        currentRoute: '/history',
+        child: Scaffold(
         appBar: AppBar(
           title: const Text('Riwayat', style: TextStyle(fontWeight: FontWeight.bold)),
           centerTitle: false,
@@ -360,6 +515,9 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                         setState(() {
                                           _selectedSale = sale;
                                         });
+                                        if (!isLarge) {
+                                          _showReceiptPreviewModal(context, sale);
+                                        }
                                       },
                                     );
                                   },
@@ -444,6 +602,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

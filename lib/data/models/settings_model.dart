@@ -8,6 +8,7 @@ class SettingsModel {
   final String printerIp;
   final int printerPort;
   final String printerType; // LAN, Bluetooth, USB, Browser
+  final String printerMacAddress;
 
   SettingsModel({
     this.shopName = 'Toko Pintar',
@@ -19,6 +20,7 @@ class SettingsModel {
     this.printerIp = '192.168.1.100',
     this.printerPort = 9100,
     this.printerType = 'LAN',
+    this.printerMacAddress = '',
   });
 
   factory SettingsModel.fromJson(Map<String, dynamic> json) {
@@ -32,6 +34,7 @@ class SettingsModel {
       printerIp: json['printer_ip'] as String? ?? '192.168.1.100',
       printerPort: json['printer_port'] as int? ?? 9100,
       printerType: json['printer_type'] as String? ?? 'LAN',
+      printerMacAddress: json['printer_mac_address'] as String? ?? '',
     );
   }
 
@@ -46,6 +49,7 @@ class SettingsModel {
       'printer_ip': printerIp,
       'printer_port': printerPort,
       'printer_type': printerType,
+      'printer_mac_address': printerMacAddress,
     };
   }
 
@@ -59,6 +63,7 @@ class SettingsModel {
     String? printerIp,
     int? printerPort,
     String? printerType,
+    String? printerMacAddress,
   }) {
     return SettingsModel(
       shopName: shopName ?? this.shopName,
@@ -70,6 +75,7 @@ class SettingsModel {
       printerIp: printerIp ?? this.printerIp,
       printerPort: printerPort ?? this.printerPort,
       printerType: printerType ?? this.printerType,
+      printerMacAddress: printerMacAddress ?? this.printerMacAddress,
     );
   }
 }

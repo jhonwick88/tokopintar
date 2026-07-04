@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
+import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/settings_model.dart';
 import '../../domain/services/printer_service.dart';
@@ -30,6 +31,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late TextEditingController _printerPortController;
 
   String _printerType = 'LAN';
+  String _printerMacAddress = '';
+  List<BluetoothInfo> _bluetoothDevices = [];
+  bool _isScanningBluetooth = false;
+  bool _isTestingPrinter = false;
   bool _isEditingUnlocked = false;
   bool _isTestingConnection = false;
   String? _connectionStatus;
@@ -47,11 +52,55 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _printerIpController = TextEditingController(text: settings.printerIp);
     _printerPortController = TextEditingController(text: settings.printerPort.toString());
     _printerType = settings.printerType;
+    _printerMacAddress = settings.printerMacAddress;
 
     // Check if the current user is already an Admin to unlock editing
     final currentUser = ref.read(authNotifierProvider).currentUser;
     if (currentUser?.role == 'admin') {
       _isEditingUnlocked = true;
+    }
+
+    if (_printerType == 'Bluetooth') {
+      Future.delayed(Duration.zero, () {
+        _scanBluetoothDevices();
+      });
+    }
+  }
+
+  Future<void> _scanBluetoothDevices() async {
+    setState(() {
+      _isScanningBluetooth = true;
+    });
+    try {
+      final bool isGranted = await PrintBluetoothThermal.isPermissionBluetoothGranted;
+      if (!isGranted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Akses perangkat terdekat (Bluetooth) diperlukan untuk mendeteksi printer.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        setState(() {
+          _isScanningBluetooth = false;
+        });
+        return;
+      }
+
+      final devices = await PrintBluetoothThermal.pairedBluetooths;
+      setState(() {
+        _bluetoothDevices = devices;
+      });
+      if (_printerMacAddress.isEmpty && devices.isNotEmpty) {
+        _printerMacAddress = devices.first.macAdress;
+      }
+    } catch (e) {
+      debugPrint('Gagal memindai perangkat Bluetooth: $e');
+    } finally {
+      setState(() {
+        _isScanningBluetooth = false;
+      });
     }
   }
 
@@ -126,6 +175,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       printerIp: _printerIpController.text,
       printerPort: int.tryParse(_printerPortController.text) ?? 9100,
       printerType: _printerType,
+      printerMacAddress: _printerMacAddress,
     );
 
     await ref.read(settingsNotifierProvider.notifier).updateSettings(updated);
@@ -233,7 +283,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     builder.text(_shopNameController.text);
     builder.boldOff();
     builder.text('Printer Type: $_printerType');
-    builder.text('IP: ${_printerIpController.text}:${_printerPortController.text}');
+    if (_printerType == 'LAN') {
+      builder.text('IP: ${_printerIpController.text}:${_printerPortController.text}');
+    } else if (_printerType == 'Bluetooth') {
+      builder.text('MAC: $_printerMacAddress');
+    }
     builder.line();
     builder.text('Printer ESC/POS 80mm works!');
     builder.feed(3);
@@ -252,6 +306,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Koneksi printer LAN gagal!'), backgroundColor: Colors.red),
+        );
+      }
+    } else if (_printerType == 'Bluetooth') {
+      setState(() {
+        _isTestingPrinter = true;
+      });
+      final success = await PrinterService.instance.printToBluetooth(
+        _printerMacAddress,
+        builder.bytes,
+      );
+      setState(() {
+        _isTestingPrinter = false;
+      });
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Test print terkirim ke printer Bluetooth'), backgroundColor: Colors.green),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Koneksi printer Bluetooth gagal! Pastikan perangkat aktif.'), backgroundColor: Colors.red),
         );
       }
     } else {
@@ -466,6 +540,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         Expanded(
                           flex: isDesktop ? 3 : 3,
                           child: DropdownButtonFormField<String>(
+                            isExpanded: true,
                             value: _printerType,
                             decoration: const InputDecoration(labelText: 'Tipe Koneksi Printer'),
                             items: ['LAN', 'Bluetooth', 'USB', 'Browser'].map((type) {
@@ -476,31 +551,91 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                     if (val != null) {
                                       setState(() {
                                         _printerType = val;
+                                        if (_printerType == 'Bluetooth') {
+                                          _scanBluetoothDevices();
+                                        }
                                       });
                                     }
                                   }
                                 : null,
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          flex: isDesktop ? 1 : 2,
-                          child: _buildTextField(
-                            controller: _printerPortController,
-                            label: 'Port',
-                            hint: '9100',
-                            keyboardType: TextInputType.number,
+                        if (_printerType == 'LAN') ...[
+                          const SizedBox(width: 16),
+                          Expanded(
+                            flex: isDesktop ? 1 : 2,
+                            child: _buildTextField(
+                              controller: _printerPortController,
+                              label: 'Port',
+                              hint: '9100',
+                              keyboardType: TextInputType.number,
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    if (_printerType == 'LAN')
+                    if (_printerType == 'LAN') ...[
+                      const SizedBox(height: 16),
                       _buildTextField(
                         controller: _printerIpController,
                         label: 'IP Address Printer',
                         hint: '192.168.1.100',
                       ),
+                    ],
+                    if (_printerType == 'Bluetooth') ...[
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              isExpanded: true,
+                              value: _printerMacAddress.isEmpty ? null : _printerMacAddress,
+                              decoration: const InputDecoration(
+                                labelText: 'Pilih Printer Bluetooth',
+                                prefixIcon: Icon(Icons.bluetooth),
+                              ),
+                              items: _bluetoothDevices.map((device) {
+                                return DropdownMenuItem<String>(
+                                  value: device.macAdress,
+                                  child: Text(
+                                    '${device.name} (${device.macAdress})',
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: _isEditingUnlocked
+                                  ? (val) {
+                                      if (val != null) {
+                                        setState(() {
+                                          _printerMacAddress = val;
+                                        });
+                                      }
+                                    }
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          IconButton.filled(
+                            style: IconButton.styleFrom(
+                              padding: const EdgeInsets.all(16),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            icon: _isScanningBluetooth
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Icon(Icons.refresh),
+                            onPressed: (_isScanningBluetooth || !_isEditingUnlocked)
+                                ? null
+                                : _scanBluetoothDevices,
+                            tooltip: 'Pindai Perangkat',
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 24),
@@ -553,8 +688,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      onPressed: _printTestPage,
-                      icon: const Icon(Icons.receipt_long_rounded),
+                      onPressed: _isTestingPrinter ? null : _printTestPage,
+                      icon: _isTestingPrinter
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.receipt_long_rounded),
                       label: const Text('Cetak Hal Uji'),
                     ),
                     const SizedBox(width: 16),

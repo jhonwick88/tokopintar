@@ -327,6 +327,8 @@ class PosNotifier extends StateNotifier<PosState> {
       final printBytes = PrinterService.instance.generateReceiptBytes(sale, settings);
       if (settings.printerType == 'LAN') {
         PrinterService.instance.printToLan(settings.printerIp, settings.printerPort, printBytes);
+      } else if (settings.printerType == 'Bluetooth') {
+        PrinterService.instance.printToBluetooth(settings.printerMacAddress, printBytes);
       } else {
         dev.log('Print Job generated. Receipt printed to output pipeline.');
       }

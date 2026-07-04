@@ -14,6 +14,7 @@ import '../widgets/payment_modal.dart';
 import 'mobile_cart_screen.dart';
 import '../providers/quick_items_provider.dart';
 import 'quick_add_item_settings_screen.dart';
+import '../providers/settings_provider.dart';
 
 class PosScreen extends ConsumerStatefulWidget {
   const PosScreen({super.key});
@@ -24,6 +25,7 @@ class PosScreen extends ConsumerStatefulWidget {
 
 class _PosScreenState extends ConsumerState<PosScreen> {
   final FocusNode _searchFocusNode = FocusNode();
+  final FocusNode _keyboardFocusNode = FocusNode();
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _catalogScrollController = ScrollController();
   final AudioPlayer _audioPlayer = AudioPlayer();
@@ -37,6 +39,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   @override
   void dispose() {
     _searchFocusNode.dispose();
+    _keyboardFocusNode.dispose();
     _searchController.dispose();
     _catalogScrollController.dispose();
     _audioPlayer.dispose();
@@ -608,7 +611,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     return BarcodeKeyboardListener(
       onBarcodeScanned: _onBarcodeScanned,
       child: KeyboardListener(
-        focusNode: FocusNode(),
+        focusNode: _keyboardFocusNode,
         autofocus: true,
         onKeyEvent: _handleRawKeyEvent,
         child: MainLayout(
@@ -689,6 +692,19 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   onPressed: _openResumeDialog,
                   tooltip: 'Lanjutkan Transaksi Ditahan',
                 ),
+                const SizedBox(width: 12),
+                IconButton.filled(
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.blueGrey,
+                    padding: const EdgeInsets.all(16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () {
+                    ref.read(itemsNotifierProvider.notifier).initCatalog();
+                  },
+                  tooltip: 'Muat Ulang Katalog (Refresh)',
+                ),
               ],
               
 
@@ -742,25 +758,63 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 ? Center(
                     child: state.isLoading
                         ? const CircularProgressIndicator()
-                        : Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.search_off_rounded, size: 64, color: Colors.grey),
-                              const SizedBox(height: 12),
-                              const Text(
-                                'Tidak ada produk ditemukan',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        : state.errorMessage != null
+                            ? Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.cloud_off_rounded,
+                                    size: 64,
+                                    color: Colors.redAccent,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Gagal Terhubung ke Server',
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                  ),
+                                  // const SizedBox(height: 8),
+                                  // Padding(
+                                  //   padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                                  //   child: Text(
+                                  //     state.errorMessage!,
+                                  //     textAlign: TextAlign.center,
+                                  //     style: const TextStyle(color: Colors.grey),
+                                  //   ),
+                                  // ),
+                                  const SizedBox(height: 24),
+                                  ElevatedButton.icon(
+                                    onPressed: () {
+                                      ref.read(itemsNotifierProvider.notifier).initCatalog();
+                                    },
+                                    icon: const Icon(Icons.refresh),
+                                    label: const Text('Coba Hubungkan Kembali'),
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.search_off_rounded, size: 64, color: Colors.grey),
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    'Tidak ada produk ditemukan',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  ElevatedButton.icon(
+                                    onPressed: () {
+                                      _openAddProductPage(itemName: state.searchQuery);
+                                    },
+                                    icon: const Icon(Icons.add),
+                                    label: const Text('Tambah Produk Baru'),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 12),
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  _openAddProductPage(itemName: state.searchQuery);
-                                },
-                                icon: const Icon(Icons.add),
-                                label: const Text('Tambah Produk Baru'),
-                              ),
-                            ],
-                          ),
                   )
                 : isLargeScreen
                     ? GridView.builder(
@@ -1199,7 +1253,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             children: [
               Icon(Icons.warning_amber_rounded, color: Colors.orange),
               SizedBox(width: 8),
-              Text('Barcode Tidak Terdaftar'),
+              Text('Barcode Unregistered'),
             ],
           ),
           content: Text(
@@ -1231,11 +1285,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   }
 
   void _openQuickMappingWizard(String barcode) async {
-    final allItems = ref.read(itemsNotifierProvider).items;
-
     final selectedProduct = await showDialog<ItemModel>(
       context: context,
-      builder: (context) => _QuickMappingSearchDialog(allItems: allItems),
+      builder: (context) => const _QuickMappingSearchDialog(),
     );
 
     if (selectedProduct == null) return;
@@ -1309,7 +1361,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
                   _showSuccessToast('Pemetaan berhasil. Produk ditambahkan ke keranjang.');
                 } catch (e) {
-                  _showErrorToast('Gagal memetakan barcode: $e');
+                  final cleanMsg = _cleanErrorMessage(e, 'Gagal memetakan barcode');
+                  _showErrorToast(cleanMsg);
                   debugPrint('Gagal memetakan barcode: $e');
                 }
               },
@@ -1405,7 +1458,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   );
                   _showSuccessToast('Produk berhasil diperbarui');
                 } catch (e) {
-                  _showErrorToast('Gagal memperbarui produk: $e');
+                  final cleanMsg = _cleanErrorMessage(e, 'Gagal memperbarui produk');
+                  _showErrorToast(cleanMsg);
                 }
               },
               child: const Text('Simpan'),
@@ -1477,38 +1531,69 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   }
 }
 
-class _QuickMappingSearchDialog extends StatefulWidget {
-  final List<ItemModel> allItems;
-  const _QuickMappingSearchDialog({required this.allItems});
+class _QuickMappingSearchDialog extends ConsumerStatefulWidget {
+  const _QuickMappingSearchDialog();
 
   @override
-  State<_QuickMappingSearchDialog> createState() => _QuickMappingSearchDialogState();
+  ConsumerState<_QuickMappingSearchDialog> createState() => _QuickMappingSearchDialogState();
 }
 
-class _QuickMappingSearchDialogState extends State<_QuickMappingSearchDialog> {
+class _QuickMappingSearchDialogState extends ConsumerState<_QuickMappingSearchDialog> {
   String _searchQuery = '';
-  late List<ItemModel> _filteredItems;
+  List<ItemModel> _filteredItems = [];
+  bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _filteredItems = widget.allItems;
+    _fetchItems();
   }
 
-  void _filter(String val) {
+  Future<void> _fetchItems() async {
     setState(() {
-      _searchQuery = val.trim().toLowerCase();
-      if (_searchQuery.isEmpty) {
-        _filteredItems = widget.allItems;
-      } else {
-        _filteredItems = widget.allItems
-            .where((item) =>
-                item.itemName.toLowerCase().contains(_searchQuery) ||
-                item.itemNo.toLowerCase().contains(_searchQuery) ||
-                item.itemUPC.toLowerCase().contains(_searchQuery))
-            .toList();
-      }
+      _isLoading = true;
+      _errorMessage = null;
     });
+
+    try {
+      final items = await ref.read(itemsRepositoryProvider).getItems(page: 1, limit: 100);
+      setState(() {
+        _filteredItems = items;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Gagal memuat produk dari server';
+      });
+    }
+  }
+
+  Future<void> _filter(String val) async {
+    final query = val.trim();
+    setState(() {
+      _searchQuery = query;
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final items = await ref.read(itemsRepositoryProvider).searchItems(query, page: 1, limit: 100);
+      if (_searchQuery == query) {
+        setState(() {
+          _filteredItems = items;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (_searchQuery == query) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Gagal mencari produk';
+        });
+      }
+    }
   }
 
   @override
@@ -1530,20 +1615,42 @@ class _QuickMappingSearchDialogState extends State<_QuickMappingSearchDialog> {
             ),
             const SizedBox(height: 12),
             Expanded(
-              child: _filteredItems.isEmpty
-                  ? const Center(child: Text('Produk tidak ditemukan'))
-                  : ListView.builder(
-                      itemCount: _filteredItems.length,
-                      itemBuilder: (context, index) {
-                        final item = _filteredItems[index];
-                        return ListTile(
-                          title: Text(item.itemName),
-                          subtitle: Text('SKU: ${item.itemNo}'),
-                          trailing: Text('Rp ${item.price.toStringAsFixed(0)}'),
-                          onTap: () => Navigator.of(context).pop(item),
-                        );
-                      },
-                    ),
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _errorMessage != null
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+                              const SizedBox(height: 8),
+                              ElevatedButton(
+                                onPressed: () {
+                                  if (_searchQuery.isEmpty) {
+                                    _fetchItems();
+                                  } else {
+                                    _filter(_searchQuery);
+                                  }
+                                },
+                                child: const Text('Coba Lagi'),
+                              ),
+                            ],
+                          ),
+                        )
+                      : _filteredItems.isEmpty
+                          ? const Center(child: Text('Produk tidak ditemukan'))
+                          : ListView.builder(
+                              itemCount: _filteredItems.length,
+                              itemBuilder: (context, index) {
+                                final item = _filteredItems[index];
+                                return ListTile(
+                                  title: Text(item.itemName),
+                                  subtitle: Text('SKU: ${item.itemNo}'),
+                                  trailing: Text('Rp ${item.price.toStringAsFixed(0)}'),
+                                  onTap: () => Navigator.of(context).pop(item),
+                                );
+                              },
+                            ),
             ),
           ],
         ),
@@ -1749,9 +1856,10 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
                     } catch (e) {
                       Navigator.of(context).pop(); // Dismiss loading
                       debugPrint('Gagal menyimpan produk: $e');
+                      final cleanMsg = _cleanErrorMessage(e, 'Gagal menyimpan produk');
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Gagal menyimpan produk: $e'),
+                          content: Text(cleanMsg),
                           backgroundColor: Colors.red,
                         ),
                       );
@@ -1769,5 +1877,36 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
       ),
     );
   }
+}
+
+String _cleanErrorMessage(dynamic error, String defaultMsg) {
+  final errorStr = error.toString().toLowerCase();
+
+  if (errorStr.contains('ie_item_itemupc') ||
+      (errorStr.contains('duplicate value') && errorStr.contains('itemupc')) ||
+      (errorStr.contains('duplicate') && errorStr.contains('barcode')) ||
+      (errorStr.contains('duplicate') && errorStr.contains('upc'))) {
+    return 'Barcode/UPC ini sudah terdaftar pada produk lain. Silakan periksa kembali daftar produk Anda.';
+  }
+
+  if (errorStr.contains('itemno') &&
+      (errorStr.contains('duplicate') ||
+          errorStr.contains('unique') ||
+          errorStr.contains('attempt to store duplicate value'))) {
+    return 'SKU/Kode Item ini sudah terdaftar pada produk lain. Silakan gunakan SKU yang berbeda.';
+  }
+
+  if (errorStr.contains('connection refused') ||
+      errorStr.contains('socketexception') ||
+      errorStr.contains('network') ||
+      errorStr.contains('failed to connect')) {
+    return 'Gagal menghubungkan ke server. Pastikan REST API sudah aktif.';
+  }
+
+  String message = error.toString();
+  if (message.startsWith('Exception: ')) {
+    message = message.substring(11);
+  }
+  return '$defaultMsg: $message';
 }
 

@@ -47,6 +47,7 @@ dependencies:
   uuid: ^4.3.3
   esc_pos_utils_plus: ^2.0.3
   audioplayers: ^6.7.1
+  print_bluetooth_thermal: ^1.2.0
 
 dev_dependencies:
   flutter_test:

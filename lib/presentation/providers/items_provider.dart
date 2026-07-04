@@ -131,17 +131,30 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
   }
 
   Future<ItemModel?> fetchItemByBarcode(String barcode) async {
+    // 1. Check local state cache first
     for (var item in state.items) {
       if (item.itemUPC == barcode || item.itemNo == barcode) {
         return item;
       }
     }
+    
+    // 2. Try fetching by SKU/itemNo directly
     try {
       final item = await _itemsRepository.getItemByNo(barcode);
-      return item;
-    } catch (_) {
-      return null;
-    }
+      if (item != null) return item;
+    } catch (_) {}
+    
+    // 3. Search database using REST API search endpoint (searches itemUPC, itemNo, itemName)
+    try {
+      final results = await _itemsRepository.searchItems(barcode, page: 1, limit: 10);
+      for (var item in results) {
+        if (item.itemUPC == barcode || item.itemNo == barcode) {
+          return item;
+        }
+      }
+    } catch (_) {}
+    
+    return null;
   }
 
   Future<ItemModel> updateItemKeys({
