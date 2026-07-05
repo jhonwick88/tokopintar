@@ -755,7 +755,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ],
                       ),
                     ],
-                  ],
                   const Divider(),
                   const SizedBox(height: 8),
                   Row(
@@ -935,11 +934,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     required String label,
     String? hint,
     TextInputType keyboardType = TextInputType.text,
+    bool obscureText = false,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
+      obscureText: obscureText,
       enabled: _isEditingUnlocked,
       validator: validator,
       decoration: InputDecoration(
