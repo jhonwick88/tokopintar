@@ -43,24 +43,23 @@ class BarcodeKeyboardListener extends StatefulWidget {
 class _BarcodeKeyboardListenerState extends State<BarcodeKeyboardListener> {
   final StringBuffer _buffer = StringBuffer();
   DateTime _lastKeyEventTime = DateTime.now();
-  final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
-    // Add to raw barcode listeners
     BarcodeService.instance.addBarcodeListener(widget.onBarcodeScanned);
+    HardwareKeyboard.instance.addHandler(_handleGlobalKeyEvent);
   }
 
   @override
   void dispose() {
     BarcodeService.instance.removeBarcodeListener(widget.onBarcodeScanned);
-    _focusNode.dispose();
+    HardwareKeyboard.instance.removeHandler(_handleGlobalKeyEvent);
     super.dispose();
   }
 
-  void _handleKeyEvent(KeyEvent event) {
-    if (event is! KeyDownEvent) return;
+  bool _handleGlobalKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
 
     final now = DateTime.now();
     final elapsed = now.difference(_lastKeyEventTime).inMilliseconds;
@@ -69,7 +68,7 @@ class _BarcodeKeyboardListenerState extends State<BarcodeKeyboardListener> {
     // A hardware scanner typed character interval is typically < 50ms.
     // If the time between keypresses is too long (e.g. > 100ms), it's probably human typing.
     // We clear the buffer if it is human typing, unless the buffer is empty.
-    if (elapsed > 100 && _buffer.isNotEmpty) {
+    if (elapsed > 80 && _buffer.isNotEmpty) {
       _buffer.clear();
     }
 
@@ -81,26 +80,31 @@ class _BarcodeKeyboardListenerState extends State<BarcodeKeyboardListener> {
         _buffer.clear();
         if (barcode.length >= 3) {
           widget.onBarcodeScanned(barcode);
+          return true; // Consume Enter key so it doesn't submit other focused text fields
         }
       }
     } else {
-      // Intercept numeric and alphabetic characters
+      // Intercept numeric and alphanumeric characters
       final char = event.character;
-      if (char != null && char.isNotEmpty) {
+      if (char != null && char.isNotEmpty && RegExp(r'^[a-zA-Z0-9]$').hasMatch(char)) {
         _buffer.write(char);
-      } else if (logicalKey.keyLabel.isNotEmpty && logicalKey.keyLabel.length == 1) {
+        // If keys are typed extremely fast, it is definitely a barcode scanner.
+        // Consume the key event so it doesn't get typed into focused inputs.
+        if (elapsed < 35) {
+          return true; 
+        }
+      } else if (logicalKey.keyLabel.isNotEmpty && logicalKey.keyLabel.length == 1 && RegExp(r'^[a-zA-Z0-9]$').hasMatch(logicalKey.keyLabel)) {
         _buffer.write(logicalKey.keyLabel);
+        if (elapsed < 35) {
+          return true;
+        }
       }
     }
+    return false;
   }
 
   @override
   Widget build(BuildContext context) {
-    return KeyboardListener(
-      focusNode: _focusNode,
-      autofocus: true,
-      onKeyEvent: _handleKeyEvent,
-      child: widget.child,
-    );
+    return widget.child;
   }
 }

@@ -34,10 +34,12 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   void initState() {
     super.initState();
     _catalogScrollController.addListener(_onScroll);
+    HardwareKeyboard.instance.addHandler(_handleGlobalKeyEvent);
   }
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleGlobalKeyEvent);
     _searchFocusNode.dispose();
     _keyboardFocusNode.dispose();
     _searchController.dispose();
@@ -92,22 +94,28 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   }
 
   // --- KEYBOARD SHORTCUTS CONTROLLER ---
-  void _handleRawKeyEvent(KeyEvent event) {
-    if (event is! KeyDownEvent) return;
+  bool _handleGlobalKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
 
     final key = event.logicalKey;
 
     if (key == LogicalKeyboardKey.f2) {
       _openCameraScanner();
+      return true;
     } else if (key == LogicalKeyboardKey.f3) {
       _searchFocusNode.requestFocus();
+      return true;
     } else if (key == LogicalKeyboardKey.f4) {
       _openPaymentCheckout();
+      return true;
     } else if (key == LogicalKeyboardKey.f8) {
       _reprintLastNota();
+      return true;
     } else if (key == LogicalKeyboardKey.escape) {
       _voidCurrentCart();
+      return true;
     }
+    return false;
   }
 
   Future<void> _openCameraScanner() async {
@@ -610,13 +618,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
     return BarcodeKeyboardListener(
       onBarcodeScanned: _onBarcodeScanned,
-      child: KeyboardListener(
-        focusNode: _keyboardFocusNode,
-        autofocus: true,
-        onKeyEvent: _handleRawKeyEvent,
-        child: MainLayout(
-          currentRoute: '/pos',
-          child: Scaffold(
+      child: MainLayout(
+        currentRoute: '/pos',
+        child: Scaffold(
             body: isLargeScreen
                 ? Row(
                     children: [
@@ -639,8 +643,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 : _buildCatalogSection(itemsState),
           ),
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildCatalogSection(ItemsState state) {
@@ -705,13 +708,14 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   },
                   tooltip: 'Muat Ulang Katalog (Refresh)',
                 ),
+                
               ],
               
 
             ],
           ),
-         // const SizedBox(height: 16),
-          
+         // ,
+          isLargeScreen? const SizedBox(height: 16) : SizedBox(height: 2),
           // Row 2: Categories filter
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,

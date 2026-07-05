@@ -191,6 +191,12 @@ class SalesHistoryNotifier extends StateNotifier<SalesHistoryState> {
           printBytes,
           copies: settings.printReceiptCopies,
         );
+      } else if (settings.printerType == 'USB') {
+        return await PrinterService.instance.printToWindows(
+          settings.printerMacAddress,
+          sale,
+          settings,
+        );
       } else {
         dev.log('Mock print: Invoice $invoiceNo reprinted.');
         return true;

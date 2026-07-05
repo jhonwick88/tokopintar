@@ -91,6 +91,7 @@ class _CameraScannerDialogState extends State<CameraScannerDialog> {
                 Expanded(
                   child: TextField(
                     controller: _manualController,
+                    autofocus: true,
                     decoration: const InputDecoration(
                       hintText: 'Masukkan UPC / Barcode',
                       contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),

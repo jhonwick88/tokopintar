@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
+import 'package:printing/printing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/settings_model.dart';
 import '../../domain/services/printer_service.dart';
@@ -45,6 +46,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String _printerMacAddress = '';
   List<BluetoothInfo> _bluetoothDevices = [];
   bool _isScanningBluetooth = false;
+  List<Printer> _windowsPrinters = [];
+  bool _isScanningPrinters = false;
   bool _isTestingPrinter = false;
   bool _isEditingUnlocked = false;
   bool _isTestingConnection = false;
@@ -84,6 +87,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       Future.delayed(Duration.zero, () {
         _scanBluetoothDevices();
       });
+    } else if (_printerType == 'USB') {
+      Future.delayed(Duration.zero, () {
+        _scanWindowsPrinters();
+      });
     }
   }
 
@@ -120,6 +127,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     } finally {
       setState(() {
         _isScanningBluetooth = false;
+      });
+    }
+  }
+
+  Future<void> _scanWindowsPrinters() async {
+    setState(() {
+      _isScanningPrinters = true;
+    });
+    try {
+      final printers = await Printing.listPrinters();
+      setState(() {
+        _windowsPrinters = printers;
+      });
+      if (_printerMacAddress.isEmpty && printers.isNotEmpty) {
+        _printerMacAddress = printers.first.name;
+      }
+    } catch (e) {
+      debugPrint('Gagal memindai printer Windows: $e');
+    } finally {
+      setState(() {
+        _isScanningPrinters = false;
       });
     }
   }
@@ -358,6 +386,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Koneksi printer Bluetooth gagal! Pastikan perangkat aktif.'), backgroundColor: Colors.red),
+        );
+      }
+    } else if (_printerType == 'USB') {
+      setState(() {
+        _isTestingPrinter = true;
+      });
+      final settings = ref.read(settingsNotifierProvider);
+      final success = await PrinterService.instance.printTestToWindows(
+        _printerMacAddress,
+        settings,
+      );
+      setState(() {
+        _isTestingPrinter = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          success
+              ? const SnackBar(content: Text('Test print terkirim ke printer USB (Windows)'), backgroundColor: Colors.green)
+              : const SnackBar(content: Text('Pencetakan printer USB gagal! Pastikan nama printer benar.'), backgroundColor: Colors.red),
         );
       }
     } else {
@@ -672,6 +719,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                         _printerType = val;
                                         if (_printerType == 'Bluetooth') {
                                           _scanBluetoothDevices();
+                                        } else if (_printerType == 'USB') {
+                                          _scanWindowsPrinters();
                                         }
                                       });
                                     }
@@ -751,6 +800,60 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 ? null
                                 : _scanBluetoothDevices,
                             tooltip: 'Pindai Perangkat',
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (_printerType == 'USB') ...[
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              isExpanded: true,
+                              value: _windowsPrinters.any((p) => p.name == _printerMacAddress) ? _printerMacAddress : null,
+                              decoration: const InputDecoration(
+                                labelText: 'Pilih Printer USB (Windows)',
+                                prefixIcon: Icon(Icons.print_outlined),
+                              ),
+                              items: _windowsPrinters.map((printer) {
+                                return DropdownMenuItem<String>(
+                                  value: printer.name,
+                                  child: Text(
+                                    printer.name,
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: _isEditingUnlocked
+                                  ? (val) {
+                                      if (val != null) {
+                                        setState(() {
+                                          _printerMacAddress = val;
+                                        });
+                                      }
+                                    }
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          IconButton.filled(
+                            style: IconButton.styleFrom(
+                              padding: const EdgeInsets.all(16),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            icon: _isScanningPrinters
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Icon(Icons.refresh),
+                            onPressed: (_isScanningPrinters || !_isEditingUnlocked)
+                                ? null
+                                : _scanWindowsPrinters,
+                            tooltip: 'Pindai Printer Windows',
                           ),
                         ],
                       ),

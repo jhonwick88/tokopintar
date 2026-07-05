@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
 
@@ -12,6 +13,64 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final List<String> _pin = [];
   final int _pinLength = 4;
+
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_handleGlobalKeyEvent);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleGlobalKeyEvent);
+    super.dispose();
+  }
+
+  bool _handleGlobalKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+
+    final key = event.logicalKey;
+
+    if (key == LogicalKeyboardKey.digit0 || key == LogicalKeyboardKey.numpad0) {
+      _onKeyPress('0');
+      return true;
+    } else if (key == LogicalKeyboardKey.digit1 || key == LogicalKeyboardKey.numpad1) {
+      _onKeyPress('1');
+      return true;
+    } else if (key == LogicalKeyboardKey.digit2 || key == LogicalKeyboardKey.numpad2) {
+      _onKeyPress('2');
+      return true;
+    } else if (key == LogicalKeyboardKey.digit3 || key == LogicalKeyboardKey.numpad3) {
+      _onKeyPress('3');
+      return true;
+    } else if (key == LogicalKeyboardKey.digit4 || key == LogicalKeyboardKey.numpad4) {
+      _onKeyPress('4');
+      return true;
+    } else if (key == LogicalKeyboardKey.digit5 || key == LogicalKeyboardKey.numpad5) {
+      _onKeyPress('5');
+      return true;
+    } else if (key == LogicalKeyboardKey.digit6 || key == LogicalKeyboardKey.numpad6) {
+      _onKeyPress('6');
+      return true;
+    } else if (key == LogicalKeyboardKey.digit7 || key == LogicalKeyboardKey.numpad7) {
+      _onKeyPress('7');
+      return true;
+    } else if (key == LogicalKeyboardKey.digit8 || key == LogicalKeyboardKey.numpad8) {
+      _onKeyPress('8');
+      return true;
+    } else if (key == LogicalKeyboardKey.digit9 || key == LogicalKeyboardKey.numpad9) {
+      _onKeyPress('9');
+      return true;
+    } else if (key == LogicalKeyboardKey.backspace) {
+      _onBackspace();
+      return true;
+    } else if (key == LogicalKeyboardKey.escape || key == LogicalKeyboardKey.delete) {
+      _onClear();
+      return true;
+    }
+
+    return false;
+  }
 
   void _onKeyPress(String val) {
     if (_pin.length < _pinLength) {

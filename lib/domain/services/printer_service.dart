@@ -3,6 +3,9 @@ import 'dart:io';
 import 'dart:developer' as dev;
 import 'package:flutter/foundation.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
+import 'package:printing/printing.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import '../../data/models/sale_model.dart';
 import '../../data/models/settings_model.dart';
 
@@ -151,6 +154,163 @@ class PrinterService {
       dev.log('Bluetooth printing failed: $e');
       return false;
     }
+  }
+
+  /// Sends print job to Windows USB/Spooler printer
+  Future<bool> printToWindows(String printerName, SaleModel sale, SettingsModel settings) async {
+    try {
+      final doc = pw.Document();
+      
+      // Paper size 58mm or 80mm
+      final double width = settings.printerPaperSize == 80 ? 80 * PdfPageFormat.mm : 58 * PdfPageFormat.mm;
+      final format = PdfPageFormat(width, double.infinity, marginAll: 4 * PdfPageFormat.mm);
+
+      doc.addPage(
+        pw.Page(
+          pageFormat: format,
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Align(
+                  alignment: pw.Alignment.center,
+                  child: pw.Text(settings.shopName, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
+                ),
+                pw.Align(
+                  alignment: pw.Alignment.center,
+                  child: pw.Text(settings.shopAddress, style: const pw.TextStyle(fontSize: 8)),
+                ),
+                pw.Align(
+                  alignment: pw.Alignment.center,
+                  child: pw.Text('Telp: ${settings.shopPhone}', style: const pw.TextStyle(fontSize: 8)),
+                ),
+                pw.Align(
+                  alignment: pw.Alignment.center,
+                  child: pw.Text(settings.receiptHeader, style: const pw.TextStyle(fontSize: 8)),
+                ),
+                pw.SizedBox(height: 4),
+                pw.Text('Invoice : ${sale.invoiceNo}', style: const pw.TextStyle(fontSize: 8)),
+                pw.Text('Tanggal : ${_formatDateTime(sale.date)}', style: const pw.TextStyle(fontSize: 8)),
+                pw.Text('Kasir   : ${sale.cashier}', style: const pw.TextStyle(fontSize: 8)),
+                pw.Divider(thickness: 0.5),
+                
+                // Items list
+                ...sale.items.map((item) {
+                  return pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(item.itemName, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+                      pw.Row(
+                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                        children: [
+                          pw.Text('  ${item.qty} x ${_formatCurrency(item.price)}', style: const pw.TextStyle(fontSize: 8)),
+                          pw.Text(_formatCurrency(item.subtotal), style: const pw.TextStyle(fontSize: 8)),
+                        ],
+                      ),
+                      if (item.note.isNotEmpty)
+                        pw.Text('  * Note: ${item.note}', style: pw.TextStyle(fontSize: 7, fontStyle: pw.FontStyle.italic)),
+                    ],
+                  );
+                }).toList(),
+                
+                pw.Divider(thickness: 0.5),
+                
+                // Totals
+                _buildPdfRow('Subtotal', _formatCurrency(sale.subtotal)),
+                if (sale.discount > 0)
+                  _buildPdfRow('Diskon', '-${_formatCurrency(sale.discount)}'),
+                if (sale.serviceCharge > 0)
+                  _buildPdfRow('Service Charge', _formatCurrency(sale.serviceCharge)),
+                if (sale.tax > 0)
+                  _buildPdfRow('Pajak (PPN)', _formatCurrency(sale.tax)),
+                pw.Divider(thickness: 0.5),
+                _buildPdfRow('Total', _formatCurrency(sale.grandTotal), isBold: true),
+                pw.SizedBox(height: 4),
+                _buildPdfRow('Bayar (${sale.paymentMethod.toUpperCase()})', _formatCurrency(sale.paidAmount)),
+                _buildPdfRow('Kembali', _formatCurrency(sale.changeAmount)),
+                pw.Divider(thickness: 0.5),
+                
+                pw.Align(
+                  alignment: pw.Alignment.center,
+                  child: pw.Text(settings.receiptFooter, style: const pw.TextStyle(fontSize: 8)),
+                ),
+                pw.Align(
+                  alignment: pw.Alignment.center,
+                  child: pw.Text('Terima Kasih', style: const pw.TextStyle(fontSize: 8)),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+
+      final printer = Printer(url: printerName, name: printerName);
+      for (int i = 0; i < settings.printReceiptCopies; i++) {
+        await Printing.directPrintPdf(
+          printer: printer,
+          onLayout: (PdfPageFormat format) async => doc.save(),
+        );
+      }
+      return true;
+    } catch (e) {
+      dev.log('Windows USB printing failed: $e');
+      return false;
+    }
+  }
+
+  /// Sends test print to Windows USB/Spooler printer
+  Future<bool> printTestToWindows(String printerName, SettingsModel settings) async {
+    try {
+      final doc = pw.Document();
+      final double width = settings.printerPaperSize == 80 ? 80 * PdfPageFormat.mm : 58 * PdfPageFormat.mm;
+      final format = PdfPageFormat(width, double.infinity, marginAll: 4 * PdfPageFormat.mm);
+
+      doc.addPage(
+        pw.Page(
+          pageFormat: format,
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Align(
+                  alignment: pw.Alignment.center,
+                  child: pw.Text('TEST PRINT', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
+                ),
+                pw.Divider(thickness: 0.5),
+                pw.Text('Printer: $printerName', style: const pw.TextStyle(fontSize: 8)),
+                pw.Text('Koneksi: USB (Windows)', style: const pw.TextStyle(fontSize: 8)),
+                pw.Text('Waktu   : ${DateTime.now().toLocal()}', style: const pw.TextStyle(fontSize: 8)),
+                pw.Divider(thickness: 0.5),
+                pw.Align(
+                  alignment: pw.Alignment.center,
+                  child: pw.Text('PRINTER BERHASIL TERHUBUNG', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+                ),
+                pw.Divider(thickness: 0.5),
+              ],
+            );
+          },
+        ),
+      );
+
+      final printer = Printer(url: printerName, name: printerName);
+      return await Printing.directPrintPdf(
+        printer: printer,
+        onLayout: (PdfPageFormat format) async => doc.save(),
+      );
+    } catch (e) {
+      dev.log('Windows test print failed: $e');
+      return false;
+    }
+  }
+
+  pw.Widget _buildPdfRow(String label, String value, {bool isBold = false}) {
+    return pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      children: [
+        pw.Text(label, style: pw.TextStyle(fontSize: 8, fontWeight: isBold ? pw.FontWeight.bold : null)),
+        pw.Text(value, style: pw.TextStyle(fontSize: 8, fontWeight: isBold ? pw.FontWeight.bold : null)),
+      ],
+    );
   }
 
   /// Format Date Time to DD/MM/YYYY HH:mm
