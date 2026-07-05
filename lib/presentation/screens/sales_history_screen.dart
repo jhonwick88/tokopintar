@@ -465,176 +465,296 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
               flex: 4,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  children: [
+                child: CustomScrollView(
+                  slivers: [
                     // Summary Cards Grid
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _buildMetricCard(
-                              title: 'Transaksi',
-                              value: '${historyState.filteredSales.length}',
-                              icon: Icons.receipt_long,
-                              color: Colors.blue,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildMetricCard(
-                              title: 'Omzet',
-                              value: currencyFormatter.format(activeRevenue),
-                              icon: Icons.monetization_on,
-                              color: Colors.green,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildMetricCard(
-                              title: 'Void/Refund',
-                              value: '$voidedCount',
-                              icon: Icons.cancel,
-                              color: Colors.red,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildMetricCard(
-                              title: 'Diskon',
-                              value: currencyFormatter.format(totalDiscounts),
-                              icon: Icons.percent,
-                              color: Colors.purple,
-                            ),
-                          ),
-                        ],
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: isLarge
+                            ? Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildMetricCard(
+                                      title: 'Transaksi',
+                                      value: '${historyState.filteredSales.length}',
+                                      icon: Icons.receipt_long,
+                                      color: Colors.blue,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: _buildMetricCard(
+                                      title: 'Omzet',
+                                      value: currencyFormatter.format(activeRevenue),
+                                      icon: Icons.monetization_on,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: _buildMetricCard(
+                                      title: 'Void/Refund',
+                                      value: '$voidedCount',
+                                      icon: Icons.cancel,
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: _buildMetricCard(
+                                      title: 'Diskon',
+                                      value: currencyFormatter.format(totalDiscounts),
+                                      icon: Icons.percent,
+                                      color: Colors.purple,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Column(
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _buildMetricCard(
+                                          title: 'Transaksi',
+                                          value: '${historyState.filteredSales.length}',
+                                          icon: Icons.receipt_long,
+                                          color: Colors.blue,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: _buildMetricCard(
+                                          title: 'Omzet',
+                                          value: currencyFormatter.format(activeRevenue),
+                                          icon: Icons.monetization_on,
+                                          color: Colors.green,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _buildMetricCard(
+                                          title: 'Void/Refund',
+                                          value: '$voidedCount',
+                                          icon: Icons.cancel,
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: _buildMetricCard(
+                                          title: 'Diskon',
+                                          value: currencyFormatter.format(totalDiscounts),
+                                          icon: Icons.percent,
+                                          color: Colors.purple,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    // Search Bar
-                    TextField(
-                      controller: _searchController,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.search),
-                        hintText: 'Cari No. Invoice... (F8 cetak ulang)',
-                      ),
-                      onChanged: (val) {
-                        ref.read(salesHistoryNotifierProvider.notifier).setSearchQuery(val.trim());
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    // Filters row
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: historyState.selectedPaymentMethod,
-                            decoration: const InputDecoration(
-                              labelText: 'Metode Bayar',
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    
+                    // Pinned Header: Search Bar & Filters
+                    SliverPersistentHeader(
+                      pinned: true,
+                      delegate: _SearchAndFilterHeaderDelegate(
+                        height: isLarge ? 140.0 : 210.0,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Search Bar
+                            TextField(
+                              controller: _searchController,
+                              decoration: const InputDecoration(
+                                prefixIcon: Icon(Icons.search),
+                                hintText: 'Cari No. Invoice... (F8 cetak ulang)',
+                              ),
+                              onChanged: (val) {
+                                ref.read(salesHistoryNotifierProvider.notifier).setSearchQuery(val.trim());
+                              },
                             ),
-                            items: const [
-                              DropdownMenuItem(value: 'all', child: Text('Semua Metode')),
-                              DropdownMenuItem(value: 'cash', child: Text('Tunai')),
-                              DropdownMenuItem(value: 'qris', child: Text('QRIS')),
-                              DropdownMenuItem(value: 'bank', child: Text('Bank/Card')),
-                              DropdownMenuItem(value: 'ewallet', child: Text('E-Wallet')),
-                            ],
-                            onChanged: (val) {
-                              if (val != null) {
-                                ref.read(salesHistoryNotifierProvider.notifier).setPaymentMethodFilter(val);
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: historyState.selectedStatus,
-                            decoration: const InputDecoration(
-                              labelText: 'Status',
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            ),
-                            items: const [
-                              DropdownMenuItem(value: 'all', child: Text('Semua Status')),
-                              DropdownMenuItem(value: 'completed', child: Text('Completed')),
-                              DropdownMenuItem(value: 'voided', child: Text('Voided')),
-                              DropdownMenuItem(value: 'refunded', child: Text('Refunded')),
-                            ],
-                            onChanged: (val) {
-                              if (val != null) {
-                                ref.read(salesHistoryNotifierProvider.notifier).setStatusFilter(val);
-                              }
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Expanded(
-                      child: historyState.isLoading
-                          ? const Center(child: CircularProgressIndicator())
-                          : historyState.filteredSales.isEmpty
-                              ? const Center(child: Text('Tidak ada riwayat transaksi'))
-                              : ListView.separated(
-                                  itemCount: historyState.filteredSales.length,
-                                  separatorBuilder: (c, i) => const Divider(height: 1),
-                                  itemBuilder: (context, index) {
-                                    final sale = historyState.filteredSales[index];
-                                    final isSelected = _selectedSale?.invoiceNo == sale.invoiceNo;
-                                    
-                                    Color statusColor = Colors.green;
-                                    if (sale.status == 'voided') {
-                                      statusColor = Colors.red;
-                                    } else if (sale.status == 'refunded') {
-                                      statusColor = Colors.orange;
-                                    }
-
-                                    return ListTile(
-                                      selected: isSelected,
-                                      selectedTileColor: Theme.of(context).colorScheme.primary.withOpacity(0.05),
-                                      title: Text(
-                                        sale.invoiceNo,
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            const SizedBox(height: 12),
+                            // Filters dropdowns
+                            if (isLarge) ...[
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      value: historyState.selectedPaymentMethod,
+                                      isExpanded: true,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Metode Bayar',
+                                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                       ),
-                                      subtitle: Text(
-                                        '${DateFormat('dd/MM/yyyy HH:mm').format(sale.date)} | ${sale.cashier}',
-                                        style: const TextStyle(fontSize: 11),
-                                      ),
-                                      trailing: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        crossAxisAlignment: CrossAxisAlignment.end,
-                                        children: [
-                                          Text(
-                                            currencyFormatter.format(sale.grandTotal),
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: statusColor.withOpacity(0.12),
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              sale.status.toUpperCase(),
-                                              style: TextStyle(color: statusColor, fontSize: 8, fontWeight: FontWeight.bold),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      onTap: () {
-                                        setState(() {
-                                          _selectedSale = sale;
-                                        });
-                                        if (!isLarge) {
-                                          _showReceiptPreviewModal(context, sale);
+                                      items: const [
+                                        DropdownMenuItem(value: 'all', child: Text('Semua Metode', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                        DropdownMenuItem(value: 'cash', child: Text('Tunai', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                        DropdownMenuItem(value: 'qris', child: Text('QRIS', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                        DropdownMenuItem(value: 'bank', child: Text('Bank/Card', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                        DropdownMenuItem(value: 'ewallet', child: Text('E-Wallet', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                      ],
+                                      onChanged: (val) {
+                                        if (val != null) {
+                                          ref.read(salesHistoryNotifierProvider.notifier).setPaymentMethodFilter(val);
                                         }
                                       },
-                                    );
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      value: historyState.selectedStatus,
+                                      isExpanded: true,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Status',
+                                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      ),
+                                      items: const [
+                                        DropdownMenuItem(value: 'all', child: Text('Semua Status', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                        DropdownMenuItem(value: 'completed', child: Text('Completed', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                        DropdownMenuItem(value: 'voided', child: Text('Voided', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                        DropdownMenuItem(value: 'refunded', child: Text('Refunded', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                      ],
+                                      onChanged: (val) {
+                                        if (val != null) {
+                                          ref.read(salesHistoryNotifierProvider.notifier).setStatusFilter(val);
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ] else ...[
+                              DropdownButtonFormField<String>(
+                                value: historyState.selectedPaymentMethod,
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'Metode Bayar',
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(value: 'all', child: Text('Semua Metode', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                  DropdownMenuItem(value: 'cash', child: Text('Tunai', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                  DropdownMenuItem(value: 'qris', child: Text('QRIS', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                  DropdownMenuItem(value: 'bank', child: Text('Bank/Card', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                  DropdownMenuItem(value: 'ewallet', child: Text('E-Wallet', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    ref.read(salesHistoryNotifierProvider.notifier).setPaymentMethodFilter(val);
+                                  }
+                                },
+                              ),
+                              const SizedBox(height: 8),
+                              DropdownButtonFormField<String>(
+                                value: historyState.selectedStatus,
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'Status',
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(value: 'all', child: Text('Semua Status', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                  DropdownMenuItem(value: 'completed', child: Text('Completed', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                  DropdownMenuItem(value: 'voided', child: Text('Voided', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                  DropdownMenuItem(value: 'refunded', child: Text('Refunded', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    ref.read(salesHistoryNotifierProvider.notifier).setStatusFilter(val);
+                                  }
+                                },
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    
+                    // Invoices List Content
+                    if (historyState.isLoading)
+                      const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (historyState.filteredSales.isEmpty)
+                      const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(child: Text('Tidak ada riwayat transaksi')),
+                      )
+                    else
+                      SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final sale = historyState.filteredSales[index];
+                            final isSelected = _selectedSale?.invoiceNo == sale.invoiceNo;
+                            
+                            Color statusColor = Colors.green;
+                            if (sale.status == 'voided') {
+                              statusColor = Colors.red;
+                            } else if (sale.status == 'refunded') {
+                              statusColor = Colors.orange;
+                            }
+
+                            return Column(
+                              children: [
+                                ListTile(
+                                  selected: isSelected,
+                                  selectedTileColor: Theme.of(context).colorScheme.primary.withOpacity(0.05),
+                                  title: Text(
+                                    sale.invoiceNo,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                  ),
+                                  subtitle: Text(
+                                    '${DateFormat('dd/MM/yyyy HH:mm').format(sale.date)} | ${sale.cashier}',
+                                    style: const TextStyle(fontSize: 11),
+                                  ),
+                                  trailing: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        currencyFormatter.format(sale.grandTotal),
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: statusColor.withOpacity(0.12),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          sale.status.toUpperCase(),
+                                          style: TextStyle(color: statusColor, fontSize: 8, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedSale = sale;
+                                    });
+                                    if (!isLarge) {
+                                      _showReceiptPreviewModal(context, sale);
+                                    }
                                   },
                                 ),
-                    ),
+                                if (index < historyState.filteredSales.length - 1)
+                                  const Divider(height: 1),
+                              ],
+                            );
+                          },
+                          childCount: historyState.filteredSales.length,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -798,6 +918,40 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
         ),
       );
     }
+  }
+}
+
+class _SearchAndFilterHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+  final double height;
+
+  _SearchAndFilterHeaderDelegate({
+    required this.child,
+    required this.height,
+  });
+
+  @override
+  double get minExtent => height;
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Material(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      elevation: overlapsContent ? 3.0 : 0.0,
+      shadowColor: Colors.black.withOpacity(0.4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 2.0),
+        child: child,
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _SearchAndFilterHeaderDelegate oldDelegate) {
+    return child != oldDelegate.child || height != oldDelegate.height;
   }
 }
 

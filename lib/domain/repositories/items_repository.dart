@@ -19,5 +19,6 @@ abstract class ItemsRepository {
     required String itemUPC,
     required int categoryId,
     required double price,
+    required double obQuantity,
   });
 }

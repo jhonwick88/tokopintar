@@ -66,6 +66,7 @@ class MockItemsRepository implements ItemsRepository {
     required String itemUPC,
     required int categoryId,
     required double price,
+    required double obQuantity,
   }) async {
     final newItem = ItemModel(
       itemNo: itemNo,
@@ -73,6 +74,7 @@ class MockItemsRepository implements ItemsRepository {
       itemUPC: itemUPC,
       categoryId: categoryId,
       price: price,
+      obQuantity: obQuantity,
     );
     db.add(newItem);
     return newItem;
@@ -136,6 +138,7 @@ void main() {
         itemUPC: '8993333',
         categoryId: 2,
         price: 35000,
+        obQuantity: 10,
       );
 
       expect(result.itemNo, 'SKU_NEW_PROD');

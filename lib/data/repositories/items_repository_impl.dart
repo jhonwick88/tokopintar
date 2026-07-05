@@ -55,6 +55,7 @@ class ItemsRepositoryImpl implements ItemsRepository {
     required String itemUPC,
     required int categoryId,
     required double price,
+    required double obQuantity,
   }) {
     return _apiClient.createItem(
       itemNo: itemNo,
@@ -62,6 +63,7 @@ class ItemsRepositoryImpl implements ItemsRepository {
       itemUPC: itemUPC,
       categoryId: categoryId,
       price: price,
+      obQuantity: obQuantity,
     );
   }
 }

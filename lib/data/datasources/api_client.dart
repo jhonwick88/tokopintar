@@ -179,6 +179,7 @@ class ApiClient {
     required String itemUPC,
     required int categoryId,
     required double price,
+    required double obQuantity,
   }) async {
     try {
       final response = await _dio.post('/api/items', data: {
@@ -187,6 +188,8 @@ class ApiClient {
         'itemupc': itemUPC,
         'categoryid': categoryId,
         'price': price,
+        'itemtype': 0,
+        'obquantity': obQuantity,
       });
       if (response.statusCode == 200 && response.data != null) {
         final success = response.data['success'] as bool? ?? false;

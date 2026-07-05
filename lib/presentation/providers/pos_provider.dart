@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../data/models/item_model.dart';
 import '../../data/models/sale_model.dart';
+import '../../data/models/settings_model.dart';
 import '../../domain/services/printer_service.dart';
 import 'auth_provider.dart';
 import 'settings_provider.dart';

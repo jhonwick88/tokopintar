@@ -187,6 +187,7 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
     required String itemUPC,
     required int categoryId,
     required double price,
+    required double obQuantity,
   }) async {
     final newItem = await _itemsRepository.createItem(
       itemNo: itemNo,
@@ -194,6 +195,7 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
       itemUPC: itemUPC,
       categoryId: categoryId,
       price: price,
+      obQuantity: obQuantity,
     );
 
     final newList = [...state.items, newItem];

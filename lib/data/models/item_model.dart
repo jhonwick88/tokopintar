@@ -4,6 +4,7 @@ class ItemModel {
   final String itemName;
   final int categoryId;
   final double price;
+  final double obQuantity;
 
   ItemModel({
     required this.itemNo,
@@ -11,6 +12,7 @@ class ItemModel {
     required this.itemName,
     required this.categoryId,
     required this.price,
+    this.obQuantity = 10.0,
   });
 
   factory ItemModel.fromJson(Map<String, dynamic> json) {
@@ -20,6 +22,7 @@ class ItemModel {
       itemName: json['itemname'] as String? ?? '',
       categoryId: json['categoryid'] as int? ?? 0,
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      obQuantity: (json['obquantity'] as num?)?.toDouble() ?? 0.0,
     );
   }
 
@@ -30,6 +33,7 @@ class ItemModel {
       'itemname': itemName,
       'categoryid': categoryId,
       'price': price,
+      'obquantity': obQuantity,
     };
   }
 }

@@ -581,7 +581,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
                 // Section: Pajak & Layanan
                 _buildCardSection(
-                  title: 'Pajak & Layanan (PPN / Service Charge)',
+                  title: 'Pajak & Layanan',
                   icon: Icons.receipt_long,
                   children: [
                     Row(
@@ -757,50 +757,93 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ],
                   const Divider(),
                   const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: DropdownButtonFormField<int>(
-                          value: _printerPaperSize,
-                          decoration: const InputDecoration(labelText: 'Lebar Kertas Thermal'),
-                          items: const [
-                            DropdownMenuItem(value: 58, child: Text('58 mm (Kecil)')),
-                            DropdownMenuItem(value: 80, child: Text('80 mm (Standar)')),
-                          ],
-                          onChanged: _isEditingUnlocked
-                              ? (val) {
-                                  if (val != null) {
-                                    setState(() {
-                                      _printerPaperSize = val;
-                                    });
+                   if (isDesktop) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<int>(
+                            value: _printerPaperSize,
+                            isExpanded: true,
+                            decoration: const InputDecoration(labelText: 'Lebar Kertas Thermal'),
+                            items: const [
+                              DropdownMenuItem(value: 58, child: Text('58 mm (Kecil)', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                              DropdownMenuItem(value: 80, child: Text('80 mm (Standar)', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                            ],
+                            onChanged: _isEditingUnlocked
+                                ? (val) {
+                                    if (val != null) {
+                                      setState(() {
+                                        _printerPaperSize = val;
+                                      });
+                                    }
                                   }
-                                }
-                              : null,
+                                : null,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: DropdownButtonFormField<int>(
-                          value: _printReceiptCopies,
-                          decoration: const InputDecoration(labelText: 'Jumlah Cetak Nota (Rangkap)'),
-                          items: const [
-                            DropdownMenuItem(value: 1, child: Text('1 Lembar')),
-                            DropdownMenuItem(value: 2, child: Text('2 Lembar (Kasir + Pelanggan)')),
-                            DropdownMenuItem(value: 3, child: Text('3 Lembar')),
-                          ],
-                          onChanged: _isEditingUnlocked
-                              ? (val) {
-                                  if (val != null) {
-                                    setState(() {
-                                      _printReceiptCopies = val;
-                                    });
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: DropdownButtonFormField<int>(
+                            value: _printReceiptCopies,
+                            isExpanded: true,
+                            decoration: const InputDecoration(labelText: 'Jumlah Cetak Nota (Rangkap)'),
+                            items: const [
+                              DropdownMenuItem(value: 1, child: Text('1 Lembar', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                              DropdownMenuItem(value: 2, child: Text('2 Lembar (Kasir + Pelanggan)', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                              DropdownMenuItem(value: 3, child: Text('3 Lembar', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                            ],
+                            onChanged: _isEditingUnlocked
+                                ? (val) {
+                                    if (val != null) {
+                                      setState(() {
+                                        _printReceiptCopies = val;
+                                      });
+                                    }
                                   }
-                                }
-                              : null,
+                                : null,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ] else ...[
+                    DropdownButtonFormField<int>(
+                      value: _printerPaperSize,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'Lebar Kertas Thermal'),
+                      items: const [
+                        DropdownMenuItem(value: 58, child: Text('58 mm (Kecil)', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                        DropdownMenuItem(value: 80, child: Text('80 mm (Standar)', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                      ],
+                      onChanged: _isEditingUnlocked
+                          ? (val) {
+                              if (val != null) {
+                                setState(() {
+                                  _printerPaperSize = val;
+                                });
+                              }
+                            }
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<int>(
+                      value: _printReceiptCopies,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'Jumlah Cetak Nota (Rangkap)'),
+                      items: const [
+                        DropdownMenuItem(value: 1, child: Text('1 Lembar', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                        DropdownMenuItem(value: 2, child: Text('2 Lembar (Kasir + Pelanggan)', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                        DropdownMenuItem(value: 3, child: Text('3 Lembar', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                      ],
+                      onChanged: _isEditingUnlocked
+                          ? (val) {
+                              if (val != null) {
+                                setState(() {
+                                  _printReceiptCopies = val;
+                                });
+                              }
+                            }
+                          : null,
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,

@@ -874,7 +874,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                           ),
                                           const SizedBox(height: 2),
                                           Text(
-                                            'SKU: ${product.itemNo}',
+                                            'SKU: ${product.itemNo}  |  Stok: ${product.obQuantity.toStringAsFixed(0)}',
                                             style: const TextStyle(fontSize: 10, color: Colors.grey),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
@@ -943,7 +943,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
-                                            'SKU: ${product.itemNo}  |  UPC: ${product.itemUPC}',
+                                            'SKU: ${product.itemNo}  |  UPC: ${product.itemUPC}  |  Stok: ${product.obQuantity.toStringAsFixed(0)}',
                                             style: const TextStyle(fontSize: 11, color: Colors.grey),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
@@ -1653,7 +1653,7 @@ class _QuickMappingSearchDialogState extends ConsumerState<_QuickMappingSearchDi
                                 final item = _filteredItems[index];
                                 return ListTile(
                                   title: Text(item.itemName),
-                                  subtitle: Text('SKU: ${item.itemNo}'),
+                                  subtitle: Text('SKU: ${item.itemNo}  |  Stok: ${item.obQuantity.toStringAsFixed(0)}'),
                                   trailing: Text('Rp ${item.price.toStringAsFixed(0)}'),
                                   onTap: () => Navigator.of(context).pop(item),
                                 );
@@ -1692,6 +1692,7 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
   late TextEditingController _skuController;
   late TextEditingController _nameController;
   late TextEditingController _priceController;
+  late TextEditingController _stockController;
   int? _selectedCategoryId;
 
   @override
@@ -1701,6 +1702,7 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
     _skuController = TextEditingController(text: '');
     _nameController = TextEditingController(text: widget.initialItemName ?? '');
     _priceController = TextEditingController(text: '');
+    _stockController = TextEditingController(text: '10');
 
     // Attempt to set a default generated SKU
     _skuController.text = 'SKU-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
@@ -1712,6 +1714,7 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
     _skuController.dispose();
     _nameController.dispose();
     _priceController.dispose();
+    _stockController.dispose();
     super.dispose();
   }
 
@@ -1824,6 +1827,25 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
                   return null;
                 },
               ),
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: _stockController,
+                decoration: const InputDecoration(
+                  labelText: 'Stok Awal (obquantity) *',
+                  prefixIcon: Icon(Icons.warehouse_outlined),
+                ),
+                keyboardType: TextInputType.number,
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return 'Stok awal wajib diisi';
+                  }
+                  if (double.tryParse(val) == null) {
+                    return 'Format stok tidak valid';
+                  }
+                  return null;
+                },
+              ),
               const SizedBox(height: 32),
               
               SizedBox(
@@ -1842,6 +1864,7 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
                     final sku = _skuController.text.trim();
                     final barcode = _barcodeController.text.trim();
                     final price = double.parse(_priceController.text.trim());
+                    final stock = double.parse(_stockController.text.trim());
                     final catId = _selectedCategoryId!;
 
                     try {
@@ -1857,6 +1880,7 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
                         itemUPC: barcode,
                         categoryId: catId,
                         price: price,
+                        obQuantity: stock,
                       );
 
                       Navigator.of(context).pop(); // Dismiss loading
