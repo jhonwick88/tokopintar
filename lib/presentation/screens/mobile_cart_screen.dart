@@ -840,42 +840,107 @@ class _MobileCartScreenState extends ConsumerState<MobileCartScreen> {
 
   void _showEditQtyDialog(CartItem cartItem) {
     final controller = TextEditingController(text: '${cartItem.qty}');
+    bool isRounded = cartItem.isRoundedTo500;
+
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Edit Jumlah'),
-          content: TextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            autofocus: true,
-            decoration: const InputDecoration(
-              suffixText: 'pcs',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Batal'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final qty = int.tryParse(controller.text) ?? 0;
-                if (qty > 0) {
-                  ref.read(posNotifierProvider.notifier).updateQty(
-                    cartItem.item.itemNo,
-                    qty,
-                  );
-                } else if (qty <= 0) {
-                  ref.read(posNotifierProvider.notifier).removeFromCart(
-                    cartItem.item.itemNo,
-                  );
-                }
-                Navigator.of(context).pop();
-              },
-              child: const Text('Simpan'),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (context, setState) {
+            void update() {
+              if (context.mounted) {
+                setState(() {});
+              }
+            }
+            controller.addListener(update);
+
+            final qty = int.tryParse(controller.text) ?? 0;
+            final price = cartItem.price;
+            final discount = cartItem.discount;
+            final rawSubtotal = (price * qty) - discount;
+            final finalSubtotal = isRounded 
+                ? (rawSubtotal / 500).ceil() * 500.0 
+                : rawSubtotal;
+
+            return AlertDialog(
+              title: Text('Edit ${cartItem.item.itemName}'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: controller,
+                    keyboardType: TextInputType.number,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Jumlah (Qty)',
+                      suffixText: 'pcs',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text(
+                      'Bulatkan ke Kelipatan 500',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    value: isRounded,
+                    onChanged: (val) {
+                      setState(() {
+                        isRounded = val ?? false;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Subtotal:',
+                        style: TextStyle(color: Colors.grey, fontSize: 13),
+                      ),
+                      Text(
+                        _formatRupiah(finalSubtotal),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    controller.removeListener(update);
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Batal'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    controller.removeListener(update);
+                    final newQty = int.tryParse(controller.text) ?? 0;
+                    if (newQty > 0) {
+                      ref.read(posNotifierProvider.notifier).updateQty(
+                        cartItem.item.itemNo,
+                        newQty,
+                        isRoundedTo500: isRounded,
+                      );
+                    } else if (newQty <= 0) {
+                      ref.read(posNotifierProvider.notifier).removeFromCart(
+                        cartItem.item.itemNo,
+                      );
+                    }
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Simpan'),
+                ),
+              ],
+            );
+          },
         );
       },
     );

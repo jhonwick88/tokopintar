@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -35,15 +36,34 @@ class _PaymentModalState extends ConsumerState<PaymentModal> {
     final grandTotal = ref.read(posNotifierProvider).grandTotal;
     _paidController.text = grandTotal.toInt().toString();
     _customCashPaid = grandTotal;
+    HardwareKeyboard.instance.addHandler(_handleLocalKeyEvent);
   }
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleLocalKeyEvent);
     _paidController.dispose();
     _splitCashController.dispose();
     _splitCardController.dispose();
     _refController.dispose();
     super.dispose();
+  }
+
+  bool _handleLocalKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+    final key = event.logicalKey;
+
+    if (key == LogicalKeyboardKey.escape) {
+      Navigator.of(context).pop();
+      return true;
+    } else if (key == LogicalKeyboardKey.f4) {
+      if (!_isProcessing) {
+        final grandTotal = ref.read(posNotifierProvider).grandTotal;
+        _processPayment(grandTotal);
+      }
+      return true;
+    }
+    return false;
   }
 
   void _onKeyPress(String val) {

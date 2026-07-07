@@ -14,6 +14,7 @@ class CartItem {
   final double? customPrice;
   final String note;
   final double discount; // item level discount nominal
+  final bool isRoundedTo500;
 
   CartItem({
     required this.item,
@@ -21,10 +22,17 @@ class CartItem {
     this.customPrice,
     this.note = '',
     this.discount = 0.0,
+    this.isRoundedTo500 = false,
   });
 
   double get price => customPrice ?? item.price;
-  double get subtotal => (price * qty) - discount;
+  double get subtotal {
+    final rawSubtotal = (price * qty) - discount;
+    if (isRoundedTo500) {
+      return (rawSubtotal / 500).ceil() * 500.0;
+    }
+    return rawSubtotal;
+  }
 
   CartItem copyWith({
     ItemModel? item,
@@ -32,6 +40,7 @@ class CartItem {
     double? customPrice,
     String? note,
     double? discount,
+    bool? isRoundedTo500,
   }) {
     return CartItem(
       item: item ?? this.item,
@@ -39,6 +48,7 @@ class CartItem {
       customPrice: customPrice ?? this.customPrice,
       note: note ?? this.note,
       discount: discount ?? this.discount,
+      isRoundedTo500: isRoundedTo500 ?? this.isRoundedTo500,
     );
   }
 }
@@ -169,14 +179,18 @@ class PosNotifier extends StateNotifier<PosState> {
     );
   }
 
-  void updateQty(String itemNo, int qty) {
+  void updateQty(String itemNo, int qty, {bool? isRoundedTo500}) {
     if (qty <= 0) {
       removeFromCart(itemNo);
       return;
     }
     final idx = state.cartItems.indexWhere((i) => i.item.itemNo == itemNo);
     if (idx >= 0) {
-      _updateItemInList(idx, state.cartItems[idx].copyWith(qty: qty));
+      var cartItem = state.cartItems[idx].copyWith(qty: qty);
+      if (isRoundedTo500 != null) {
+        cartItem = cartItem.copyWith(isRoundedTo500: isRoundedTo500);
+      }
+      _updateItemInList(idx, cartItem);
     }
   }
 

@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
@@ -17,6 +18,14 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     dev.log('Firebase initialized successfully.');
+    
+    // Attempt anonymous authentication to secure Firestore rules
+    try {
+      final userCredential = await FirebaseAuth.instance.signInAnonymously();
+      dev.log('Firebase Anonymous Auth success: ${userCredential.user?.uid}');
+    } catch (authError) {
+      dev.log('Firebase Anonymous Auth failed: $authError');
+    }
   } catch (e) {
     dev.log('Firebase initialization failed: $e. Operating in Mock Offline Mode.');
   }

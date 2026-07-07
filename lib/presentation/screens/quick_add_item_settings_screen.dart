@@ -5,6 +5,7 @@ import '../../data/models/item_model.dart';
 import '../../data/models/quick_item_model.dart';
 import '../providers/items_provider.dart';
 import '../providers/quick_items_provider.dart';
+import '../providers/settings_provider.dart';
 
 // Predefined Icon Mappings
 final Map<String, IconData> quickItemIconsMap = {
@@ -40,39 +41,77 @@ class QuickAddItemSettingsScreen extends ConsumerStatefulWidget {
   ConsumerState<QuickAddItemSettingsScreen> createState() => _QuickAddItemSettingsScreenState();
 }
 
-class _MobileItemPickerDialog extends StatefulWidget {
-  final List<ItemModel> allItems;
-
-  const _MobileItemPickerDialog({required this.allItems});
+class _MobileItemPickerDialog extends ConsumerStatefulWidget {
+  const _MobileItemPickerDialog();
 
   @override
-  State<_MobileItemPickerDialog> createState() => _MobileItemPickerDialogState();
+  ConsumerState<_MobileItemPickerDialog> createState() => _MobileItemPickerDialogState();
 }
 
-class _MobileItemPickerDialogState extends State<_MobileItemPickerDialog> {
+class _MobileItemPickerDialogState extends ConsumerState<_MobileItemPickerDialog> {
   String _searchQuery = '';
-  late List<ItemModel> _filteredItems;
+  List<ItemModel> _items = [];
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _filteredItems = widget.allItems;
+    _loadDefaultItems();
   }
 
-  void _filter(String val) {
+  Future<void> _loadDefaultItems() async {
+    if (!mounted) return;
     setState(() {
-      _searchQuery = val.trim().toLowerCase();
-      if (_searchQuery.isEmpty) {
-        _filteredItems = widget.allItems;
-      } else {
-        _filteredItems = widget.allItems
-            .where((item) =>
-                item.itemName.toLowerCase().contains(_searchQuery) ||
-                item.itemNo.toLowerCase().contains(_searchQuery) ||
-                item.itemUPC.toLowerCase().contains(_searchQuery))
-            .toList();
-      }
+      _isLoading = true;
     });
+    try {
+      final repo = ref.read(itemsRepositoryProvider);
+      final list = await repo.getItems(page: 1, limit: 50);
+      if (mounted) {
+        setState(() {
+          _items = list;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to load default items: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _filter(String val) async {
+    final query = val.trim();
+    if (!mounted) return;
+    setState(() {
+      _searchQuery = query;
+      _isLoading = true;
+    });
+    try {
+      final repo = ref.read(itemsRepositoryProvider);
+      List<ItemModel> list;
+      if (query.isEmpty) {
+        list = await repo.getItems(page: 1, limit: 50);
+      } else {
+        list = await repo.searchItems(query, page: 1, limit: 50);
+      }
+      if (mounted && _searchQuery == query) {
+        setState(() {
+          _items = list;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to search items: $e');
+    } finally {
+      if (mounted && _searchQuery == query) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -93,20 +132,22 @@ class _MobileItemPickerDialogState extends State<_MobileItemPickerDialog> {
             ),
             const SizedBox(height: 12),
             Expanded(
-              child: _filteredItems.isEmpty
-                  ? const Center(child: Text('Produk tidak ditemukan'))
-                  : ListView.builder(
-                      itemCount: _filteredItems.length,
-                      itemBuilder: (context, index) {
-                        final item = _filteredItems[index];
-                        return ListTile(
-                          title: Text(item.itemName),
-                          subtitle: Text('Code: ${item.itemNo}'),
-                          trailing: Text('Rp ${item.price.toStringAsFixed(0)}'),
-                          onTap: () => Navigator.of(context).pop(item),
-                        );
-                      },
-                    ),
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _items.isEmpty
+                      ? const Center(child: Text('Produk tidak ditemukan'))
+                      : ListView.builder(
+                          itemCount: _items.length,
+                          itemBuilder: (context, index) {
+                            final item = _items[index];
+                            return ListTile(
+                              title: Text(item.itemName),
+                              subtitle: Text('Code: ${item.itemNo}'),
+                              trailing: Text('Rp ${item.price.toStringAsFixed(0)}'),
+                              onTap: () => Navigator.of(context).pop(item),
+                            );
+                          },
+                        ),
             ),
           ],
         ),
@@ -202,7 +243,7 @@ class _QuickAddItemSettingsScreenState extends ConsumerState<QuickAddItemSetting
                       onTap: () async {
                         final chosen = await showDialog<ItemModel>(
                           context: context,
-                          builder: (context) => _MobileItemPickerDialog(allItems: allItems),
+                          builder: (context) => const _MobileItemPickerDialog(),
                         );
                         if (chosen != null) {
                           setDialogState(() {
