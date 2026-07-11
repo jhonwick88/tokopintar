@@ -5,11 +5,42 @@ import 'package:intl/intl.dart';
 import '../providers/sales_history_provider.dart';
 import '../widgets/main_layout.dart';
 
-class DashboardScreen extends ConsumerWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  late final ScrollController _scrollController;
+  int _leaderboardLimit = 10;
+  int _totalTopItems = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController()..addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      if (_leaderboardLimit < _totalTopItems) {
+        setState(() {
+          _leaderboardLimit += 10;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final salesState = ref.watch(salesHistoryNotifierProvider);
     final now = DateTime.now();
 
@@ -64,7 +95,7 @@ class DashboardScreen extends ConsumerWidget {
     // Sort leaderboard by quantity sold
     final topItems = itemLeaderboard.values.toList()
       ..sort((a, b) => b.qty.compareTo(a.qty));
-    final leaderboardLimit = topItems.length > 5 ? topItems.sublist(0, 5) : topItems;
+    _totalTopItems = topItems.length;
 
     // 2. Generate dynamic line chart spots based on active range
     final start = salesState.startDate ?? (completedSales.isEmpty ? now.subtract(const Duration(days: 30)) : completedSales.last.date);
@@ -151,6 +182,9 @@ class DashboardScreen extends ConsumerWidget {
       dateRangeStr = '${DateFormat('dd MMM yyyy').format(salesState.startDate!)} - ${DateFormat('dd MMM yyyy').format(salesState.endDate!)}';
     }
 
+    final width = MediaQuery.of(context).size.width;
+    final isLargeScreen = width >= 900;
+
     return MainLayout(
       currentRoute: '/dashboard',
       child: Scaffold(
@@ -183,102 +217,230 @@ class DashboardScreen extends ConsumerWidget {
                 onRefresh: () async {
                   await ref.read(salesHistoryNotifierProvider.notifier).fetchSales();
                 },
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
+                child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Date range selectors (Chips)
-                      _buildFilterChips(context, ref, salesState),
-                      const SizedBox(height: 16),
+                  child: CustomScrollView(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Date range selectors (Chips)
+                            _buildFilterChips(context, salesState),
+                            const SizedBox(height: 16),
 
-                      // Stats Row
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final count = constraints.maxWidth < 600
-                              ? 1
-                              : constraints.maxWidth < 900
-                                  ? 2
-                                  : 4;
-                          return GridView.count(
-                            crossAxisCount: count,
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            crossAxisSpacing: 16,
-                            mainAxisSpacing: 16,
-                            childAspectRatio: constraints.maxWidth < 600 ? 3.0 : 1.8,
-                            children: [
-                              _buildStatCard(
-                                context,
-                                'Pendapatan Kotor',
-                                _formatRupiah(totalRevenue),
-                                Icons.monetization_on_rounded,
-                                Colors.teal,
-                              ),
-                              _buildStatCard(
-                                context,
-                                'Jumlah Transaksi',
-                                '$totalTransactions Transaksi',
-                                Icons.shopping_basket_rounded,
-                                Colors.orange,
-                              ),
-                              _buildStatCard(
-                                context,
-                                'Rata-rata Belanja',
-                                _formatRupiah(averageBasket),
-                                Icons.trending_up_rounded,
-                                Colors.indigo,
-                              ),
-                              _buildStatCard(
-                                context,
-                                'Diskon Terpakai',
-                                _formatRupiah(totalDiscounts),
-                                Icons.percent_rounded,
-                                Colors.pink,
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 24),
-                      
-                      // Chart, Payment distribution and Leaderboard rows
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          if (constraints.maxWidth < 1000) {
-                            return Column(
-                              children: [
-                                _buildChartCard(context, spots, chartEntries, maxVal, dateRangeStr),
-                                const SizedBox(height: 24),
-                                _buildPaymentDistributionCard(context, cashTotal, qrisTotal, bankTotal),
-                                const SizedBox(height: 24),
-                                _buildLeaderboardCard(context, leaderboardLimit),
-                              ],
-                            );
-                          } else {
-                            return Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  flex: 2,
-                                  child: Column(
+                            // Stats Row
+                            _buildStatsGrid(totalRevenue, totalTransactions, averageBasket, totalDiscounts),
+                            const SizedBox(height: 24),
+
+                            // Charts & Payment Distribution
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                if (constraints.maxWidth < 1000) {
+                                  return Column(
                                     children: [
                                       _buildChartCard(context, spots, chartEntries, maxVal, dateRangeStr),
                                       const SizedBox(height: 24),
                                       _buildPaymentDistributionCard(context, cashTotal, qrisTotal, bankTotal),
                                     ],
+                                  );
+                                } else {
+                                  return Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: _buildChartCard(context, spots, chartEntries, maxVal, dateRangeStr),
+                                      ),
+                                      const SizedBox(width: 24),
+                                      Expanded(
+                                        child: _buildPaymentDistributionCard(context, cashTotal, qrisTotal, bankTotal),
+                                      ),
+                                    ],
+                                  );
+                                }
+                              },
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+                        ),
+                      ),
+
+                      // Sticky Pinned Header Card top
+                      SliverPersistentHeader(
+                        pinned: true,
+                        delegate: _StickyHeaderDelegate(
+                          child: Container(
+                            color: Theme.of(context).colorScheme.surface,
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Card(
+                              margin: EdgeInsets.zero,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(16),
+                                  topRight: Radius.circular(16),
+                                ),
+                                side: BorderSide(color: Colors.grey.shade200),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'Produk Terlaris',
+                                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                                    ),
+                                    if (topItems.isNotEmpty)
+                                      Text(
+                                        'Menampilkan ${_leaderboardLimit < topItems.length ? _leaderboardLimit : topItems.length} dari ${topItems.length} Produk',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // List Content wrapped as cards
+                      if (topItems.isEmpty)
+                        SliverToBoxAdapter(
+                          child: Container(
+                            color: Theme.of(context).colorScheme.surface,
+                            child: Card(
+                              margin: EdgeInsets.zero,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: const BorderRadius.only(
+                                  bottomLeft: Radius.circular(16),
+                                  bottomRight: Radius.circular(16),
+                                ),
+                                side: BorderSide(color: Colors.grey.shade200),
+                              ),
+                              child: const Padding(
+                                padding: EdgeInsets.all(40.0),
+                                child: Center(child: Text('Belum ada transaksi')),
+                              ),
+                            ),
+                          ),
+                        )
+                      else ...[
+                        SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final item = topItems[index];
+                              final isLast = index == _leaderboardLimit - 1 || index == topItems.length - 1;
+                              final double maxRevenue = topItems.isNotEmpty ? topItems.first.revenue : 1.0;
+
+                              return Container(
+                                color: Theme.of(context).colorScheme.surface,
+                                child: Card(
+                                  margin: EdgeInsets.zero,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.only(
+                                      bottomLeft: isLast ? const Radius.circular(16) : Radius.zero,
+                                      bottomRight: isLast ? const Radius.circular(16) : Radius.zero,
+                                    ),
+                                    side: BorderSide(color: Colors.grey.shade200),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+                                    child: Column(
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Container(
+                                              width: 28,
+                                              height: 28,
+                                              alignment: Alignment.center,
+                                              decoration: BoxDecoration(
+                                                color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: Text(
+                                                '#${index + 1}',
+                                                style: TextStyle(
+                                                  color: Theme.of(context).colorScheme.primary,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 14),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    item.name,
+                                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  ClipRRect(
+                                                    borderRadius: BorderRadius.circular(2),
+                                                    child: LinearProgressIndicator(
+                                                      value: maxRevenue > 0 ? item.revenue / maxRevenue : 0.0,
+                                                      backgroundColor: Colors.grey.shade100,
+                                                      color: Theme.of(context).colorScheme.primary,
+                                                      minHeight: 4,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    'Terjual ${item.qty} item',
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Text(
+                                              _formatRupiah(item.revenue),
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                            ),
+                                          ],
+                                        ),
+                                        if (!isLast) const Divider(height: 20, indent: 44),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(width: 24),
-                                Expanded(
-                                  child: _buildLeaderboardCard(context, leaderboardLimit),
+                              );
+                            },
+                            childCount: _leaderboardLimit < topItems.length ? _leaderboardLimit : topItems.length,
+                          ),
+                        ),
+                        if (_leaderboardLimit < topItems.length)
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 16.0),
+                              child: Center(
+                                child: TextButton.icon(
+                                  onPressed: () {
+                                    setState(() {
+                                      _leaderboardLimit += 10;
+                                    });
+                                  },
+                                  icon: const Icon(Icons.add),
+                                  label: const Text('Muat Lebih Banyak'),
                                 ),
-                              ],
-                            );
-                          }
-                        },
-                      ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ],
                   ),
                 ),
@@ -287,7 +449,14 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildFilterChips(BuildContext context, WidgetRef ref, SalesHistoryState salesState) {
+  void _updateFilter(VoidCallback updateCallback) {
+    setState(() {
+      _leaderboardLimit = 10;
+    });
+    updateCallback();
+  }
+
+  Widget _buildFilterChips(BuildContext context, SalesHistoryState salesState) {
     final notifier = ref.read(salesHistoryNotifierProvider.notifier);
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
@@ -296,13 +465,17 @@ class DashboardScreen extends ConsumerWidget {
     if (salesState.startDate != null && salesState.endDate != null) {
       final start = salesState.startDate!;
       final end = salesState.endDate!;
-      if (start.year == todayStart.year && start.month == todayStart.month && start.day == todayStart.day) {
+      final startZero = DateTime(start.year, start.month, start.day);
+      final endZero = DateTime(end.year, end.month, end.day);
+      final diffDays = endZero.difference(startZero).inDays;
+
+      if (startZero.year == todayStart.year && startZero.month == todayStart.month && startZero.day == todayStart.day) {
         activeFilter = 'today';
-      } else if (end.difference(start).inDays == 6 && end.day == now.day) {
+      } else if (diffDays == 6 && endZero.year == todayStart.year && endZero.month == todayStart.month && endZero.day == todayStart.day) {
         activeFilter = '7days';
-      } else if (end.difference(start).inDays == 29 && end.day == now.day) {
+      } else if (diffDays == 29 && endZero.year == todayStart.year && endZero.month == todayStart.month && endZero.day == todayStart.day) {
         activeFilter = '30days';
-      } else if (start.year == now.year && start.month == now.month && start.day == 1) {
+      } else if (startZero.year == now.year && startZero.month == now.month && startZero.day == 1) {
         activeFilter = 'month';
       } else {
         activeFilter = 'custom';
@@ -317,7 +490,9 @@ class DashboardScreen extends ConsumerWidget {
             label: const Text('Semua'),
             selected: activeFilter == 'all',
             onSelected: (selected) {
-              if (selected) notifier.updateDateFilter(null, null);
+              if (selected) {
+                _updateFilter(() => notifier.updateDateFilter(null, null));
+              }
             },
           ),
           const SizedBox(width: 8),
@@ -327,7 +502,7 @@ class DashboardScreen extends ConsumerWidget {
             onSelected: (selected) {
               if (selected) {
                 final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
-                notifier.updateDateFilter(todayStart, end);
+                _updateFilter(() => notifier.updateDateFilter(todayStart, end));
               }
             },
           ),
@@ -339,7 +514,7 @@ class DashboardScreen extends ConsumerWidget {
               if (selected) {
                 final start = todayStart.subtract(const Duration(days: 6));
                 final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
-                notifier.updateDateFilter(start, end);
+                _updateFilter(() => notifier.updateDateFilter(start, end));
               }
             },
           ),
@@ -351,7 +526,7 @@ class DashboardScreen extends ConsumerWidget {
               if (selected) {
                 final start = todayStart.subtract(const Duration(days: 29));
                 final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
-                notifier.updateDateFilter(start, end);
+                _updateFilter(() => notifier.updateDateFilter(start, end));
               }
             },
           ),
@@ -363,7 +538,7 @@ class DashboardScreen extends ConsumerWidget {
               if (selected) {
                 final start = DateTime(now.year, now.month, 1);
                 final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
-                notifier.updateDateFilter(start, end);
+                _updateFilter(() => notifier.updateDateFilter(start, end));
               }
             },
           ),
@@ -391,12 +566,62 @@ class DashboardScreen extends ConsumerWidget {
               );
               if (picked != null) {
                 final end = DateTime(picked.end.year, picked.end.month, picked.end.day, 23, 59, 59);
-                notifier.updateDateFilter(picked.start, end);
+                _updateFilter(() => notifier.updateDateFilter(picked.start, end));
               }
             },
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildStatsGrid(double totalRevenue, int totalTransactions, double averageBasket, double totalDiscounts) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final count = constraints.maxWidth < 600
+            ? 1
+            : constraints.maxWidth < 900
+                ? 2
+                : 4;
+        return GridView.count(
+          crossAxisCount: count,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+          childAspectRatio: constraints.maxWidth < 600 ? 3.0 : 1.8,
+          children: [
+            _buildStatCard(
+              context,
+              'Pendapatan Kotor',
+              _formatRupiah(totalRevenue),
+              Icons.monetization_on_rounded,
+              Colors.teal,
+            ),
+            _buildStatCard(
+              context,
+              'Jumlah Transaksi',
+              '$totalTransactions Transaksi',
+              Icons.shopping_basket_rounded,
+              Colors.orange,
+            ),
+            _buildStatCard(
+              context,
+              'Rata-rata Belanja',
+              _formatRupiah(averageBasket),
+              Icons.trending_up_rounded,
+              Colors.indigo,
+            ),
+            _buildStatCard(
+              context,
+              'Diskon Terpakai',
+              _formatRupiah(totalDiscounts),
+              Icons.percent_rounded,
+              Colors.pink,
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -663,104 +888,6 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildLeaderboardCard(BuildContext context, List<_TopItem> topItems) {
-    final double maxRevenue = topItems.isNotEmpty ? topItems.first.revenue : 1.0;
-
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Produk Terlaris',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            if (topItems.isEmpty)
-              const SizedBox(
-                height: 180,
-                child: Center(child: Text('Belum ada transaksi')),
-              )
-            else
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: topItems.length,
-                separatorBuilder: (c, i) => const Divider(height: 20, indent: 44),
-                itemBuilder: (context, index) {
-                  final item = topItems[index];
-                  return Row(
-                    children: [
-                      Container(
-                        width: 28,
-                        height: 28,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          '#${index + 1}',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.name,
-                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(2),
-                              child: LinearProgressIndicator(
-                                value: maxRevenue > 0 ? item.revenue / maxRevenue : 0.0,
-                                backgroundColor: Colors.grey.shade100,
-                                color: Theme.of(context).colorScheme.primary,
-                                minHeight: 4,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Terjual ${item.qty} item',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        _formatRupiah(item.revenue),
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                      ),
-                    ],
-                  );
-                },
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
   String _formatRupiah(double val) {
     final formatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
     return formatter.format(val);
@@ -777,4 +904,32 @@ class _TopItem {
     required this.qty,
     required this.revenue,
   });
+}
+
+class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+
+  _StickyHeaderDelegate({required this.child});
+
+  @override
+  double get minExtent => 76.0;
+
+  @override
+  double get maxExtent => 76.0;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: SizedBox(
+        height: maxExtent,
+        child: child,
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _StickyHeaderDelegate oldDelegate) {
+    return oldDelegate.child != child;
+  }
 }

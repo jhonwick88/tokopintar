@@ -9,7 +9,7 @@ import '../providers/settings_provider.dart';
 import '../screens/mobile_cart_screen.dart';
 import '../widgets/camera_scanner_dialog.dart';
 
-class MainLayout extends ConsumerWidget {
+class MainLayout extends ConsumerStatefulWidget {
   final Widget child;
   final String currentRoute;
 
@@ -18,6 +18,26 @@ class MainLayout extends ConsumerWidget {
     required this.child,
     required this.currentRoute,
   });
+
+  @override
+  ConsumerState<MainLayout> createState() => _MainLayoutState();
+}
+
+class _MainLayoutState extends ConsumerState<MainLayout> {
+  late final TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    final query = ref.read(itemsNotifierProvider).searchQuery;
+    _searchController = TextEditingController(text: query);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   void _openCameraScanner(BuildContext context, WidgetRef ref) async {
     final barcode = await showDialog<String>(
@@ -94,243 +114,171 @@ class MainLayout extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    // Sync external query reset
+    final searchVal = ref.watch(itemsNotifierProvider.select((s) => s.searchQuery));
+    if (searchVal.isEmpty && _searchController.text.isNotEmpty) {
+      _searchController.text = '';
+    }
+
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width >= 900;
     final authState = ref.watch(authNotifierProvider);
-    final settings = ref.watch(settingsNotifierProvider);
-    final themeMode = ref.watch(themeModeProvider);
-
-    void confirmLogout(BuildContext context) {
-      showDialog(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: const Text('Konfirmasi Keluar'),
-            content: const Text('Apakah Anda yakin ingin keluar dari akun kasir saat ini?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Batal'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  ref.read(authNotifierProvider.notifier).logout();
-                },
-                child: const Text('Keluar', style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          );
-        },
-      );
-    }
-
-    final cashierName = authState.currentUser?.fullname ?? 'Admin';
-    final cashierRole = authState.currentUser?.role.toUpperCase() ?? 'ADMIN';
 
     final navItems = [
-      _NavItem(icon: Icons.point_of_sale, label: 'POS Kasir', route: '/pos'),
+      _NavItem(icon: Icons.point_of_sale, label: 'POS', route: '/pos'),
       _NavItem(icon: Icons.dashboard, label: 'Dashboard', route: '/dashboard'),
       _NavItem(icon: Icons.history, label: 'Riwayat', route: '/history'),
       _NavItem(icon: Icons.settings, label: 'Pengaturan', route: '/settings'),
     ];
 
+    int activeIndex = navItems.indexWhere((i) => widget.currentRoute == i.route);
+    if (activeIndex < 0) activeIndex = 0;
+
     if (isDesktop) {
-      // Desktop Sidebar Layout
       return Scaffold(
         body: Row(
           children: [
             // Sidebar Navigation
             Container(
-              width: 260,
+              width: 240,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHigh,
-                border: Border(
-                  right: BorderSide(
-                    color: Theme.of(context).dividerColor.withOpacity(0.08),
-                  ),
-                ),
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                border: Border(right: BorderSide(color: Colors.grey.withOpacity(0.12))),
               ),
               child: Column(
                 children: [
-                  // Shop branding header
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                  // App Brand Logo
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    alignment: Alignment.centerLeft,
                     child: Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.store,
-                            color: Theme.of(context).colorScheme.primary,
-                            size: 28,
-                          ),
-                        ),
+                        Icon(Icons.storefront_rounded, color: Theme.of(context).colorScheme.primary, size: 32),
                         const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                settings.shopName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                  letterSpacing: 0.5,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Text(
-                                'Multiplatform POS',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
+                        const Text(
+                          'TokoPintar',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
                         ),
                       ],
                     ),
                   ),
+                  const Divider(height: 1),
+                  const SizedBox(height: 16),
                   
-                  // Navigation Links
+                  // Nav Options
                   Expanded(
                     child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
                       itemCount: navItems.length,
                       itemBuilder: (context, index) {
                         final item = navItems[index];
-                        final isActive = currentRoute == item.route;
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 4),
+                        final isSelected = activeIndex == index;
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                           child: ListTile(
-                            selected: isActive,
-                            selectedTileColor: Theme.of(context).colorScheme.primary.withOpacity(0.08),
-                            iconColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                            selectedColor: Theme.of(context).colorScheme.primary,
-                            leading: Icon(item.icon),
+                            leading: Icon(
+                              item.icon,
+                              color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey,
+                            ),
                             title: Text(
                               item.label,
                               style: TextStyle(
-                                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                color: isSelected ? Theme.of(context).colorScheme.primary : null,
                               ),
                             ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            onTap: () => context.go(item.route),
+                            selected: isSelected,
+                            selectedTileColor: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            onTap: () {
+                              context.go(item.route);
+                            },
                           ),
                         );
                       },
                     ),
                   ),
-
-                  // Bottom Cashier info and toggles
-                  Divider(height: 1, color: Theme.of(context).dividerColor.withOpacity(0.08)),
                   
-                  // Theme Mode & Logged Cashier Profile
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              themeMode == ThemeMode.dark ? 'Dark Mode' : 'Light Mode',
-                              style: const TextStyle(fontSize: 14),
+                  // Cashier Info Footer
+                  const Divider(height: 1),
+                  if (authState.currentUser != null)
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                            child: Text(
+                              authState.currentUser!.fullname[0].toUpperCase(),
+                              style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
                             ),
-                            IconButton(
-                              onPressed: () {
-                                ref.read(themeModeProvider.notifier).state =
-                                    themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
-                              },
-                              icon: Icon(
-                                themeMode == ThemeMode.dark ? Icons.dark_mode : Icons.light_mode,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                              child: Text(
-                                cashierName[0].toUpperCase(),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  authState.currentUser!.fullname,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ),
+                                Text(
+                                  authState.currentUser!.role.toUpperCase(),
+                                  style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    cashierName,
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  Text(
-                                    cashierRole,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Theme.of(context).colorScheme.primary,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: () => confirmLogout(context),
-                              icon: const Icon(Icons.logout, size: 20),
-                              tooltip: 'Keluar',
-                            ),
-                          ],
-                        ),
-                      ],
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.logout, size: 18),
+                            onPressed: () {
+                              ref.read(authNotifierProvider.notifier).logout();
+                              context.go('/login');
+                            },
+                            tooltip: 'Keluar Akun',
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
             
             // Content Pane
-            Expanded(child: child),
+            Expanded(child: widget.child),
           ],
         ),
       );
     } else {
       // Mobile Layout (AppBar + Bottom Nav)
-      int activeIndex = navItems.indexWhere((i) => currentRoute == i.route);
-      if (activeIndex < 0) activeIndex = 0;
-
-      final showOuterAppBar = currentRoute == '/pos';
+      final showOuterAppBar = widget.currentRoute == '/pos';
 
       return Scaffold(
         appBar: showOuterAppBar
             ? AppBar(
                 title: TextField(
+                  controller: _searchController,
                   style: const TextStyle(fontSize: 14),
                   decoration: InputDecoration(
                     hintText: 'Cari produk... (F3)',
                     prefixIcon: const Icon(Icons.search, size: 20),
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.qr_code_scanner, size: 20),
-                      onPressed: () => _openCameraScanner(context, ref),
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (searchVal.isNotEmpty)
+                          IconButton(
+                            icon: const Icon(Icons.clear, size: 20),
+                            onPressed: () {
+                              _searchController.clear();
+                              ref.read(itemsNotifierProvider.notifier).search('');
+                            },
+                          ),
+                        IconButton(
+                          icon: const Icon(Icons.qr_code_scanner, size: 20),
+                          onPressed: () => _openCameraScanner(context, ref),
+                        ),
+                      ],
                     ),
                     filled: true,
                     fillColor: Theme.of(context).colorScheme.surfaceContainer,
@@ -374,7 +322,7 @@ class MainLayout extends ConsumerWidget {
                 ],
               )
             : null,
-        body: child,
+        body: widget.child,
         bottomNavigationBar: NavigationBar(
           selectedIndex: activeIndex,
           onDestinationSelected: (idx) {

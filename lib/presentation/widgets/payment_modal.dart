@@ -1,9 +1,13 @@
+import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../providers/pos_provider.dart';
+import '../providers/settings_provider.dart';
+import '../../data/models/sale_model.dart';
+import '../../domain/services/printer_service.dart';
 
 class PaymentModal extends ConsumerStatefulWidget {
   const PaymentModal({super.key});
@@ -157,7 +161,7 @@ class _PaymentModalState extends ConsumerState<PaymentModal> {
       if (mounted && sale != null) {
         // Show Success Dialog
         Navigator.of(context).pop(); // Close Payment Modal
-        _showSuccessDialog(sale.invoiceNo, sale.grandTotal, sale.paidAmount, sale.changeAmount);
+        _showSuccessDialog(sale);
       }
     } catch (e) {
       setState(() {
@@ -167,7 +171,7 @@ class _PaymentModalState extends ConsumerState<PaymentModal> {
     }
   }
 
-  void _showSuccessDialog(String invoice, double total, double paid, double change) {
+  void _showSuccessDialog(SaleModel sale) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -188,7 +192,7 @@ class _PaymentModalState extends ConsumerState<PaymentModal> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  invoice,
+                  sale.invoiceNo,
                   style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 24),
@@ -202,15 +206,15 @@ class _PaymentModalState extends ConsumerState<PaymentModal> {
                   ),
                   child: Column(
                     children: [
-                      _buildSummaryRow('Total Belanja', _formatRupiah(total)),
+                      _buildSummaryRow('Total Belanja', _formatRupiah(sale.grandTotal)),
                       const SizedBox(height: 8),
-                      _buildSummaryRow('Total Bayar', _formatRupiah(paid)),
+                      _buildSummaryRow('Total Bayar', _formatRupiah(sale.paidAmount)),
                       const SizedBox(height: 8),
                       const Divider(),
                       const SizedBox(height: 8),
                       _buildSummaryRow(
                         'Kembalian',
-                        _formatRupiah(change),
+                        _formatRupiah(sale.changeAmount),
                         valueColor: Colors.green,
                         bold: true,
                       ),
@@ -228,11 +232,7 @@ class _PaymentModalState extends ConsumerState<PaymentModal> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         onPressed: () {
-                          // Print again
-                          ref.read(posNotifierProvider.notifier).checkout(
-                            paymentMethod: _selectedMethod,
-                            paidAmount: paid,
-                          ); // Re-trigger printer
+                          _printReceiptDirect(sale);
                         },
                         icon: const Icon(Icons.print),
                         label: const Text('Cetak Ulang'),
@@ -261,6 +261,70 @@ class _PaymentModalState extends ConsumerState<PaymentModal> {
     );
   }
 
+  Future<void> _printReceiptDirect(SaleModel sale) async {
+    final settings = ref.read(settingsNotifierProvider);
+    final printBytes = PrinterService.instance.generateReceiptBytes(sale, settings);
+    bool success = false;
+    
+    try {
+      if (settings.printerType == 'LAN') {
+        success = await PrinterService.instance.printToLan(
+          settings.printerIp,
+          settings.printerPort,
+          printBytes,
+          copies: settings.printReceiptCopies,
+        );
+      } else if (settings.printerType == 'Bluetooth') {
+        success = await PrinterService.instance.printToBluetooth(
+          settings.printerMacAddress,
+          printBytes,
+          copies: settings.printReceiptCopies,
+        );
+      } else if (settings.printerType == 'USB') {
+        success = await PrinterService.instance.printToWindows(
+          settings.printerMacAddress,
+          sale,
+          settings,
+        );
+      } else {
+        dev.log('Mock print direct: Invoice ${sale.invoiceNo} printed.');
+        success = true;
+      }
+      
+      if (success) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Print job berhasil dikirim'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Gagal mengirim print job. Periksa printer Anda.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Terjadi kesalahan saat mencetak: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildSummaryRow(String label, String val, {Color? valueColor, bool bold = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -287,7 +351,7 @@ class _PaymentModalState extends ConsumerState<PaymentModal> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Container(
         width: 800,
-        height: 600,
+        height: 660,
         child: Row(
           children: [
             // Left pane: Payment Details & Selection
@@ -298,89 +362,96 @@ class _PaymentModalState extends ConsumerState<PaymentModal> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Metode Pembayaran',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // Toggle Buttons
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          _buildMethodTab('cash', Icons.money_rounded, 'Tunai'),
-                          const SizedBox(width: 8),
-                          _buildMethodTab('qris', Icons.qr_code_2_rounded, 'QRIS'),
-                          const SizedBox(width: 8),
-                          _buildMethodTab('bank', Icons.credit_card_rounded, 'Bank/Card'),
-                          const SizedBox(width: 8),
-                          _buildMethodTab('ewallet', Icons.wallet_rounded, 'E-Wallet'),
-                          const SizedBox(width: 8),
-                          _buildMethodTab('split', Icons.alt_route_rounded, 'Split'),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    
-                    // Dynamic payment details screen based on selection
                     Expanded(
-                      child: _buildSelectedMethodPane(grandTotal),
-                    ),
-                    
-                    const Divider(),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Subtotal:', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                        Text(_formatRupiah(posState.subtotal), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-                      ],
-                    ),
-                    if (posState.totalDiscount > 0) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Total Diskon:', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                          Text('-${_formatRupiah(posState.totalDiscount)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.red)),
-                        ],
-                      ),
-                    ],
-                    if (posState.enableServiceCharge && posState.serviceCharge > 0) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Service Charge (${posState.serviceChargePercentage.toInt()}%):', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                          Text(_formatRupiah(posState.serviceCharge), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-                        ],
-                      ),
-                    ],
-                    if (posState.enableTax && posState.tax > 0) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Pajak PPN (${posState.taxPercentage.toInt()}%):', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                          Text(_formatRupiah(posState.tax), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-                        ],
-                      ),
-                    ],
-                    const Divider(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Total Harus Dibayar:', style: TextStyle(fontSize: 14, color: Colors.black, fontWeight: FontWeight.bold)),
-                        Text(
-                          _formatRupiah(grandTotal),
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Metode Pembayaran',
+                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 16),
+                            
+                            // Toggle Buttons
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  _buildMethodTab('cash', Icons.money_rounded, 'Tunai'),
+                                  const SizedBox(width: 8),
+                                  _buildMethodTab('qris', Icons.qr_code_2_rounded, 'QRIS'),
+                                  const SizedBox(width: 8),
+                                  _buildMethodTab('bank', Icons.credit_card_rounded, 'Bank/Card'),
+                                  const SizedBox(width: 8),
+                                  _buildMethodTab('ewallet', Icons.wallet_rounded, 'E-Wallet'),
+                                  const SizedBox(width: 8),
+                                  _buildMethodTab('split', Icons.alt_route_rounded, 'Split'),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            
+                            // Dynamic payment details screen based on selection
+                            _buildSelectedMethodPane(grandTotal),
+                            
+                            const Divider(),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Subtotal:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                Text(_formatRupiah(posState.subtotal), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                              ],
+                            ),
+                            if (posState.totalDiscount > 0) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Total Diskon:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                  Text('-${_formatRupiah(posState.totalDiscount)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.red)),
+                                ],
+                              ),
+                            ],
+                            if (posState.enableServiceCharge && posState.serviceCharge > 0) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('Service Charge (${posState.serviceChargePercentage.toInt()}%):', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                  Text(_formatRupiah(posState.serviceCharge), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                                ],
+                              ),
+                            ],
+                            if (posState.enableTax && posState.tax > 0) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('Pajak PPN (${posState.taxPercentage.toInt()}%):', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                  Text(_formatRupiah(posState.tax), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                                ],
+                              ),
+                            ],
+                            const Divider(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Total Harus Dibayar:', style: TextStyle(fontSize: 14, color: Colors.black, fontWeight: FontWeight.bold)),
+                                Text(
+                                  _formatRupiah(grandTotal),
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                     const SizedBox(height: 16),
                     

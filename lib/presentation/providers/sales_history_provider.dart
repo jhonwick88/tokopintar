@@ -71,7 +71,12 @@ class SalesHistoryNotifier extends StateNotifier<SalesHistoryState> {
   final SalesRepository _salesRepository;
   final Ref _ref;
 
-  SalesHistoryNotifier(this._salesRepository, this._ref) : super(SalesHistoryState()) {
+  SalesHistoryNotifier(this._salesRepository, this._ref) : super(
+    SalesHistoryState(
+      startDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day).subtract(const Duration(days: 6)),
+      endDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day, 23, 59, 59),
+    ),
+  ) {
     fetchSales();
   }
 

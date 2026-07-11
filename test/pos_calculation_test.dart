@@ -49,11 +49,11 @@ void main() {
 
       final posState = PosState(cartItems: items);
 
-      // subtotal sum (gross price * qty) = 30000 + 12000 = 42000
-      expect(posState.subtotal, 42000.0);
+      // subtotal sum (including item discounts) = 28000 + 12000 = 40000
+      expect(posState.subtotal, 40000.0);
       // item discounts total = 2000
       expect(posState.itemDiscountsTotal, 2000.0);
-      // grandTotal = 42000 - 2000 = 40000
+      // grandTotal = 40000
       expect(posState.grandTotal, 40000.0);
     });
 
@@ -99,6 +99,32 @@ void main() {
       final change = paid - posState.grandTotal;
 
       expect(change, 5000.0);
+    });
+
+    test('PosState total metrics with nearest 500 rounding active', () {
+      final items = [
+        CartItem(
+          item: ItemModel(
+            itemNo: '003',
+            itemUPC: '89903',
+            itemName: 'Aqua',
+            categoryId: 1,
+            price: 1200.0,
+          ),
+          qty: 1,
+          isRoundedTo500: true,
+        ), // subtotal: 1200 rounded up to 1500
+        CartItem(item: mockItem2, qty: 1), // subtotal: 12000 (not rounded)
+      ];
+
+      final posState = PosState(cartItems: items);
+
+      // subtotal sum (including rounded items) = 1500 + 12000 = 13500
+      expect(posState.subtotal, 13500.0);
+      // rounding adjustment is no longer active at the state level (it is 0.0)
+      expect(posState.roundingAdjustment, 0.0);
+      // grandTotal = 13500
+      expect(posState.grandTotal, 13500.0);
     });
   });
 }

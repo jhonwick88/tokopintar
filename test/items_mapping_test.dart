@@ -3,6 +3,7 @@ import 'package:tokopintar/data/models/category_model.dart';
 import 'package:tokopintar/data/models/item_model.dart';
 import 'package:tokopintar/domain/repositories/items_repository.dart';
 import 'package:tokopintar/presentation/providers/items_provider.dart';
+import 'package:tokopintar/presentation/screens/pos_screen.dart';
 
 class MockItemsRepository implements ItemsRepository {
   List<ItemModel> db = [];
@@ -149,6 +150,96 @@ void main() {
 
       expect(mockRepo.db.any((it) => it.itemNo == 'SKU_NEW_PROD'), isTrue);
       expect(notifier.state.items.any((it) => it.itemNo == 'SKU_NEW_PROD'), isTrue);
+    });
+  });
+
+  group('ItemsNotifier Category and Search Filtering Tests', () {
+    late MockItemsRepository mockRepo;
+    late ItemsNotifier notifier;
+
+    setUp(() async {
+      mockRepo = MockItemsRepository();
+      mockRepo.db = [
+        ItemModel(
+          itemNo: 'SKU_1',
+          itemUPC: '1111',
+          itemName: 'Bola Basket',
+          categoryId: 1, // Sports
+          price: 150000,
+        ),
+        ItemModel(
+          itemNo: 'SKU_2',
+          itemUPC: '2222',
+          itemName: 'Bola Lampu',
+          categoryId: 2, // Electronics
+          price: 15000,
+        ),
+        ItemModel(
+          itemNo: 'SKU_3',
+          itemUPC: '3333',
+          itemName: 'Sepatu Lari',
+          categoryId: 1, // Sports
+          price: 300000,
+        ),
+      ];
+      notifier = ItemsNotifier(mockRepo);
+      await Future.delayed(const Duration(milliseconds: 50));
+      while (notifier.state.isLoading) {
+        await Future.delayed(const Duration(milliseconds: 5));
+      }
+    });
+
+    test('Searching "Bola" globally shows both Bola Basket and Bola Lampu', () async {
+      await notifier.search('Bola');
+      expect(notifier.state.items.length, 2);
+      expect(notifier.state.items.any((it) => it.itemName == 'Bola Basket'), isTrue);
+      expect(notifier.state.items.any((it) => it.itemName == 'Bola Lampu'), isTrue);
+      expect(notifier.state.selectedCategoryId, isNull);
+    });
+
+    test('Selecting a category after searching "Bola" filters matches to that category only', () async {
+      await notifier.search('Bola');
+      await notifier.selectCategory(1); // Sports
+
+      expect(notifier.state.searchQuery, 'Bola');
+      expect(notifier.state.selectedCategoryId, 1);
+      expect(notifier.state.items.length, 1);
+      expect(notifier.state.items.first.itemName, 'Bola Basket');
+    });
+
+    test('Clearing category back to null (Semua Produk) retains search query and returns all search results', () async {
+      await notifier.search('Bola');
+      await notifier.selectCategory(1); // Sports
+      await notifier.selectCategory(null); // Semua Produk
+
+      expect(notifier.state.searchQuery, 'Bola');
+      expect(notifier.state.selectedCategoryId, isNull);
+      expect(notifier.state.items.length, 2);
+    });
+  });
+
+  group('generateSKUFromName Helper Tests', () {
+    test('Correctly generates SKU for Buku Tulis Sinar Dunia Isi 32 Ecer', () {
+      final name = 'Buku Tulis Sinar Dunia Isi 32 Ecer';
+      final sku = generateSKUFromName(name);
+      expect(sku, 'BKTLSSNRD32E');
+    });
+
+    test('Correctly generates SKU for Buku Tulis Sinar Dunia Isi 32 Pak', () {
+      final name = 'Buku Tulis Sinar Dunia Isi 32 Pak';
+      final sku = generateSKUFromName(name);
+      expect(sku, 'BKTLSSNRD32P');
+    });
+
+    test('Correctly generates SKU for Kopi Kapal Api Saset', () {
+      final name = 'Kopi Kapal Api Saset';
+      final sku = generateSKUFromName(name);
+      expect(sku, 'KPKPLAPS');
+    });
+
+    test('Correctly handles empty and special character names', () {
+      expect(generateSKUFromName(''), '');
+      expect(generateSKUFromName('Aqua Pcs'), 'AQE');
     });
   });
 }

@@ -95,17 +95,20 @@ class PosState {
   });
 
   double get subtotal {
-    return cartItems.fold(0.0, (sum, i) => sum + (i.price * i.qty));
+    return cartItems.fold(0.0, (sum, i) => sum + i.subtotal);
   }
 
   double get itemDiscountsTotal {
     return cartItems.fold(0.0, (sum, i) => sum + i.discount);
   }
 
+  double get roundingAdjustment {
+    return 0.0;
+  }
+
   double get transactionDiscount {
-    final subAfterItems = subtotal - itemDiscountsTotal;
     if (discountType == 'percent') {
-      return subAfterItems * (discountValue / 100);
+      return subtotal * (discountValue / 100);
     } else if (discountType == 'nominal') {
       return discountValue;
     }
@@ -116,19 +119,19 @@ class PosState {
 
   double get serviceCharge {
     if (!enableServiceCharge) return 0.0;
-    final netSub = subtotal - totalDiscount;
+    final netSub = subtotal - transactionDiscount;
     return netSub > 0 ? netSub * (serviceChargePercentage / 100) : 0.0;
   }
 
   double get tax {
     if (!enableTax) return 0.0;
-    final netSub = subtotal - totalDiscount;
+    final netSub = subtotal - transactionDiscount;
     final totalWithService = netSub + serviceCharge;
     return totalWithService > 0 ? totalWithService * (taxPercentage / 100) : 0.0;
   }
 
   double get grandTotal {
-    final netSub = subtotal - totalDiscount;
+    final netSub = subtotal - transactionDiscount;
     final total = netSub + serviceCharge + tax;
     return total > 0 ? total : 0.0;
   }
@@ -349,7 +352,7 @@ class PosNotifier extends StateNotifier<PosState> {
       date: now,
       cashier: cashierName,
       subtotal: state.subtotal,
-      discount: state.totalDiscount,
+      discount: state.transactionDiscount,
       tax: state.tax,
       serviceCharge: state.serviceCharge,
       grandTotal: state.grandTotal,

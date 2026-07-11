@@ -13,6 +13,7 @@ class ItemsState {
   final bool isLoading;
   final bool hasReachedMax;
   final String? errorMessage;
+  final String sortByPrice; // 'none', 'asc', 'desc'
 
   ItemsState({
     this.categories = const [],
@@ -23,7 +24,19 @@ class ItemsState {
     this.isLoading = false,
     this.hasReachedMax = false,
     this.errorMessage,
+    this.sortByPrice = 'none',
   });
+
+  List<ItemModel> get sortedItems {
+    if (sortByPrice == 'none') return items;
+    final sorted = List<ItemModel>.from(items);
+    if (sortByPrice == 'asc') {
+      sorted.sort((a, b) => a.price.compareTo(b.price));
+    } else if (sortByPrice == 'desc') {
+      sorted.sort((a, b) => b.price.compareTo(a.price));
+    }
+    return sorted;
+  }
 
   ItemsState copyWith({
     List<CategoryModel>? categories,
@@ -36,6 +49,7 @@ class ItemsState {
     bool? hasReachedMax,
     String? errorMessage,
     bool clearError = false,
+    String? sortByPrice,
   }) {
     return ItemsState(
       categories: categories ?? this.categories,
@@ -46,6 +60,7 @@ class ItemsState {
       isLoading: isLoading ?? this.isLoading,
       hasReachedMax: hasReachedMax ?? this.hasReachedMax,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      sortByPrice: sortByPrice ?? this.sortByPrice,
     );
   }
 }
@@ -55,6 +70,10 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
 
   ItemsNotifier(this._itemsRepository) : super(ItemsState()) {
     initCatalog();
+  }
+
+  void toggleSortByPrice(String order) {
+    state = state.copyWith(sortByPrice: order);
   }
 
   Future<void> initCatalog() async {
@@ -82,7 +101,16 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
       List<ItemModel> fetchedItems = [];
       const limit = 50;
 
-      if (state.selectedCategoryId != null) {
+      if (state.selectedCategoryId != null && state.searchQuery.isNotEmpty) {
+        final searchResults = await _itemsRepository.searchItems(
+          state.searchQuery,
+          page: targetPage,
+          limit: limit,
+        );
+        fetchedItems = searchResults
+            .where((item) => item.categoryId == state.selectedCategoryId)
+            .toList();
+      } else if (state.selectedCategoryId != null) {
         fetchedItems = await _itemsRepository.getItemsByCategory(
           state.selectedCategoryId!,
           page: targetPage,
@@ -118,9 +146,9 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
   Future<void> selectCategory(int? categoryId) async {
     if (state.selectedCategoryId == categoryId) return;
     if (categoryId == null) {
-      state = state.copyWith(clearCategory: true, searchQuery: '');
+      state = state.copyWith(clearCategory: true);
     } else {
-      state = state.copyWith(selectedCategoryId: categoryId, searchQuery: '');
+      state = state.copyWith(selectedCategoryId: categoryId);
     }
     await loadItems(refresh: true);
   }

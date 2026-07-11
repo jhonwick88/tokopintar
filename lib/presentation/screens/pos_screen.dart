@@ -661,6 +661,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   Widget _buildCatalogSection(ItemsState state) {
     final width = MediaQuery.of(context).size.width;
     final isLargeScreen = width >= 900;
+    final displayItems = state.sortedItems;
 
     return Padding(
       padding: const EdgeInsets.all(20.0),
@@ -673,10 +674,19 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   child: TextField(
                     focusNode: _searchFocusNode,
                     controller: _searchController,
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.search),
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.search),
                       hintText: 'Cari produk berdasarkan nama... (F3)',
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      suffixIcon: state.searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchController.clear();
+                                ref.read(itemsNotifierProvider.notifier).search('');
+                              },
+                            )
+                          : null,
                     ),
                     onChanged: (val) {
                       ref.read(itemsNotifierProvider.notifier).search(val.trim());
@@ -733,6 +743,36 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  style: IconButton.styleFrom(
+                    backgroundColor: state.sortByPrice != 'none'
+                        ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                        : null,
+                    foregroundColor: state.sortByPrice != 'none'
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                  ),
+                  icon: Icon(
+                    state.sortByPrice == 'asc'
+                        ? Icons.arrow_upward
+                        : state.sortByPrice == 'desc'
+                            ? Icons.arrow_downward
+                            : Icons.sort_by_alpha_outlined,
+                    size: 20,
+                  ),
+                  onPressed: () {
+                    final current = state.sortByPrice;
+                    final next = current == 'none'
+                        ? 'asc'
+                        : current == 'asc'
+                            ? 'desc'
+                            : 'none';
+                    ref.read(itemsNotifierProvider.notifier).toggleSortByPrice(next);
+                  },
+                  tooltip: 'Sortir Harga',
+                ),
+                const SizedBox(width: 8),
                 ActionChip(
                   avatar: const Icon(Icons.bolt, color: Colors.teal, size: 18),
                   label: const Text(
@@ -770,7 +810,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           
           // Row 3: Product Grid/List Catalog
           Expanded(
-            child: state.items.isEmpty
+            child: displayItems.isEmpty
                 ? Center(
                     child: state.isLoading
                         ? const CircularProgressIndicator()
@@ -841,12 +881,12 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
                         ),
-                        itemCount: state.items.length + (state.isLoading ? 6 : 0),
+                        itemCount: displayItems.length + (state.isLoading ? 6 : 0),
                         itemBuilder: (context, index) {
-                          if (index >= state.items.length) {
+                          if (index >= displayItems.length) {
                             return const Card(child: Center(child: CircularProgressIndicator()));
                           }
-                          final product = state.items[index];
+                          final product = displayItems[index];
                           return InkWell(
                             onTap: () {
                               ref.read(posNotifierProvider.notifier).addToCart(product);
@@ -923,10 +963,10 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                     : ListView.separated(
                         controller: _catalogScrollController,
                         padding: const EdgeInsets.symmetric(vertical: 8),
-                        itemCount: state.items.length + (state.isLoading ? 3 : 0),
+                        itemCount: displayItems.length + (state.isLoading ? 3 : 0),
                         separatorBuilder: (context, index) => const SizedBox(height: 8),
                         itemBuilder: (context, index) {
-                          if (index >= state.items.length) {
+                          if (index >= displayItems.length) {
                             return const Card(
                               child: Padding(
                                 padding: EdgeInsets.all(16.0),
@@ -934,7 +974,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                               ),
                             );
                           }
-                          final product = state.items[index];
+                          final product = displayItems[index];
                           return Card(
                             child: InkWell(
                               onTap: () {
@@ -1158,48 +1198,59 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           color: Theme.of(context).colorScheme.surface,
           padding: const EdgeInsets.all(16),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              _buildSummaryRow('Subtotal', _formatRupiah(state.subtotal)),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Diskon Transaksi', style: TextStyle(fontSize: 12)),
-                  InkWell(
-                    onTap: _openDiscountDialog,
-                    child: Text(
-                      state.totalDiscount > 0 ? '-${_formatRupiah(state.totalDiscount)}' : 'Tambah Diskon',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: state.totalDiscount > 0 ? Colors.red : Theme.of(context).colorScheme.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                  _buildSummaryRow(
+                    'Total Barang',
+                    '${state.cartItems.length} Jenis (${state.cartItems.fold<int>(0, (sum, item) => sum + item.qty)} Pcs)',
                   ),
-                ],
-              ),
-              if (state.enableServiceCharge && state.serviceCharge > 0) ...[
-                const SizedBox(height: 4),
-                _buildSummaryRow('Service Charge (${state.serviceChargePercentage.toInt()}%)', _formatRupiah(state.serviceCharge)),
-              ],
-              if (state.enableTax && state.tax > 0) ...[
-                const SizedBox(height: 4),
-                _buildSummaryRow('Pajak PPN (${state.taxPercentage.toInt()}%)', _formatRupiah(state.tax)),
-              ],
-              const SizedBox(height: 8),
-              const Divider(),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Total Pembayaran', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  Text(
-                    _formatRupiah(state.grandTotal),
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                  const SizedBox(height: 4),
+                  _buildSummaryRow('Subtotal', _formatRupiah(state.subtotal)),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Diskon Transaksi', style: TextStyle(fontSize: 12)),
+                      InkWell(
+                        onTap: _openDiscountDialog,
+                        child: Text(
+                          state.totalDiscount > 0 ? '-${_formatRupiah(state.totalDiscount)}' : 'Tambah Diskon',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: state.totalDiscount > 0 ? Colors.red : Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (state.enableServiceCharge && state.serviceCharge > 0) ...[
+                    const SizedBox(height: 4),
+                    _buildSummaryRow('Service Charge (${state.serviceChargePercentage.toInt()}%)', _formatRupiah(state.serviceCharge)),
+                  ],
+                  if (state.enableTax && state.tax > 0) ...[
+                    const SizedBox(height: 4),
+                    _buildSummaryRow('Pajak PPN (${state.taxPercentage.toInt()}%)', _formatRupiah(state.tax)),
+                  ],
+                  const SizedBox(height: 8),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Total Pembayaran', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      Text(
+                        _formatRupiah(state.grandTotal),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1277,7 +1328,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             children: [
               Icon(Icons.warning_amber_rounded, color: Colors.orange),
               SizedBox(width: 8),
-              Text('Barcode Unregistered'),
+              Text('UPC Unregister'),
             ],
           ),
           content: Text(
@@ -1426,18 +1477,48 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 const SizedBox(height: 16),
                 TextField(
                   controller: barcodeController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Barcode / UPC (itemUPC)',
-                    prefixIcon: Icon(Icons.qr_code),
+                    prefixIcon: const Icon(Icons.qr_code),
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.qr_code_scanner),
+                      onPressed: () async {
+                        final scanned = await showDialog<String>(
+                          context: context,
+                          builder: (context) => const CameraScannerDialog(),
+                        );
+                        if (scanned != null) {
+                          barcodeController.text = scanned;
+                        }
+                      },
+                      tooltip: 'Scan Barcode',
+                    ),
                   ),
                   keyboardType: TextInputType.number,
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: skuController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'SKU / Kode Item (itemNo)',
-                    prefixIcon: Icon(Icons.inventory_2),
+                    prefixIcon: const Icon(Icons.inventory_2),
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.auto_awesome, color: Colors.blue),
+                          onPressed: () {
+                            skuController.text = generateSKUFromName(product.itemName);
+                          },
+                          tooltip: 'Generate SKU Otomatis',
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.help_outline, color: Colors.grey),
+                          onPressed: () => _showSKUGuideDialog(context),
+                          tooltip: 'Panduan Aturan SKU',
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -1846,10 +1927,27 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
               
               TextFormField(
                 controller: _skuController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'SKU / Kode Item *',
-                  prefixIcon: Icon(Icons.inventory_2_outlined),
+                  prefixIcon: const Icon(Icons.inventory_2_outlined),
                   hintText: 'Contoh: AQUA-600',
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.auto_awesome, color: Colors.blue),
+                        onPressed: () {
+                          _skuController.text = generateSKUFromName(_nameController.text);
+                        },
+                        tooltip: 'Generate SKU Otomatis',
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.help_outline, color: Colors.grey),
+                        onPressed: () => _showSKUGuideDialog(context),
+                        tooltip: 'Panduan Aturan SKU',
+                      ),
+                    ],
+                  ),
                 ),
                 validator: (val) {
                   if (val == null || val.trim().isEmpty) {
@@ -1862,10 +1960,23 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
               
               TextFormField(
                 controller: _barcodeController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Barcode / UPC',
-                  prefixIcon: Icon(Icons.qr_code_scanner_outlined),
+                  prefixIcon: const Icon(Icons.qr_code_scanner_outlined),
                   hintText: 'Scan atau ketik barcode',
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.qr_code_scanner),
+                    onPressed: () async {
+                      final scanned = await showDialog<String>(
+                        context: context,
+                        builder: (context) => const CameraScannerDialog(),
+                      );
+                      if (scanned != null) {
+                        _barcodeController.text = scanned;
+                      }
+                    },
+                    tooltip: 'Scan Barcode',
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -2022,5 +2133,159 @@ String _cleanErrorMessage(dynamic error, String defaultMsg) {
     message = message.substring(11);
   }
   return '$defaultMsg: $message';
+}
+
+String generateSKUFromName(String name) {
+  if (name.isEmpty) return '';
+  
+  final upper = name.toUpperCase();
+  final words = upper.split(RegExp(r'\s+'));
+  
+  String suffix = '';
+  String number = '';
+  List<String> coreWords = [];
+  
+  // 1. Determine suffix based on packaging type keyword at the end
+  final lastWord = words.isNotEmpty ? words.last : '';
+  if (lastWord.contains('ECER') || lastWord.contains('PCS') || lastWord.contains('UNIT') || lastWord == 'E') {
+    suffix = 'E';
+  } else if (lastWord.contains('PAK') || lastWord.contains('PACK') || lastWord == 'P') {
+    suffix = 'P';
+  } else if (lastWord.contains('DUS') || lastWord.contains('BOX') || lastWord.contains('KARTON') || lastWord.contains('DOOS') || lastWord == 'D') {
+    suffix = 'D';
+  } else if (lastWord.contains('LUSIN') || lastWord == 'L') {
+    suffix = 'L';
+  } else if (lastWord.contains('BOTOL') || lastWord == 'B') {
+    suffix = 'B';
+  } else if (lastWord.contains('KALENG') || lastWord == 'K') {
+    suffix = 'K';
+  } else if (lastWord.contains('SACHET') || lastWord.contains('SASET') || lastWord == 'S') {
+    suffix = 'S';
+  }
+  
+  // Stopwords list
+  final stopWords = {'ISI', 'DAN', 'DENGAN', 'YANG', 'UNTUK', 'DI', 'KE', 'DARI', 'FOR', 'THE', 'AND', 'WITH', 'OF'};
+  
+  // 2. Parse words
+  for (int i = 0; i < words.length; i++) {
+    final w = words[i];
+    
+    // Skip suffix word if it is at the end and matched
+    if (i == words.length - 1 && suffix.isNotEmpty) continue;
+    
+    // Skip common stop words
+    if (stopWords.contains(w)) continue;
+    
+    // Look for digits
+    final numMatch = RegExp(r'\d+').firstMatch(w);
+    if (numMatch != null && number.isEmpty) {
+      number = numMatch.group(0) ?? '';
+    }
+    
+    // Extract clean alphabetic part of the word
+    final cleanWord = w.replaceAll(RegExp(r'[^A-Z]'), '');
+    if (cleanWord.isNotEmpty) {
+      coreWords.add(cleanWord);
+    }
+  }
+  
+  // 3. Build core abbreviation
+  StringBuffer coreAbbr = StringBuffer();
+  for (final w in coreWords) {
+    if (w.isEmpty) continue;
+    
+    // Always keep the first letter
+    coreAbbr.write(w[0]);
+    
+    // Keep subsequent consonants
+    for (int j = 1; j < w.length; j++) {
+      final char = w[j];
+      if (char != 'A' && char != 'I' && char != 'U' && char != 'E' && char != 'O') {
+        coreAbbr.write(char);
+      }
+    }
+  }
+  
+  // Combine core + number + suffix
+  String sku = coreAbbr.toString() + number + suffix;
+  sku = sku.replaceAll(RegExp(r'[^A-Z0-9]'), '');
+  
+  // Clean and limit length (e.g. max 12 characters to keep it compact)
+  if (sku.length > 12) {
+    final coreLength = 12 - number.length - suffix.length;
+    if (coreLength > 0 && coreAbbr.length > coreLength) {
+      sku = coreAbbr.toString().substring(0, coreLength) + number + suffix;
+    }
+  }
+  
+  return sku;
+}
+
+void _showSKUGuideDialog(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.blue),
+            SizedBox(width: 8),
+            Text('Panduan Penamaan SKU'),
+          ],
+        ),
+        content: const SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Aturan Penamaan SKU (Stock Keeping Unit):',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'SKU dibuat dengan menyingkat Nama Produk (mengambil konsonan huruf kapital penting), diikuti detail ukuran/jumlah (jika ada), dan jenis kemasan di ujungnya.',
+                style: TextStyle(fontSize: 13, height: 1.4),
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Kode Tipe Kemasan (Akhiran):',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              Text('• E = Ecer / Pcs / Unit\n• P = Pak / Pack\n• D = Dus / Box / Karton\n• L = Lusin\n• S = Sachet / Saset\n• B = Botol\n• K = Kaleng', style: TextStyle(fontSize: 13, height: 1.4)),
+              SizedBox(height: 16),
+              Text(
+                'Contoh Kasus:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              SizedBox(height: 4),
+              Divider(),
+              SizedBox(height: 4),
+              Text(
+                '1. Buku Tulis Sinar Dunia Isi 32 Ecer\n   » SKU: BKTLSSD32E\n   (Buku Tulis = BKTLS, Sinar Dunia = SD, 32 = 32, Ecer = E)',
+                style: TextStyle(fontSize: 13, height: 1.4, fontFamily: 'monospace'),
+              ),
+              SizedBox(height: 8),
+              Text(
+                '2. Buku Tulis Sinar Dunia Isi 32 Pak\n   » SKU: BKTLSSD32P\n   (Buku Tulis = BKTLS, Sinar Dunia = SD, 32 = 32, Pak = P)',
+                style: TextStyle(fontSize: 13, height: 1.4, fontFamily: 'monospace'),
+              ),
+              SizedBox(height: 8),
+              Text(
+                '3. Kopi Kapal Api Saset\n   » SKU: KPKPLAPS\n   (Kopi = KP, Kapal Api = KPLAP, Saset = S)',
+                style: TextStyle(fontSize: 13, height: 1.4, fontFamily: 'monospace'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Mengerti'),
+          ),
+        ],
+      );
+    },
+  );
 }
 
