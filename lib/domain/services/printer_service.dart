@@ -162,8 +162,9 @@ class PrinterService {
       final doc = pw.Document();
       
       // Paper size 58mm or 80mm
-      final double width = settings.printerPaperSize == 80 ? 80 * PdfPageFormat.mm : 58 * PdfPageFormat.mm;
-      final format = PdfPageFormat(width, double.infinity, marginAll: 4 * PdfPageFormat.mm);
+      // Windows printer drivers typically have smaller printable widths (e.g. 72mm for 80mm roll, 48mm for 58mm roll)
+      final double width = settings.printerPaperSize == 80 ? 72 * PdfPageFormat.mm : 48 * PdfPageFormat.mm;
+      final format = PdfPageFormat(width, double.infinity, marginAll: 2 * PdfPageFormat.mm);
 
       doc.addPage(
         pw.Page(
@@ -176,10 +177,14 @@ class PrinterService {
                   alignment: pw.Alignment.center,
                   child: pw.Text(settings.shopName, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
                 ),
-                pw.Align(
-                  alignment: pw.Alignment.center,
-                  child: pw.Text(settings.shopAddress, style: const pw.TextStyle(fontSize: 8)),
-                ),
+                 pw.Align(
+                   alignment: pw.Alignment.center,
+                   child: pw.Text(
+                     settings.shopAddress,
+                     textAlign: pw.TextAlign.center,
+                     style: const pw.TextStyle(fontSize: 8),
+                   ),
+                 ),
                 pw.Align(
                   alignment: pw.Alignment.center,
                   child: pw.Text('Telp: ${settings.shopPhone}', style: const pw.TextStyle(fontSize: 8)),
@@ -262,8 +267,8 @@ class PrinterService {
   Future<bool> printTestToWindows(String printerName, SettingsModel settings) async {
     try {
       final doc = pw.Document();
-      final double width = settings.printerPaperSize == 80 ? 80 * PdfPageFormat.mm : 58 * PdfPageFormat.mm;
-      final format = PdfPageFormat(width, double.infinity, marginAll: 4 * PdfPageFormat.mm);
+      final double width = settings.printerPaperSize == 80 ? 72 * PdfPageFormat.mm : 48 * PdfPageFormat.mm;
+      final format = PdfPageFormat(width, double.infinity, marginAll: 2 * PdfPageFormat.mm);
 
       doc.addPage(
         pw.Page(

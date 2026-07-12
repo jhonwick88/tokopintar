@@ -757,7 +757,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           Expanded(
                             child: DropdownButtonFormField<String>(
                               isExpanded: true,
-                              value: _printerMacAddress.isEmpty ? null : _printerMacAddress,
+                              value: _bluetoothDevices.any((device) => device.macAdress == _printerMacAddress) ? _printerMacAddress : null,
                               decoration: const InputDecoration(
                                 labelText: 'Pilih Printer Bluetooth',
                                 prefixIcon: Icon(Icons.bluetooth),
