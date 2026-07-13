@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:developer' as dev;
 import '../../data/models/category_model.dart';
 import '../../data/models/item_model.dart';
 import '../../domain/repositories/items_repository.dart';
@@ -102,7 +103,7 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
       const limit = 50;
 
       if (state.selectedCategoryId != null && state.searchQuery.isNotEmpty) {
-        final searchResults = await _itemsRepository.searchItems(
+        final searchResults = await _performMultiWordSearch(
           state.searchQuery,
           page: targetPage,
           limit: limit,
@@ -117,7 +118,7 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
           limit: limit,
         );
       } else if (state.searchQuery.isNotEmpty) {
-        fetchedItems = await _itemsRepository.searchItems(
+        fetchedItems = await _performMultiWordSearch(
           state.searchQuery,
           page: targetPage,
           limit: limit,
@@ -141,6 +142,72 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
         errorMessage: 'Gagal memuat produk: $e',
       );
     }
+  }
+
+  Future<List<ItemModel>> _performMultiWordSearch(String query, {required int page, required int limit}) async {
+    final queryWords = query
+        .toLowerCase()
+        .split(' ')
+        .map((w) => w.trim())
+        .where((w) => w.isNotEmpty)
+        .toList();
+
+    if (queryWords.isEmpty) return [];
+
+    if (queryWords.length == 1) {
+      return await _itemsRepository.searchItems(
+        query,
+        page: page,
+        limit: limit,
+      );
+    }
+
+    final allResults = <ItemModel>[];
+    final seenIds = <String>{};
+
+    for (final word in queryWords) {
+      try {
+        final results = await _itemsRepository.searchItems(
+          word,
+          page: 1, // Ambil halaman pertama untuk setiap kata kunci pencarian
+          limit: limit * 2, // Ambil lebih banyak produk agar penggabungan lebih relevan
+        );
+        for (final item in results) {
+          final id = item.itemNo;
+          if (!seenIds.contains(id)) {
+            seenIds.add(id);
+            allResults.add(item);
+          }
+        }
+      } catch (e) {
+        dev.log('Error searching for word "$word": $e');
+      }
+    }
+
+    // Urutkan berdasarkan relevansi (berapa banyak kecocokan kata kunci di nama produk)
+    allResults.sort((a, b) {
+      final aName = a.itemName.toLowerCase();
+      final bName = b.itemName.toLowerCase();
+
+      int aMatches = 0;
+      int bMatches = 0;
+      for (final word in queryWords) {
+        if (aName.contains(word)) aMatches++;
+        if (bName.contains(word)) bMatches++;
+      }
+
+      if (aMatches != bMatches) {
+        return bMatches.compareTo(aMatches); // Kecocokan terbanyak berada di atas
+      }
+      return aName.compareTo(bName); // Jika jumlah kecocokan sama, urutkan berdasarkan abjad
+    });
+
+    // Paginasi lokal pada daftar gabungan
+    final startIndex = (page - 1) * limit;
+    if (startIndex < allResults.length) {
+      return allResults.skip(startIndex).take(limit).toList();
+    }
+    return [];
   }
 
   Future<void> selectCategory(int? categoryId) async {

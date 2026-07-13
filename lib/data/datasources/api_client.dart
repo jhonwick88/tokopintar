@@ -154,7 +154,7 @@ class ApiClient {
     try {
       final response = await _dio.put('/api/items/$originalItemNo', data: {
         'new_itemno': newItemNo,
-        'itemupc': itemUPC,
+        'itemupc': itemUPC.trim().isEmpty ? null : itemUPC.trim(),
         'price': price,
       });
       if (response.statusCode == 200 && response.data != null) {
@@ -185,7 +185,7 @@ class ApiClient {
       final response = await _dio.post('/api/items', data: {
         'itemno': itemNo,
         'itemname': itemName,
-        'itemupc': itemUPC,
+        'itemupc': itemUPC.trim().isEmpty ? null : itemUPC.trim(),
         'categoryid': categoryId,
         'price': price,
         'itemtype': 0,

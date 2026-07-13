@@ -14,6 +14,7 @@ import '../widgets/payment_modal.dart';
 import 'mobile_cart_screen.dart';
 import '../providers/quick_items_provider.dart';
 import 'quick_add_item_settings_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/settings_provider.dart';
 
 class PosScreen extends ConsumerStatefulWidget {
@@ -29,6 +30,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _catalogScrollController = ScrollController();
   final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _isGridView = true;
   bool _isPaymentModalOpen = false;
 
   @override
@@ -36,6 +38,30 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     super.initState();
     _catalogScrollController.addListener(_onScroll);
     HardwareKeyboard.instance.addHandler(_handleGlobalKeyEvent);
+    _loadViewPreference();
+  }
+
+  Future<void> _loadViewPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _isGridView = prefs.getBool('pos_is_grid_view') ?? true;
+      });
+    } catch (e) {
+      debugPrint('Error loading view preference: $e');
+    }
+  }
+
+  Future<void> _toggleViewPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _isGridView = !_isGridView;
+        prefs.setBool('pos_is_grid_view', _isGridView);
+      });
+    } catch (e) {
+      debugPrint('Error saving view preference: $e');
+    }
   }
 
   @override
@@ -773,6 +799,13 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   tooltip: 'Sortir Harga',
                 ),
                 const SizedBox(width: 8),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view, size: 20),
+                  onPressed: _toggleViewPreference,
+                  tooltip: _isGridView ? 'Tampilan List' : 'Tampilan Grid',
+                ),
+                const SizedBox(width: 8),
                 ActionChip(
                   avatar: const Icon(Icons.bolt, color: Colors.teal, size: 18),
                   label: const Text(
@@ -872,12 +905,12 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                 ],
                               ),
                   )
-                : isLargeScreen
+                : _isGridView
                     ? GridView.builder(
                         controller: _catalogScrollController,
-                        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 180,
-                          childAspectRatio: 0.82,
+                        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: isLargeScreen ? 180 : 130,
+                          childAspectRatio: isLargeScreen ? 0.72 : 0.65,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
                         ),
@@ -924,9 +957,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                         children: [
                                           Text(
                                             product.itemName,
-                                            maxLines: 1,
+                                            maxLines: 3,
                                             overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                                           ),
                                           const SizedBox(height: 2),
                                           Text(
@@ -1478,7 +1511,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 TextField(
                   controller: barcodeController,
                   decoration: InputDecoration(
-                    labelText: 'Barcode / UPC (itemUPC)',
+                    labelText: 'Barcode / UPC (Opsional)',
                     prefixIcon: const Icon(Icons.qr_code),
                     suffixIcon: IconButton(
                       icon: const Icon(Icons.qr_code_scanner),
@@ -1545,9 +1578,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 final priceText = priceController.text.trim();
                 final newPrice = double.tryParse(priceText) ?? 0.0;
 
-                if (newBarcode.isEmpty || newSKU.isEmpty || priceText.isEmpty) {
+                if (newSKU.isEmpty || priceText.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Semua field harus diisi')),
+                    const SnackBar(content: Text('SKU dan Harga wajib diisi')),
                   );
                   return;
                 }
