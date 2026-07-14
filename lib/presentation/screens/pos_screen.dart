@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -29,6 +30,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   final FocusNode _keyboardFocusNode = FocusNode();
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _catalogScrollController = ScrollController();
+  final ScrollController _categoryScrollController = ScrollController();
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isGridView = true;
   bool _isPaymentModalOpen = false;
@@ -71,6 +73,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     _keyboardFocusNode.dispose();
     _searchController.dispose();
     _catalogScrollController.dispose();
+    _categoryScrollController.dispose();
     _audioPlayer.dispose();
     super.dispose();
   }
@@ -765,78 +768,94 @@ class _PosScreenState extends ConsumerState<PosScreen> {
          // ,
           isLargeScreen? const SizedBox(height: 16) : SizedBox(height: 2),
           // Row 2: Categories filter
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  style: IconButton.styleFrom(
-                    backgroundColor: state.sortByPrice != 'none'
-                        ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
-                        : null,
-                    foregroundColor: state.sortByPrice != 'none'
-                        ? Theme.of(context).colorScheme.primary
-                        : null,
+          ScrollConfiguration(
+            behavior: ScrollConfiguration.of(context).copyWith(
+              dragDevices: {
+                PointerDeviceKind.touch,
+                PointerDeviceKind.mouse,
+              },
+            ),
+            child: Scrollbar(
+              controller: _categoryScrollController,
+              thumbVisibility: false,
+              child: SingleChildScrollView(
+                controller: _categoryScrollController,
+                scrollDirection: Axis.horizontal,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        style: IconButton.styleFrom(
+                          backgroundColor: state.sortByPrice != 'none'
+                              ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                              : null,
+                          foregroundColor: state.sortByPrice != 'none'
+                              ? Theme.of(context).colorScheme.primary
+                              : null,
+                        ),
+                        icon: Icon(
+                          state.sortByPrice == 'asc'
+                              ? Icons.arrow_upward
+                              : state.sortByPrice == 'desc'
+                                  ? Icons.arrow_downward
+                                  : Icons.sort_by_alpha_outlined,
+                          size: 20,
+                        ),
+                        onPressed: () {
+                          final current = state.sortByPrice;
+                          final next = current == 'none'
+                              ? 'asc'
+                              : current == 'asc'
+                                  ? 'desc'
+                                  : 'none';
+                          ref.read(itemsNotifierProvider.notifier).toggleSortByPrice(next);
+                        },
+                        tooltip: 'Sortir Harga',
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view, size: 20),
+                        onPressed: _toggleViewPreference,
+                        tooltip: _isGridView ? 'Tampilan List' : 'Tampilan Grid',
+                      ),
+                      const SizedBox(width: 8),
+                      ActionChip(
+                        avatar: const Icon(Icons.bolt, color: Colors.teal, size: 18),
+                        label: const Text(
+                          'Quick Add',
+                          style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold),
+                        ),
+                        backgroundColor: Colors.teal.withOpacity(0.08),
+                        side: BorderSide(color: Colors.teal.withOpacity(0.3)),
+                        onPressed: _openQuickItemsBottomSheet,
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('Semua Produk'),
+                        selected: state.selectedCategoryId == null,
+                        onSelected: (val) {
+                          if (val) ref.read(itemsNotifierProvider.notifier).selectCategory(null);
+                        },
+                      ),
+                      ...state.categories.map((cat) {
+                        return Padding(
+                          padding: const EdgeInsets.only(left: 8.0),
+                          child: ChoiceChip(
+                            label: Text(cat.name),
+                            selected: state.selectedCategoryId == cat.id,
+                            onSelected: (val) {
+                              if (val) ref.read(itemsNotifierProvider.notifier).selectCategory(cat.id);
+                            },
+                          ),
+                        );
+                      }),
+                    ],
                   ),
-                  icon: Icon(
-                    state.sortByPrice == 'asc'
-                        ? Icons.arrow_upward
-                        : state.sortByPrice == 'desc'
-                            ? Icons.arrow_downward
-                            : Icons.sort_by_alpha_outlined,
-                    size: 20,
-                  ),
-                  onPressed: () {
-                    final current = state.sortByPrice;
-                    final next = current == 'none'
-                        ? 'asc'
-                        : current == 'asc'
-                            ? 'desc'
-                            : 'none';
-                    ref.read(itemsNotifierProvider.notifier).toggleSortByPrice(next);
-                  },
-                  tooltip: 'Sortir Harga',
                 ),
-                const SizedBox(width: 8),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view, size: 20),
-                  onPressed: _toggleViewPreference,
-                  tooltip: _isGridView ? 'Tampilan List' : 'Tampilan Grid',
-                ),
-                const SizedBox(width: 8),
-                ActionChip(
-                  avatar: const Icon(Icons.bolt, color: Colors.teal, size: 18),
-                  label: const Text(
-                    'Quick Add',
-                    style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold),
-                  ),
-                  backgroundColor: Colors.teal.withOpacity(0.08),
-                  side: BorderSide(color: Colors.teal.withOpacity(0.3)),
-                  onPressed: _openQuickItemsBottomSheet,
-                ),
-                const SizedBox(width: 8),
-                ChoiceChip(
-                  label: const Text('Semua Produk'),
-                  selected: state.selectedCategoryId == null,
-                  onSelected: (val) {
-                    if (val) ref.read(itemsNotifierProvider.notifier).selectCategory(null);
-                  },
-                ),
-                ...state.categories.map((cat) {
-                  return Padding(
-                    padding: const EdgeInsets.only(left: 8.0),
-                    child: ChoiceChip(
-                      label: Text(cat.name),
-                      selected: state.selectedCategoryId == cat.id,
-                      onSelected: (val) {
-                        if (val) ref.read(itemsNotifierProvider.notifier).selectCategory(cat.id);
-                      },
-                    ),
-                  );
-                }),
-              ],
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -1463,6 +1482,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                     newItemNo: newSKU,
                     itemUPC: newBarcode,
                     price: product.price,
+                    itemName: product.itemName,
                   );
 
                   ref.read(posNotifierProvider.notifier).addToCart(updatedItem);
@@ -1483,6 +1503,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   }
 
   void _showEditProductDialog(ItemModel product) {
+    final nameController = TextEditingController(text: product.itemName);
     final barcodeController = TextEditingController(text: product.itemUPC);
     final skuController = TextEditingController(text: product.itemNo);
     final priceController = TextEditingController(text: product.price.toStringAsFixed(0));
@@ -1503,11 +1524,14 @@ class _PosScreenState extends ConsumerState<PosScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  product.itemName,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nama Produk (itemName)',
+                    prefixIcon: Icon(Icons.shopping_bag),
+                  ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 TextField(
                   controller: barcodeController,
                   decoration: InputDecoration(
@@ -1541,7 +1565,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                         IconButton(
                           icon: const Icon(Icons.auto_awesome, color: Colors.blue),
                           onPressed: () {
-                            skuController.text = generateSKUFromName(product.itemName);
+                            skuController.text = generateSKUFromName(nameController.text);
                           },
                           tooltip: 'Generate SKU Otomatis',
                         ),
@@ -1573,14 +1597,15 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
+                final newName = nameController.text.trim();
                 final newBarcode = barcodeController.text.trim();
                 final newSKU = skuController.text.trim();
                 final priceText = priceController.text.trim();
                 final newPrice = double.tryParse(priceText) ?? 0.0;
 
-                if (newSKU.isEmpty || priceText.isEmpty) {
+                if (newName.isEmpty || newSKU.isEmpty || priceText.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('SKU dan Harga wajib diisi')),
+                    const SnackBar(content: Text('Nama Produk, SKU, dan Harga wajib diisi')),
                   );
                   return;
                 }
@@ -1593,6 +1618,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                     newItemNo: newSKU,
                     itemUPC: newBarcode,
                     price: newPrice,
+                    itemName: newName,
                   );
                   _showSuccessToast('Produk berhasil diperbarui');
                 } catch (e) {

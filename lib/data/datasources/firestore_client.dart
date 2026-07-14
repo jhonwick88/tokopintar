@@ -7,6 +7,7 @@ import '../models/user_model.dart';
 import '../models/audit_log_model.dart';
 import '../models/settings_model.dart';
 import '../models/quick_item_model.dart';
+import '../models/cash_reconciliation_model.dart';
 
 class FirestoreClient {
   bool get isFirebaseInitialized {
@@ -36,6 +37,7 @@ class FirestoreClient {
   };
   final List<AuditLogModel> _mockLogs = [];
   final Map<String, QuickItemModel> _mockQuickItems = {};
+  final List<CashReconciliationModel> _mockReconciliations = [];
   SettingsModel _mockSettings = SettingsModel();
 
   // --- SALES METHODS ---
@@ -353,5 +355,34 @@ class FirestoreClient {
     for (var item in items) {
       _mockQuickItems[item.id] = item;
     }
+  }
+
+  // --- CASH RECONCILIATION METHODS ---
+  Future<void> saveCashReconciliation(CashReconciliationModel reconciliation) async {
+    final firestore = _firestore;
+    if (firestore != null) {
+      try {
+        await firestore.collection('cash_reconciliations').doc(reconciliation.id).set(reconciliation.toJson());
+        dev.log('Cash reconciliation saved to Firestore: ${reconciliation.id}');
+        return;
+      } catch (e) {
+        dev.log('Firestore error in saveCashReconciliation: $e. Falling back to local cache.');
+      }
+    }
+    _mockReconciliations.add(reconciliation);
+    dev.log('Cash reconciliation saved to Memory: ${reconciliation.id}');
+  }
+
+  Future<List<CashReconciliationModel>> getCashReconciliations() async {
+    final firestore = _firestore;
+    if (firestore != null) {
+      try {
+        final snap = await firestore.collection('cash_reconciliations').orderBy('date', descending: true).get();
+        return snap.docs.map((doc) => CashReconciliationModel.fromJson(doc.data())).toList();
+      } catch (e) {
+        dev.log('Firestore error in getCashReconciliations: $e. Falling back to memory.');
+      }
+    }
+    return List.from(_mockReconciliations..sort((a, b) => b.date.compareTo(a.date)));
   }
 }

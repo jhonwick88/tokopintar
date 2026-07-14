@@ -43,6 +43,7 @@ class MockItemsRepository implements ItemsRepository {
     required String newItemNo,
     required String itemUPC,
     required double price,
+    required String itemName,
   }) async {
     final idx = db.indexWhere((it) => it.itemNo == originalItemNo);
     if (idx < 0) {
@@ -52,7 +53,7 @@ class MockItemsRepository implements ItemsRepository {
     final updated = ItemModel(
       itemNo: newItemNo,
       itemUPC: itemUPC,
-      itemName: existing.itemName,
+      itemName: itemName,
       categoryId: existing.categoryId,
       price: price,
     );
@@ -116,16 +117,18 @@ void main() {
         newItemNo: 'SKU_1_NEW',
         itemUPC: '8991111',
         price: 15000,
+        itemName: 'Item Satu Baru',
       );
 
       expect(result.itemNo, 'SKU_1_NEW');
       expect(result.itemUPC, '8991111');
-      expect(result.itemName, 'Item Satu');
+      expect(result.itemName, 'Item Satu Baru');
 
       expect(mockRepo.db.first.itemNo, 'SKU_1_NEW');
       expect(mockRepo.db.first.itemUPC, '8991111');
+      expect(mockRepo.db.first.itemName, 'Item Satu Baru');
 
-      final updatedItem = notifier.state.items.firstWhere((it) => it.itemName == 'Item Satu');
+      final updatedItem = notifier.state.items.firstWhere((it) => it.itemName == 'Item Satu Baru');
       expect(updatedItem.itemNo, 'SKU_1_NEW');
       expect(updatedItem.itemUPC, '8991111');
     });
@@ -215,6 +218,24 @@ void main() {
       expect(notifier.state.searchQuery, 'Bola');
       expect(notifier.state.selectedCategoryId, isNull);
       expect(notifier.state.items.length, 2);
+    });
+
+    test('Sorting search results by price asc and desc works correctly', () async {
+      await notifier.search('Bola');
+      
+      // Sort Ascending
+      notifier.toggleSortByPrice('asc');
+      expect(notifier.state.sortByPrice, 'asc');
+      var sorted = notifier.state.sortedItems;
+      expect(sorted[0].itemName, 'Bola Lampu'); // Price 15000
+      expect(sorted[1].itemName, 'Bola Basket'); // Price 150000
+
+      // Sort Descending
+      notifier.toggleSortByPrice('desc');
+      expect(notifier.state.sortByPrice, 'desc');
+      sorted = notifier.state.sortedItems;
+      expect(sorted[0].itemName, 'Bola Basket'); // Price 150000
+      expect(sorted[1].itemName, 'Bola Lampu'); // Price 15000
     });
   });
 

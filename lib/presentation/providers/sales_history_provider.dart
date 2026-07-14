@@ -1,10 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:developer' as dev;
 import '../../data/models/sale_model.dart';
+import '../../data/models/cash_reconciliation_model.dart';
 import '../../domain/repositories/sales_repository.dart';
 import '../../domain/services/printer_service.dart';
 import 'auth_provider.dart';
 import 'settings_provider.dart';
+import 'package:uuid/uuid.dart';
 
 class SalesHistoryState {
   final List<SaleModel> sales;
@@ -221,6 +223,57 @@ class SalesHistoryNotifier extends StateNotifier<SalesHistoryState> {
       return await reprintReceipt(lastInvoice);
     }
     return false;
+  }
+
+  Future<bool> saveReconciliation({
+    required double systemRevenue,
+    required double actualDrawerCash,
+    required String notes,
+  }) async {
+    final user = _ref.read(authNotifierProvider).currentUser;
+    final cashierName = user?.fullname ?? 'Admin';
+
+    final difference = actualDrawerCash - systemRevenue;
+    
+    double accuracyRate;
+    if (systemRevenue == 0) {
+      accuracyRate = actualDrawerCash == 0 ? 100.0 : 0.0;
+    } else {
+      if (actualDrawerCash >= systemRevenue) {
+        accuracyRate = (systemRevenue / actualDrawerCash) * 100;
+      } else {
+        accuracyRate = (actualDrawerCash / systemRevenue) * 100;
+      }
+    }
+
+    final reconciliation = CashReconciliationModel(
+      id: const Uuid().v4(),
+      date: DateTime.now(),
+      cashierName: cashierName,
+      systemRevenue: systemRevenue,
+      actualDrawerCash: actualDrawerCash,
+      difference: difference,
+      accuracyRate: accuracyRate,
+      notes: notes,
+    );
+
+    try {
+      await _salesRepository.saveCashReconciliation(reconciliation);
+      
+      // Audit log
+      if (user != null) {
+        await _ref.read(auditRepositoryProvider).logActivity(
+          user.uid,
+          user.username,
+          'cash_reconciliation',
+          'Reconciliation saved. Sys: Rp ${systemRevenue.toStringAsFixed(0)}, Actual: Rp ${actualDrawerCash.toStringAsFixed(0)}, Diff: Rp ${difference.toStringAsFixed(0)}, Acc: ${accuracyRate.toStringAsFixed(1)}%',
+        );
+      }
+      return true;
+    } catch (e) {
+      dev.log('Save reconciliation failed: $e');
+      return false;
+    }
   }
 }
 

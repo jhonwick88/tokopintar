@@ -124,11 +124,14 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width >= 900;
     final authState = ref.watch(authNotifierProvider);
+    final isAdmin = authState.currentUser?.role == 'admin';
 
     final navItems = [
       _NavItem(icon: Icons.point_of_sale, label: 'POS', route: '/pos'),
       _NavItem(icon: Icons.dashboard, label: 'Dashboard', route: '/dashboard'),
       _NavItem(icon: Icons.history, label: 'Riwayat', route: '/history'),
+      if (isAdmin)
+        _NavItem(icon: Icons.analytics_outlined, label: 'Analisis Kas', route: '/reconciliation-analysis'),
       _NavItem(icon: Icons.settings, label: 'Pengaturan', route: '/settings'),
     ];
 

@@ -39,12 +39,14 @@ class ItemsRepositoryImpl implements ItemsRepository {
     required String newItemNo,
     required String itemUPC,
     required double price,
+    required String itemName,
   }) {
     return _apiClient.updateItemKeys(
       originalItemNo: originalItemNo,
       newItemNo: newItemNo,
       itemUPC: itemUPC,
       price: price,
+      itemName: itemName,
     );
   }
 

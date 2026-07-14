@@ -406,13 +406,19 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
     final currencyFormatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
 
     final activeRevenue = historyState.filteredSales
-        .where((s) => s.status != 'voided')
+        .where((s) => s.status != 'voided' && s.status != 'refunded')
         .fold(0.0, (sum, s) => sum + s.grandTotal);
     final voidedCount = historyState.filteredSales
-        .where((s) => s.status == 'voided')
+        .where((s) => s.status == 'voided' || s.status == 'refunded')
         .length;
     final totalDiscounts = historyState.filteredSales
         .fold(0.0, (sum, s) => sum + s.discount);
+    
+    final today = DateTime.now();
+    final todayRevenue = historyState.sales
+        .where((s) => s.date.year == today.year && s.date.month == today.month && s.date.day == today.day)
+        .where((s) => s.status != 'voided' && s.status != 'refunded')
+        .fold(0.0, (sum, s) => sum + s.grandTotal);
 
     return KeyboardListener(
       focusNode: _keyboardFocusNode,
@@ -489,6 +495,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                       value: currencyFormatter.format(activeRevenue),
                                       icon: Icons.monetization_on,
                                       color: Colors.green,
+                                      onTap: () => _showCashReconciliationDialog(todayRevenue),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -530,6 +537,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                           value: currencyFormatter.format(activeRevenue),
                                           icon: Icons.monetization_on,
                                           color: Colors.green,
+                                          onTap: () => _showCashReconciliationDialog(todayRevenue),
                                         ),
                                       ),
                                     ],
@@ -843,8 +851,9 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
     required String value,
     required IconData icon,
     required Color color,
+    VoidCallback? onTap,
   }) {
-    return Card(
+    final cardContent = Card(
       elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -868,6 +877,195 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
           ],
         ),
       ),
+    );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8.0),
+        child: cardContent,
+      );
+    }
+    return cardContent;
+  }
+
+  void _showCashReconciliationDialog(double todayRevenue) {
+    final cashController = TextEditingController();
+    final notesController = TextEditingController();
+    double actualCash = 0.0;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final difference = actualCash - todayRevenue;
+            
+            double accuracyRate;
+            if (todayRevenue == 0) {
+              accuracyRate = actualCash == 0 ? 100.0 : 0.0;
+            } else {
+              if (actualCash >= todayRevenue) {
+                accuracyRate = (todayRevenue / actualCash) * 100;
+              } else {
+                accuracyRate = (actualCash / todayRevenue) * 100;
+              }
+            }
+            
+            Color accuracyColor = Colors.red;
+            if (accuracyRate >= 98.0) {
+              accuracyColor = Colors.green;
+            } else if (accuracyRate >= 90.0) {
+              accuracyColor = Colors.orange;
+            }
+
+            final currencyFormatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
+
+            return AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.balance, color: Colors.teal),
+                  SizedBox(width: 8),
+                  Text('Rekonsiliasi Kas Laci'),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Bandingkan uang fisik di laci dengan omzet tercatat di aplikasi hari ini.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.teal.withOpacity(0.2)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Omzet Hari Ini (Sistem):', style: TextStyle(fontWeight: FontWeight.bold)),
+                          Text(
+                            currencyFormatter.format(todayRevenue),
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal, fontSize: 16),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: cashController,
+                      decoration: const InputDecoration(
+                        labelText: 'Uang Fisik di Laci (Rp)',
+                        prefixIcon: Icon(Icons.payments),
+                        hintText: 'Masukkan jumlah uang fisik',
+                      ),
+                      keyboardType: TextInputType.number,
+                      onChanged: (val) {
+                        setState(() {
+                          actualCash = double.tryParse(val) ?? 0.0;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Selisih:', style: TextStyle(fontWeight: FontWeight.w500)),
+                        Text(
+                          difference == 0
+                              ? 'Cocok'
+                              : (difference > 0 ? '+' : '') + currencyFormatter.format(difference),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: difference == 0
+                                ? Colors.green
+                                : (difference > 0 ? Colors.orange : Colors.red),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Tingkat Akurasi:', style: TextStyle(fontWeight: FontWeight.w500)),
+                        Text(
+                          '${accuracyRate.toStringAsFixed(1)}%',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: accuracyColor),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: accuracyRate / 100,
+                        backgroundColor: Colors.grey.shade200,
+                        valueColor: AlwaysStoppedAnimation<Color>(accuracyColor),
+                        minHeight: 6,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: notesController,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: 'Catatan (Opsional)',
+                        hintText: 'Contoh: Selisih Rp 2.000 karena kembalian...',
+                        prefixIcon: Icon(Icons.note_alt),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Batal'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    
+                    final success = await ref
+                        .read(salesHistoryNotifierProvider.notifier)
+                        .saveReconciliation(
+                          systemRevenue: todayRevenue,
+                          actualDrawerCash: actualCash,
+                          notes: notesController.text.trim(),
+                        );
+                    
+                    if (success) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Rekonsiliasi kas berhasil disimpan ke Firestore'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Gagal menyimpan rekonsiliasi kas'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Simpan Rekonsiliasi'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

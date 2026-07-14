@@ -103,14 +103,38 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
       const limit = 50;
 
       if (state.selectedCategoryId != null && state.searchQuery.isNotEmpty) {
-        final searchResults = await _performMultiWordSearch(
-          state.searchQuery,
-          page: targetPage,
-          limit: limit,
+        int currentPage = targetPage;
+        List<ItemModel> accumulated = [];
+        bool reachedEnd = false;
+
+        while (accumulated.length < limit && !reachedEnd) {
+          final searchResults = await _performMultiWordSearch(
+            state.searchQuery,
+            page: currentPage,
+            limit: limit,
+          );
+          if (searchResults.isEmpty) {
+            reachedEnd = true;
+            break;
+          }
+          final filtered = searchResults
+              .where((item) => item.categoryId == state.selectedCategoryId)
+              .toList();
+          accumulated.addAll(filtered);
+          if (searchResults.length < limit) {
+            reachedEnd = true;
+          } else {
+            currentPage++;
+          }
+        }
+        fetchedItems = accumulated;
+        state = state.copyWith(
+          items: refresh ? fetchedItems : [...state.items, ...fetchedItems],
+          page: currentPage,
+          isLoading: false,
+          hasReachedMax: reachedEnd,
         );
-        fetchedItems = searchResults
-            .where((item) => item.categoryId == state.selectedCategoryId)
-            .toList();
+        return;
       } else if (state.selectedCategoryId != null) {
         fetchedItems = await _itemsRepository.getItemsByCategory(
           state.selectedCategoryId!,
@@ -257,12 +281,14 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
     required String newItemNo,
     required String itemUPC,
     required double price,
+    required String itemName,
   }) async {
     final updated = await _itemsRepository.updateItemKeys(
       originalItemNo: originalItemNo,
       newItemNo: newItemNo,
       itemUPC: itemUPC,
       price: price,
+      itemName: itemName,
     );
 
     final updatedList = state.items.map((item) {

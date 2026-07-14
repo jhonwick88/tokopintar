@@ -12,6 +12,7 @@ abstract class ItemsRepository {
     required String newItemNo,
     required String itemUPC,
     required double price,
+    required String itemName,
   });
   Future<ItemModel> createItem({
     required String itemNo,

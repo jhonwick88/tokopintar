@@ -7,6 +7,7 @@ import '../../presentation/screens/login_screen.dart';
 import '../../presentation/screens/pos_screen.dart';
 import '../../presentation/screens/sales_history_screen.dart';
 import '../../presentation/screens/settings_screen.dart';
+import '../../presentation/screens/reconciliation_analysis_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authNotifierProvider);
@@ -22,6 +23,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
       if (isLoggedIn && isLoggingIn) {
         return '/pos'; // Redirect to POS screen after successful login
+      }
+      if (state.matchedLocation == '/reconciliation-analysis' && authState.currentUser?.role != 'admin') {
+        return '/pos';
       }
       return null;
     },
@@ -45,6 +49,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings',
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/reconciliation-analysis',
+        builder: (context, state) => const ReconciliationAnalysisScreen(),
       ),
     ],
   );
