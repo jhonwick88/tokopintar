@@ -29,13 +29,53 @@ class ItemsState {
   });
 
   List<ItemModel> get sortedItems {
-    if (sortByPrice == 'none') return items;
+    if (searchQuery.isEmpty && sortByPrice == 'none') return items;
+    
     final sorted = List<ItemModel>.from(items);
-    if (sortByPrice == 'asc') {
-      sorted.sort((a, b) => a.price.compareTo(b.price));
-    } else if (sortByPrice == 'desc') {
-      sorted.sort((a, b) => b.price.compareTo(a.price));
+    
+    // Split search query into lowercase keywords if present
+    final queryWords = searchQuery.isEmpty
+        ? <String>[]
+        : searchQuery
+            .toLowerCase()
+            .split(' ')
+            .map((w) => w.trim())
+            .where((w) => w.isNotEmpty)
+            .toList();
+
+    int getMatchCount(ItemModel item) {
+      if (queryWords.isEmpty) return 0;
+      final name = item.itemName.toLowerCase();
+      int matches = 0;
+      for (final word in queryWords) {
+        if (name.contains(word)) {
+          matches++;
+        }
+      }
+      return matches;
     }
+
+    sorted.sort((a, b) {
+      if (queryWords.isNotEmpty) {
+        final aMatches = getMatchCount(a);
+        final bMatches = getMatchCount(b);
+        if (aMatches != bMatches) {
+          // Higher match count comes first
+          return bMatches.compareTo(aMatches);
+        }
+      }
+      
+      // If match counts are equal (or query is empty), sort by price if specified
+      if (sortByPrice == 'asc') {
+        return a.price.compareTo(b.price);
+      } else if (sortByPrice == 'desc') {
+        return b.price.compareTo(a.price);
+      }
+      
+      // If sortByPrice is 'none' and match counts are equal, keep alphabetical
+      return a.itemName.toLowerCase().compareTo(b.itemName.toLowerCase());
+    });
+
     return sorted;
   }
 

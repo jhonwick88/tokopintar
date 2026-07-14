@@ -362,13 +362,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                               height: 28,
                                               alignment: Alignment.center,
                                               decoration: BoxDecoration(
-                                                color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+                                                gradient: index == 0
+                                                    ? const LinearGradient(colors: [Color(0xFFFFD700), Color(0xFFFFA500)])
+                                                    : index == 1
+                                                        ? const LinearGradient(colors: [Color(0xFFE0E0E0), Color(0xFF9E9E9E)])
+                                                        : index == 2
+                                                            ? const LinearGradient(colors: [Color(0xFFCD7F32), Color(0xFF8B4513)])
+                                                            : null,
+                                                color: index > 2
+                                                    ? Theme.of(context).colorScheme.primary.withOpacity(0.08)
+                                                    : null,
                                                 shape: BoxShape.circle,
                                               ),
                                               child: Text(
                                                 '#${index + 1}',
                                                 style: TextStyle(
-                                                  color: Theme.of(context).colorScheme.primary,
+                                                  color: index <= 2
+                                                      ? Colors.white
+                                                      : Theme.of(context).colorScheme.primary,
                                                   fontWeight: FontWeight.bold,
                                                   fontSize: 11,
                                                 ),
@@ -460,7 +471,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final notifier = ref.read(salesHistoryNotifierProvider.notifier);
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
-    
+
     String activeFilter = 'all';
     if (salesState.startDate != null && salesState.endDate != null) {
       final start = salesState.startDate!;
@@ -484,93 +495,157 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          FilterChip(
-            label: const Text('Semua'),
-            selected: activeFilter == 'all',
-            onSelected: (selected) {
-              if (selected) {
-                _updateFilter(() => notifier.updateDateFilter(null, null));
-              }
-            },
-          ),
-          const SizedBox(width: 8),
-          FilterChip(
-            label: const Text('Hari Ini'),
-            selected: activeFilter == 'today',
-            onSelected: (selected) {
-              if (selected) {
+      child: Container(
+        padding: const EdgeInsets.all(4.0),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            _buildSegmentItem(
+              context: context,
+              label: 'Semua',
+              isSelected: activeFilter == 'all',
+              onTap: () => _updateFilter(() => notifier.updateDateFilter(null, null)),
+            ),
+            _buildSegmentItem(
+              context: context,
+              label: 'Hari Ini',
+              isSelected: activeFilter == 'today',
+              onTap: () {
                 final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
                 _updateFilter(() => notifier.updateDateFilter(todayStart, end));
-              }
-            },
-          ),
-          const SizedBox(width: 8),
-          FilterChip(
-            label: const Text('7 Hari Terakhir'),
-            selected: activeFilter == '7days',
-            onSelected: (selected) {
-              if (selected) {
+              },
+            ),
+            _buildSegmentItem(
+              context: context,
+              label: '7 Hari',
+              isSelected: activeFilter == '7days',
+              onTap: () {
                 final start = todayStart.subtract(const Duration(days: 6));
                 final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
                 _updateFilter(() => notifier.updateDateFilter(start, end));
-              }
-            },
-          ),
-          const SizedBox(width: 8),
-          FilterChip(
-            label: const Text('30 Hari Terakhir'),
-            selected: activeFilter == '30days',
-            onSelected: (selected) {
-              if (selected) {
+              },
+            ),
+            _buildSegmentItem(
+              context: context,
+              label: '30 Hari',
+              isSelected: activeFilter == '30days',
+              onTap: () {
                 final start = todayStart.subtract(const Duration(days: 29));
                 final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
                 _updateFilter(() => notifier.updateDateFilter(start, end));
-              }
-            },
-          ),
-          const SizedBox(width: 8),
-          FilterChip(
-            label: const Text('Bulan Ini'),
-            selected: activeFilter == 'month',
-            onSelected: (selected) {
-              if (selected) {
+              },
+            ),
+            _buildSegmentItem(
+              context: context,
+              label: 'Bulan Ini',
+              isSelected: activeFilter == 'month',
+              onTap: () {
                 final start = DateTime(now.year, now.month, 1);
                 final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
                 _updateFilter(() => notifier.updateDateFilter(start, end));
-              }
-            },
-          ),
-          const SizedBox(width: 8),
-          FilterChip(
-            label: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.date_range, size: 14),
-                const SizedBox(width: 4),
-                Text(activeFilter == 'custom' 
-                    ? '${DateFormat('dd/MM').format(salesState.startDate!)} - ${DateFormat('dd/MM').format(salesState.endDate!)}'
-                    : 'Kustom'),
-              ],
+              },
             ),
-            selected: activeFilter == 'custom',
-            onSelected: (selected) async {
-              final picked = await showDateRangePicker(
-                context: context,
-                firstDate: DateTime(2025),
-                lastDate: DateTime(2030),
-                initialDateRange: salesState.startDate != null && salesState.endDate != null
-                    ? DateTimeRange(start: salesState.startDate!, end: salesState.endDate!)
-                    : null,
-              );
-              if (picked != null) {
-                final end = DateTime(picked.end.year, picked.end.month, picked.end.day, 23, 59, 59);
-                _updateFilter(() => notifier.updateDateFilter(picked.start, end));
-              }
-            },
+            GestureDetector(
+              onTap: () async {
+                final picked = await showDateRangePicker(
+                  context: context,
+                  firstDate: DateTime(2025),
+                  lastDate: DateTime(2030),
+                  initialDateRange: salesState.startDate != null && salesState.endDate != null
+                      ? DateTimeRange(start: salesState.startDate!, end: salesState.endDate!)
+                      : null,
+                );
+                if (picked != null) {
+                  final end = DateTime(picked.end.year, picked.end.month, picked.end.day, 23, 59, 59);
+                  _updateFilter(() => notifier.updateDateFilter(picked.start, end));
+                }
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: activeFilter == 'custom' ? Theme.of(context).colorScheme.surface : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: activeFilter == 'custom'
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          )
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.date_range_rounded,
+                      size: 14,
+                      color: activeFilter == 'custom'
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      activeFilter == 'custom'
+                          ? '${DateFormat('dd/MM').format(salesState.startDate!)} - ${DateFormat('dd/MM').format(salesState.endDate!)}'
+                          : 'Kustom',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: activeFilter == 'custom' ? FontWeight.bold : FontWeight.w500,
+                        color: activeFilter == 'custom'
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSegmentItem({
+    required BuildContext context,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Theme.of(context).colorScheme.surface : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  )
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            color: isSelected
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.onSurfaceVariant,
           ),
-        ],
+        ),
       ),
     );
   }
@@ -592,32 +667,32 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           childAspectRatio: constraints.maxWidth < 600 ? 3.0 : 1.8,
           children: [
             _buildStatCard(
-              context,
-              'Pendapatan Kotor',
-              _formatRupiah(totalRevenue),
-              Icons.monetization_on_rounded,
-              Colors.teal,
+              context: context,
+              title: 'Pendapatan Kotor',
+              value: _formatRupiah(totalRevenue),
+              icon: Icons.monetization_on_rounded,
+              gradientColors: [const Color(0xFF0F9B0F), const Color(0xFF4CAF50)],
             ),
             _buildStatCard(
-              context,
-              'Jumlah Transaksi',
-              '$totalTransactions Transaksi',
-              Icons.shopping_basket_rounded,
-              Colors.orange,
+              context: context,
+              title: 'Jumlah Transaksi',
+              value: '$totalTransactions Transaksi',
+              icon: Icons.shopping_basket_rounded,
+              gradientColors: [const Color(0xFFE65100), const Color(0xFFF57C00)],
             ),
             _buildStatCard(
-              context,
-              'Rata-rata Belanja',
-              _formatRupiah(averageBasket),
-              Icons.trending_up_rounded,
-              Colors.indigo,
+              context: context,
+              title: 'Rata-rata Belanja',
+              value: _formatRupiah(averageBasket),
+              icon: Icons.trending_up_rounded,
+              gradientColors: [const Color(0xFF1E3C72), const Color(0xFF2A5298)],
             ),
             _buildStatCard(
-              context,
-              'Diskon Terpakai',
-              _formatRupiah(totalDiscounts),
-              Icons.percent_rounded,
-              Colors.pink,
+              context: context,
+              title: 'Diskon Terpakai',
+              value: _formatRupiah(totalDiscounts),
+              icon: Icons.percent_rounded,
+              gradientColors: [const Color(0xFFD81B60), const Color(0xFFEC407A)],
             ),
           ],
         );
@@ -625,49 +700,81 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget _buildStatCard(BuildContext context, String title, String value, IconData icon, Color color) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
+  Widget _buildStatCard({
+    required BuildContext context,
+    required String title,
+    required String value,
+    required IconData icon,
+    required List<Color> gradientColors,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: gradientColors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: gradientColors.last.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Stack(
           children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(14),
+            Positioned(
+              right: -16,
+              top: -16,
+              child: CircleAvatar(
+                radius: 40,
+                backgroundColor: Colors.white.withOpacity(0.06),
               ),
-              child: Icon(icon, color: color, size: 24),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
                 children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.55),
-                      fontWeight: FontWeight.w500,
-                    ),
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: Colors.white.withOpacity(0.2),
+                    foregroundColor: Colors.white,
+                    child: Icon(icon, size: 24),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    value,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.5,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withOpacity(0.8),
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          value,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            letterSpacing: -0.5,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),

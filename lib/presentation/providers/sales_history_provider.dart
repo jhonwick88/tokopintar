@@ -229,9 +229,12 @@ class SalesHistoryNotifier extends StateNotifier<SalesHistoryState> {
     required double systemRevenue,
     required double actualDrawerCash,
     required String notes,
+    String? operatorName,
   }) async {
     final user = _ref.read(authNotifierProvider).currentUser;
-    final cashierName = user?.fullname ?? 'Admin';
+    final cashierName = operatorName != null && operatorName.trim().isNotEmpty
+        ? operatorName.trim()
+        : (user?.fullname ?? 'Admin');
 
     final difference = actualDrawerCash - systemRevenue;
     

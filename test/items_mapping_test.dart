@@ -237,6 +237,27 @@ void main() {
       expect(sorted[0].itemName, 'Bola Basket'); // Price 150000
       expect(sorted[1].itemName, 'Bola Lampu'); // Price 15000
     });
+
+    test('Prioritizes multi-word query matches (Buku Tulis) at the top even when sorted by price asc', () async {
+      final items = [
+        ItemModel(itemNo: '1', itemUPC: '', itemName: 'Buku Tulis Sidu', categoryId: 1, price: 4000),
+        ItemModel(itemNo: '2', itemUPC: '', itemName: 'Buku Tulis Kiky', categoryId: 1, price: 6000),
+        ItemModel(itemNo: '3', itemUPC: '', itemName: 'Buku Gambar', categoryId: 1, price: 2000),
+        ItemModel(itemNo: '4', itemUPC: '', itemName: 'Buku Bacaan A3', categoryId: 1, price: 3000),
+      ];
+      
+      notifier.state = notifier.state.copyWith(
+        items: items,
+        searchQuery: 'buku tulis',
+        sortByPrice: 'asc',
+      );
+
+      final sorted = notifier.state.sortedItems;
+      expect(sorted[0].itemName, 'Buku Tulis Sidu'); // 2 matches, 4000
+      expect(sorted[1].itemName, 'Buku Tulis Kiky'); // 2 matches, 6000
+      expect(sorted[2].itemName, 'Buku Gambar');     // 1 match, 2000
+      expect(sorted[3].itemName, 'Buku Bacaan A3');  // 1 match, 3000
+    });
   });
 
   group('generateSKUFromName Helper Tests', () {

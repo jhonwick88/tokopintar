@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../data/models/sale_model.dart';
 import '../providers/sales_history_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/main_layout.dart';
 
 class SalesHistoryScreen extends ConsumerStatefulWidget {
@@ -890,9 +891,12 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
   }
 
   void _showCashReconciliationDialog(double todayRevenue) {
+    final defaultOperator = '';
+    final operatorController = TextEditingController(text: defaultOperator);
     final cashController = TextEditingController();
     final notesController = TextEditingController();
     double actualCash = 0.0;
+    String? operatorError;
 
     showDialog(
       context: context,
@@ -956,6 +960,23 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                           ),
                         ],
                       ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: operatorController,
+                      decoration: InputDecoration(
+                        labelText: 'Nama Inputer',
+                        prefixIcon: const Icon(Icons.person),
+                        hintText: 'Masukkan nama Anda',
+                        errorText: operatorError,
+                      ),
+                      onChanged: (val) {
+                        if (operatorError != null && val.trim().isNotEmpty) {
+                          setState(() {
+                            operatorError = null;
+                          });
+                        }
+                      },
                     ),
                     const SizedBox(height: 16),
                     TextField(
@@ -1033,6 +1054,14 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
+                    final opName = operatorController.text.trim();
+                    if (opName.isEmpty) {
+                      setState(() {
+                        operatorError = 'Nama inputer wajib diisi';
+                      });
+                      return;
+                    }
+                    
                     Navigator.of(context).pop();
                     
                     final success = await ref
@@ -1041,6 +1070,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                           systemRevenue: todayRevenue,
                           actualDrawerCash: actualCash,
                           notes: notesController.text.trim(),
+                          operatorName: opName,
                         );
                     
                     if (success) {
