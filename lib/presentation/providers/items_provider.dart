@@ -43,37 +43,58 @@ class ItemsState {
             .where((w) => w.isNotEmpty)
             .toList();
 
-    int getMatchCount(ItemModel item) {
+    final q = searchQuery.toLowerCase();
+
+    // Helper to determine the sorting priority group of an item
+    int getGroupPriority(ItemModel item) {
       if (queryWords.isEmpty) return 0;
       final name = item.itemName.toLowerCase();
-      int matches = 0;
+      
+      // Group 1: Matches exact contiguous query phrase
+      if (name.contains(q)) {
+        return 1;
+      }
+      
+      // Group 2: Matches all query words but not contiguously
+      bool matchesAll = true;
       for (final word in queryWords) {
-        if (name.contains(word)) {
-          matches++;
+        if (!name.contains(word)) {
+          matchesAll = false;
+          break;
         }
       }
-      return matches;
+      if (matchesAll) {
+        return 2;
+      }
+      
+      // Group 3: Partial or other matches
+      return 3;
     }
 
     sorted.sort((a, b) {
       if (queryWords.isNotEmpty) {
-        final aMatches = getMatchCount(a);
-        final bMatches = getMatchCount(b);
-        if (aMatches != bMatches) {
-          // Higher match count comes first
-          return bMatches.compareTo(aMatches);
+        final aPriority = getGroupPriority(a);
+        final bPriority = getGroupPriority(b);
+        if (aPriority != bPriority) {
+          // Lower priority group number comes first (Group 1 before Group 2)
+          return aPriority.compareTo(bPriority);
         }
       }
       
-      // If match counts are equal (or query is empty), sort by price if specified
+      // If same group (or no query), apply price sorting
       if (sortByPrice == 'asc') {
         return a.price.compareTo(b.price);
       } else if (sortByPrice == 'desc') {
         return b.price.compareTo(a.price);
       }
       
-      // If sortByPrice is 'none' and match counts are equal, keep alphabetical
-      return a.itemName.toLowerCase().compareTo(b.itemName.toLowerCase());
+      // If sortByPrice is 'none' and they are in the same group, sort by name length (shorter first) then alphabetically
+      final aName = a.itemName.toLowerCase();
+      final bName = b.itemName.toLowerCase();
+      if (aName.length != bName.length) {
+        return aName.length.compareTo(bName.length);
+      }
+      return aName.compareTo(bName);
     });
 
     return sorted;
@@ -218,58 +239,95 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
 
     if (queryWords.isEmpty) return [];
 
-    if (queryWords.length == 1) {
-      return await _itemsRepository.searchItems(
-        query,
-        page: page,
-        limit: limit,
-      );
-    }
-
     final allResults = <ItemModel>[];
     final seenIds = <String>{};
 
-    for (final word in queryWords) {
+    // If single word, query directly. Otherwise, merge results of all query words.
+    if (queryWords.length == 1) {
       try {
         final results = await _itemsRepository.searchItems(
-          word,
-          page: 1, // Ambil halaman pertama untuk setiap kata kunci pencarian
-          limit: limit * 2, // Ambil lebih banyak produk agar penggabungan lebih relevan
+          queryWords[0],
+          page: 1,
+          limit: limit * 3, // Fetch more to enable local filtering/sorting
         );
         for (final item in results) {
-          final id = item.itemNo;
-          if (!seenIds.contains(id)) {
-            seenIds.add(id);
+          if (seenIds.add(item.itemNo)) {
             allResults.add(item);
           }
         }
       } catch (e) {
-        dev.log('Error searching for word "$word": $e');
+        dev.log('Error searching for single word: $e');
+      }
+    } else {
+      for (final word in queryWords) {
+        try {
+          final results = await _itemsRepository.searchItems(
+            word,
+            page: 1,
+            limit: limit * 3, // Fetch more to enable local filtering/sorting
+          );
+          for (final item in results) {
+            if (seenIds.add(item.itemNo)) {
+              allResults.add(item);
+            }
+          }
+        } catch (e) {
+          dev.log('Error searching for word "$word": $e');
+        }
       }
     }
 
-    // Urutkan berdasarkan relevansi (berapa banyak kecocokan kata kunci di nama produk)
-    allResults.sort((a, b) {
+    // Filter: MUST contain ALL query words (case-insensitive)
+    final filteredResults = <ItemModel>[];
+    for (final item in allResults) {
+      final name = item.itemName.toLowerCase();
+      bool matchesAll = true;
+      for (final word in queryWords) {
+        if (!name.contains(word)) {
+          matchesAll = false;
+          break;
+        }
+      }
+      if (matchesAll) {
+        filteredResults.add(item);
+      }
+    }
+
+    // Sort by relevance:
+    // 1. Contiguous match (matches exact query phrase)
+    // 2. Index of exact match (closer to start of name is better)
+    // 3. Length of name (shorter name = tighter match)
+    // 4. Alphabetical
+    filteredResults.sort((a, b) {
       final aName = a.itemName.toLowerCase();
       final bName = b.itemName.toLowerCase();
+      final q = query.toLowerCase();
 
-      int aMatches = 0;
-      int bMatches = 0;
-      for (final word in queryWords) {
-        if (aName.contains(word)) aMatches++;
-        if (bName.contains(word)) bMatches++;
+      final aExact = aName.contains(q);
+      final bExact = bName.contains(q);
+
+      if (aExact && !bExact) return -1;
+      if (!aExact && bExact) return 1;
+
+      if (aExact && bExact) {
+        final aIdx = aName.indexOf(q);
+        final bIdx = bName.indexOf(q);
+        if (aIdx != bIdx) {
+          return aIdx.compareTo(bIdx);
+        }
       }
 
-      if (aMatches != bMatches) {
-        return bMatches.compareTo(aMatches); // Kecocokan terbanyak berada di atas
+      if (aName.length != bName.length) {
+        return aName.length.compareTo(bName.length);
       }
-      return aName.compareTo(bName); // Jika jumlah kecocokan sama, urutkan berdasarkan abjad
+
+      return aName.compareTo(bName);
     });
 
-    // Paginasi lokal pada daftar gabungan
+    // Local pagination
     final startIndex = (page - 1) * limit;
-    if (startIndex < allResults.length) {
-      return allResults.skip(startIndex).take(limit).toList();
+    if (startIndex < filteredResults.length) {
+      return filteredResults.skip(startIndex).take(limit).toList();
     }
     return [];
   }

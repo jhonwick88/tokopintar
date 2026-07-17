@@ -10,6 +10,8 @@ import '../providers/items_provider.dart';
 import '../providers/pos_provider.dart';
 import '../providers/sales_history_provider.dart';
 import '../widgets/camera_scanner_dialog.dart';
+import '../widgets/app_permissions_dialog.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../widgets/main_layout.dart';
 import '../widgets/payment_modal.dart';
 import 'mobile_cart_screen.dart';
@@ -150,6 +152,17 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   }
 
   Future<void> _openCameraScanner() async {
+    var status = await Permission.camera.status;
+    if (status != PermissionStatus.granted) {
+      if (mounted) {
+        await AppPermissionsDialog.show(context);
+      }
+      status = await Permission.camera.status;
+      if (status != PermissionStatus.granted) {
+        return;
+      }
+    }
+
     final barcode = await showDialog<String>(
       context: context,
       builder: (context) => const CameraScannerDialog(),
@@ -1540,6 +1553,18 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                     suffixIcon: IconButton(
                       icon: const Icon(Icons.qr_code_scanner),
                       onPressed: () async {
+                        var status = await Permission.camera.status;
+                        if (status != PermissionStatus.granted) {
+                          if (context.mounted) {
+                            await AppPermissionsDialog.show(context);
+                          }
+                          status = await Permission.camera.status;
+                          if (status != PermissionStatus.granted) {
+                            return;
+                          }
+                        }
+                        
+                        if (!context.mounted) return;
                         final scanned = await showDialog<String>(
                           context: context,
                           builder: (context) => const CameraScannerDialog(),
@@ -2026,6 +2051,18 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.qr_code_scanner),
                     onPressed: () async {
+                      var status = await Permission.camera.status;
+                      if (status != PermissionStatus.granted) {
+                        if (context.mounted) {
+                          await AppPermissionsDialog.show(context);
+                        }
+                        status = await Permission.camera.status;
+                        if (status != PermissionStatus.granted) {
+                          return;
+                        }
+                      }
+                      
+                      if (!context.mounted) return;
                       final scanned = await showDialog<String>(
                         context: context,
                         builder: (context) => const CameraScannerDialog(),

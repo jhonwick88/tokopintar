@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 import '../providers/items_provider.dart';
 import '../providers/pos_provider.dart';
-import '../providers/settings_provider.dart';
 import '../screens/mobile_cart_screen.dart';
 import '../widgets/camera_scanner_dialog.dart';
+import '../widgets/app_permissions_dialog.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class MainLayout extends ConsumerStatefulWidget {
   final Widget child;
@@ -40,6 +40,17 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
   }
 
   void _openCameraScanner(BuildContext context, WidgetRef ref) async {
+    var status = await Permission.camera.status;
+    if (status != PermissionStatus.granted) {
+      if (!context.mounted) return;
+      await AppPermissionsDialog.show(context);
+      status = await Permission.camera.status;
+      if (status != PermissionStatus.granted) {
+        return;
+      }
+    }
+
+    if (!context.mounted) return;
     final barcode = await showDialog<String>(
       context: context,
       builder: (context) => const CameraScannerDialog(),

@@ -29,7 +29,7 @@ class MockItemsRepository implements ItemsRepository {
 
   @override
   Future<List<ItemModel>> searchItems(String query, {required int page, int limit = 50}) async {
-    return db.where((it) => it.itemName.contains(query)).toList();
+    return db.where((it) => it.itemName.toLowerCase().contains(query.toLowerCase())).toList();
   }
 
   @override
@@ -257,6 +257,30 @@ void main() {
       expect(sorted[1].itemName, 'Buku Tulis Kiky'); // 2 matches, 6000
       expect(sorted[2].itemName, 'Buku Gambar');     // 1 match, 2000
       expect(sorted[3].itemName, 'Buku Bacaan A3');  // 1 match, 3000
+    });
+
+    test('Searching "Buku Tulis" only returns items containing both words and sorts by relevance', () async {
+      mockRepo.db = [
+        ItemModel(itemNo: '1', itemUPC: '', itemName: 'Buku Tulis Sidu', categoryId: 1, price: 4000),
+        ItemModel(itemNo: '2', itemUPC: '', itemName: 'Buku Sidu Tulis', categoryId: 1, price: 5000),
+        ItemModel(itemNo: '3', itemUPC: '', itemName: 'Buku Gambar', categoryId: 1, price: 2000),
+        ItemModel(itemNo: '4', itemUPC: '', itemName: 'Tulis Buku Kiky', categoryId: 1, price: 6000),
+      ];
+
+      await notifier.search('buku tulis');
+      
+      // Excludes "Buku Gambar"
+      expect(notifier.state.items.length, 3);
+      
+      // "Buku Tulis Sidu" matches contiguous phrase exactly at index 0, so it must be at index 0
+      expect(notifier.state.items[0].itemName, 'Buku Tulis Sidu');
+      
+      // All returned items must contain both words
+      for (final item in notifier.state.items) {
+        final name = item.itemName.toLowerCase();
+        expect(name.contains('buku'), isTrue);
+        expect(name.contains('tulis'), isTrue);
+      }
     });
   });
 

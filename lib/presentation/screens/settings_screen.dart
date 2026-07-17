@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
@@ -9,6 +11,8 @@ import '../../domain/services/printer_service.dart';
 import '../providers/auth_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/main_layout.dart';
+import '../widgets/app_permissions_dialog.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'quick_add_item_settings_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -52,6 +56,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _isEditingUnlocked = false;
   bool _isTestingConnection = false;
   String? _connectionStatus;
+  bool _allPermissionsGranted = true;
 
   @override
   void initState() {
@@ -92,29 +97,65 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         _scanWindowsPrinters();
       });
     }
+    _checkAppPermissions();
+  }
+
+  Future<void> _checkAppPermissions() async {
+    if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) {
+      if (mounted) {
+        setState(() {
+          _allPermissionsGranted = true;
+        });
+      }
+      return;
+    }
+
+    final camera = await Permission.camera.isGranted;
+    final location = await Permission.locationWhenInUse.isGranted;
+    final mic = await Permission.microphone.isGranted;
+    final btConnect = await Permission.bluetoothConnect.isGranted;
+    final btScan = await Permission.bluetoothScan.isGranted;
+
+    if (mounted) {
+      setState(() {
+        _allPermissionsGranted = camera && location && mic && btConnect && btScan;
+      });
+    }
   }
 
   Future<void> _scanBluetoothDevices() async {
+    // Check Mobile Permissions for Bluetooth Connection & Location
+    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+      final locGranted = await Permission.locationWhenInUse.isGranted;
+      final btConnectGranted = await Permission.bluetoothConnect.isGranted;
+      final btScanGranted = await Permission.bluetoothScan.isGranted;
+      
+      if (!locGranted || !btConnectGranted || !btScanGranted) {
+        if (mounted) {
+          await AppPermissionsDialog.show(context);
+        }
+        
+        final locNow = await Permission.locationWhenInUse.isGranted;
+        final btConnectNow = await Permission.bluetoothConnect.isGranted;
+        final btScanNow = await Permission.bluetoothScan.isGranted;
+        if (!locNow || !btConnectNow || !btScanNow) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Izin Lokasi & Perangkat Sekitar diperlukan untuk mendeteksi printer Bluetooth.'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+          return;
+        }
+      }
+    }
+
     setState(() {
       _isScanningBluetooth = true;
     });
     try {
-      final bool isGranted = await PrintBluetoothThermal.isPermissionBluetoothGranted;
-      if (!isGranted) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Akses perangkat terdekat (Bluetooth) diperlukan untuk mendeteksi printer.'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-        setState(() {
-          _isScanningBluetooth = false;
-        });
-        return;
-      }
-
       final devices = await PrintBluetoothThermal.pairedBluetooths;
       setState(() {
         _bluetoothDevices = devices;
@@ -614,6 +655,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   title: 'Keamanan Akses',
                   icon: Icons.security,
                   children: [
+
                     _buildTextField(
                       controller: _adminPinController,
                       label: 'PIN Otorisasi Admin',
@@ -621,6 +663,56 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       obscureText: true,
                       keyboardType: TextInputType.number,
                       validator: (val) => val!.isEmpty ? 'PIN wajib diisi' : null,
+                    ),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: _allPermissionsGranted
+                            ? Colors.green.withOpacity(0.05)
+                            : Colors.red.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _allPermissionsGranted
+                              ? Colors.green.withOpacity(0.2)
+                              : Colors.red.withOpacity(0.2),
+                          width: 1,
+                        ),
+                      ),
+                      child: ListTile(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        onTap: () async {
+                          await AppPermissionsDialog.show(context);
+                          _checkAppPermissions();
+                        },
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: _allPermissionsGranted
+                                ? Colors.green.withOpacity(0.1)
+                                : Colors.red.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            _allPermissionsGranted ? Icons.security_rounded : Icons.gpp_maybe_rounded,
+                            color: _allPermissionsGranted ? Colors.green : Colors.red,
+                            size: 20,
+                          ),
+                        ),
+                        title: const Text(
+                          'Kelola Izin Aplikasi',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        subtitle: const Text(
+                          'Kelola Izin Kamera, Bluetooth, & Lokasi',
+                          style: TextStyle(fontSize: 11, color: Colors.grey),
+                        ),
+                        trailing: Icon(
+                          _allPermissionsGranted ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                          color: _allPermissionsGranted ? Colors.green : Colors.red,
+                          size: 22,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -984,7 +1076,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     const Divider(),
                     ListTile(
                       leading: const Icon(Icons.bolt, color: Colors.amber),
-                      title: const Text('Kelola Quick Add Item', style: TextStyle(fontWeight: FontWeight.bold)),
+                      title: const Text('Quick Add Item', style: TextStyle(fontWeight: FontWeight.bold)),
                       subtitle: const Text('Konfigurasi tombol cepat untuk produk kasir'),
                       trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                       onTap: () {
@@ -996,7 +1088,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     const Divider(),
                     ListTile(
                       leading: const Icon(Icons.logout, color: Colors.red),
-                      title: const Text('Keluar dari Akun (Logout)', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                      title: const Text('Logout', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
                       subtitle: const Text('Mengakhiri sesi kasir aktif saat ini'),
                       onTap: () => _confirmAndLogout(context),
                     ),

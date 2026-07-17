@@ -1,13 +1,10 @@
-import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../providers/pos_provider.dart';
-import '../providers/settings_provider.dart';
-import '../../data/models/sale_model.dart';
-import '../../domain/services/printer_service.dart';
+import 'transaction_success_dialog.dart';
 
 class PaymentModal extends ConsumerStatefulWidget {
   const PaymentModal({super.key});
@@ -159,9 +156,13 @@ class _PaymentModalState extends ConsumerState<PaymentModal> {
       });
 
       if (mounted && sale != null) {
-        // Show Success Dialog
-        Navigator.of(context).pop(); // Close Payment Modal
-        _showSuccessDialog(sale);
+        final navigator = Navigator.of(context);
+        navigator.pop(); // Close Payment Modal
+        showDialog(
+          context: navigator.context,
+          barrierDismissible: false,
+          builder: (context) => TransactionSuccessDialog(sale: sale),
+        );
       }
     } catch (e) {
       setState(() {
@@ -171,176 +172,9 @@ class _PaymentModalState extends ConsumerState<PaymentModal> {
     }
   }
 
-  void _showSuccessDialog(SaleModel sale) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          content: Container(
-            width: 380,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.check_circle_rounded, color: Colors.green, size: 72),
-                const SizedBox(height: 16),
-                const Text(
-                  'Transaksi Sukses!',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  sale.invoiceNo,
-                  style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
-                ),
-                const SizedBox(height: 24),
-                
-                // Details Grid
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    children: [
-                      _buildSummaryRow('Total Belanja', _formatRupiah(sale.grandTotal)),
-                      const SizedBox(height: 8),
-                      _buildSummaryRow('Total Bayar', _formatRupiah(sale.paidAmount)),
-                      const SizedBox(height: 8),
-                      const Divider(),
-                      const SizedBox(height: 8),
-                      _buildSummaryRow(
-                        'Kembalian',
-                        _formatRupiah(sale.changeAmount),
-                        valueColor: Colors.green,
-                        bold: true,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: () {
-                          _printReceiptDirect(sale);
-                        },
-                        icon: const Icon(Icons.print),
-                        label: const Text('Cetak Ulang'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                        },
-                        child: const Text('Selesai'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 
-  Future<void> _printReceiptDirect(SaleModel sale) async {
-    final settings = ref.read(settingsNotifierProvider);
-    final printBytes = PrinterService.instance.generateReceiptBytes(sale, settings);
-    bool success = false;
-    
-    try {
-      if (settings.printerType == 'LAN') {
-        success = await PrinterService.instance.printToLan(
-          settings.printerIp,
-          settings.printerPort,
-          printBytes,
-          copies: settings.printReceiptCopies,
-        );
-      } else if (settings.printerType == 'Bluetooth') {
-        success = await PrinterService.instance.printToBluetooth(
-          settings.printerMacAddress,
-          printBytes,
-          copies: settings.printReceiptCopies,
-        );
-      } else if (settings.printerType == 'USB') {
-        success = await PrinterService.instance.printToWindows(
-          settings.printerMacAddress,
-          sale,
-          settings,
-        );
-      } else {
-        dev.log('Mock print direct: Invoice ${sale.invoiceNo} printed.');
-        success = true;
-      }
-      
-      if (success) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Print job berhasil dikirim'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Gagal mengirim print job. Periksa printer Anda.'),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Terjadi kesalahan saat mencetak: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    }
-  }
 
-  Widget _buildSummaryRow(String label, String val, {Color? valueColor, bool bold = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 14)),
-        Text(
-          val,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-            color: valueColor,
-          ),
-        ),
-      ],
-    );
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -849,3 +683,5 @@ class _PaymentModalState extends ConsumerState<PaymentModal> {
     return formatter.format(val);
   }
 }
+
+

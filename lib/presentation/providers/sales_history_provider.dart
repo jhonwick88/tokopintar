@@ -30,7 +30,7 @@ class SalesHistoryState {
   });
 
   List<SaleModel> get filteredSales {
-    return sales.where((s) {
+    final list = sales.where((s) {
       final matchesQuery = searchQuery.isEmpty || 
           s.invoiceNo.toLowerCase().contains(searchQuery.toLowerCase());
       
@@ -42,6 +42,10 @@ class SalesHistoryState {
           
       return matchesQuery && matchesPayment && matchesStatus;
     }).toList();
+    
+    // Sort by date descending (newest time at the top)
+    list.sort((a, b) => b.date.compareTo(a.date));
+    return list;
   }
 
   SalesHistoryState copyWith({
@@ -75,7 +79,7 @@ class SalesHistoryNotifier extends StateNotifier<SalesHistoryState> {
 
   SalesHistoryNotifier(this._salesRepository, this._ref) : super(
     SalesHistoryState(
-      startDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day).subtract(const Duration(days: 6)),
+      startDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
       endDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day, 23, 59, 59),
     ),
   ) {

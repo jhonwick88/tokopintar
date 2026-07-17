@@ -6,6 +6,7 @@ import '../providers/pos_provider.dart';
 import '../providers/settings_provider.dart';
 import '../../data/models/sale_model.dart';
 import '../../domain/services/printer_service.dart';
+import '../widgets/transaction_success_dialog.dart';
 import 'pos_screen.dart';
 
 class MobileCartScreen extends ConsumerStatefulWidget {
@@ -95,8 +96,13 @@ class _MobileCartScreenState extends ConsumerState<MobileCartScreen> {
       });
 
       if (mounted && sale != null) {
-        Navigator.of(context).pop(); // Go back to POS catalog
-        _showSuccessDialog(sale);
+        final navigator = Navigator.of(context);
+        navigator.pop(); // Go back to POS catalog
+        showDialog(
+          context: navigator.context,
+          barrierDismissible: false,
+          builder: (context) => TransactionSuccessDialog(sale: sale),
+        );
       }
     } catch (e) {
       setState(() {
@@ -106,155 +112,7 @@ class _MobileCartScreenState extends ConsumerState<MobileCartScreen> {
     }
   }
 
-  void _showSuccessDialog(SaleModel sale) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          content: Container(
-            width: 340,
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.check_circle_rounded, color: Colors.green, size: 64),
-                const SizedBox(height: 16),
-                const Text(
-                  'Transaksi Sukses!',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  sale.invoiceNo,
-                  style: const TextStyle(color: Colors.grey, fontSize: 13),
-                ),
-                const SizedBox(height: 20),
-                
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    children: [
-                      _buildSummaryRow('Total Belanja', _formatRupiah(sale.grandTotal)),
-                      const SizedBox(height: 6),
-                      _buildSummaryRow('Total Bayar', _formatRupiah(sale.paidAmount)),
-                      const SizedBox(height: 6),
-                      const Divider(),
-                      const SizedBox(height: 6),
-                      _buildSummaryRow(
-                        'Kembalian',
-                        _formatRupiah(sale.changeAmount),
-                        valueColor: Colors.green,
-                        bold: true,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: () {
-                          _printReceiptDirect(sale);
-                        },
-                        icon: const Icon(Icons.print, size: 18),
-                        label: const Text('Cetak Nota', style: TextStyle(fontSize: 13)),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Selesai', style: TextStyle(fontSize: 13)),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 
-  Future<void> _printReceiptDirect(SaleModel sale) async {
-    final settings = ref.read(settingsNotifierProvider);
-    final printBytes = PrinterService.instance.generateReceiptBytes(sale, settings);
-    bool success = false;
-    
-    try {
-      if (settings.printerType == 'LAN') {
-        success = await PrinterService.instance.printToLan(
-          settings.printerIp,
-          settings.printerPort,
-          printBytes,
-          copies: settings.printReceiptCopies,
-        );
-      } else if (settings.printerType == 'Bluetooth') {
-        success = await PrinterService.instance.printToBluetooth(
-          settings.printerMacAddress,
-          printBytes,
-          copies: settings.printReceiptCopies,
-        );
-      } else if (settings.printerType == 'USB') {
-        success = await PrinterService.instance.printToWindows(
-          settings.printerMacAddress,
-          sale,
-          settings,
-        );
-      } else {
-        success = true;
-      }
-      
-      if (success) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Print job berhasil dikirim'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Gagal mengirim print job. Periksa printer Anda.'),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Terjadi kesalahan saat mencetak: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    }
-  }
 
   Widget _buildSummaryRow(String label, String val, {Color? valueColor, bool bold = false}) {
     return Row(
