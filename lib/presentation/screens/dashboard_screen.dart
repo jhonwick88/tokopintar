@@ -1,9 +1,13 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../providers/sales_history_provider.dart';
 import '../widgets/main_layout.dart';
+import '../widgets/app_permissions_dialog.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -21,6 +25,27 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void initState() {
     super.initState();
     _scrollController = ScrollController()..addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndPromptPermissions();
+    });
+  }
+
+  Future<void> _checkAndPromptPermissions() async {
+    if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) {
+      return;
+    }
+
+    final camera = await Permission.camera.isGranted;
+    final location = await Permission.locationWhenInUse.isGranted;
+    final mic = await Permission.microphone.isGranted;
+    final btConnect = await Permission.bluetoothConnect.isGranted;
+    final btScan = await Permission.bluetoothScan.isGranted;
+
+    if (!camera || !location || !mic || !btConnect || !btScan) {
+      if (mounted) {
+        await AppPermissionsDialog.show(context);
+      }
+    }
   }
 
   @override

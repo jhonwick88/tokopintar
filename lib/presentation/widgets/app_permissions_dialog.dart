@@ -46,7 +46,7 @@ class _AppPermissionsDialogState extends State<AppPermissionsDialog> {
     ),
     PermissionItem(
       permission: Permission.bluetoothConnect, // Represents Nearby Devices / Bluetooth
-      name: 'Perangkat Sekitar',
+      name: 'Device Sekitar',
       description: 'Diperlukan untuk menghubungkan printer Bluetooth di Android 12+.',
       icon: Icons.devices_other_rounded,
       color: Colors.purple,

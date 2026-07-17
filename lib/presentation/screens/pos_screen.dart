@@ -1,4 +1,6 @@
 import 'dart:ui';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -43,6 +45,27 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     _catalogScrollController.addListener(_onScroll);
     HardwareKeyboard.instance.addHandler(_handleGlobalKeyEvent);
     _loadViewPreference();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndPromptPermissions();
+    });
+  }
+
+  Future<void> _checkAndPromptPermissions() async {
+    if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) {
+      return;
+    }
+
+    final camera = await Permission.camera.isGranted;
+    final location = await Permission.locationWhenInUse.isGranted;
+    final mic = await Permission.microphone.isGranted;
+    final btConnect = await Permission.bluetoothConnect.isGranted;
+    final btScan = await Permission.bluetoothScan.isGranted;
+
+    if (!camera || !location || !mic || !btConnect || !btScan) {
+      if (mounted) {
+        await AppPermissionsDialog.show(context);
+      }
+    }
   }
 
   Future<void> _loadViewPreference() async {
@@ -895,15 +918,6 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                           fontWeight: FontWeight.bold,
                                         ),
                                   ),
-                                  // const SizedBox(height: 8),
-                                  // Padding(
-                                  //   padding: const EdgeInsets.symmetric(horizontal: 32.0),
-                                  //   child: Text(
-                                  //     state.errorMessage!,
-                                  //     textAlign: TextAlign.center,
-                                  //     style: const TextStyle(color: Colors.grey),
-                                  //   ),
-                                  // ),
                                   const SizedBox(height: 24),
                                   ElevatedButton.icon(
                                     onPressed: () {
@@ -1029,7 +1043,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                         controller: _catalogScrollController,
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         itemCount: displayItems.length + (state.isLoading ? 3 : 0),
-                        separatorBuilder: (context, index) => const SizedBox(height: 8),
+                        separatorBuilder: (context, index) => const SizedBox(height: 2),
                         itemBuilder: (context, index) {
                           if (index >= displayItems.length) {
                             return const Card(
@@ -1041,6 +1055,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                           }
                           final product = displayItems[index];
                           return Card(
+                            margin: EdgeInsets.zero,
                             child: InkWell(
                               onTap: () {
                                 ref.read(posNotifierProvider.notifier).addToCart(product);
@@ -1049,7 +1064,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                               onLongPress: () => _showEditProductDialog(product),
                               borderRadius: BorderRadius.circular(12),
                               child: Padding(
-                                padding: const EdgeInsets.all(12.0),
+                                padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
                                 child: Row(
                                   children: [
                                     Expanded(
@@ -1058,33 +1073,28 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                         children: [
                                           Text(
                                             product.itemName,
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            'SKU: ${product.itemNo}  |  UPC: ${product.itemUPC}  |  Stok: ${product.obQuantity.toStringAsFixed(0)}',
-                                            style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),
-                                          const SizedBox(height: 6),
+                                          const SizedBox(height: 3),
                                           Text(
-                                            _formatRupiah(product.price),
-                                            style: TextStyle(
-                                              color: Theme.of(context).colorScheme.primary,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 14,
-                                            ),
+                                            'SKU: ${product.itemNo}  •  Stok: ${product.obQuantity.toStringAsFixed(0)}',
+                                            style: const TextStyle(fontSize: 10.5, color: Colors.grey),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
                                         ],
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    Icon(
-                                      Icons.add_shopping_cart,
-                                      color: Theme.of(context).colorScheme.primary,
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      _formatRupiah(product.price),
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.primary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13.5,
+                                      ),
                                     ),
                                   ],
                                 ),
