@@ -302,6 +302,49 @@ class _MobileCartScreenState extends ConsumerState<MobileCartScreen> {
     );
   }
 
+  Widget _buildPaymentMethodCard({
+    required String method,
+    required String label,
+    required IconData icon,
+    required bool selected,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: () => setState(() => _selectedMethod = method),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? colorScheme.primaryContainer : Colors.transparent,
+          border: Border.all(
+            color: selected ? colorScheme.primary : Colors.grey.withOpacity(0.3),
+            width: selected ? 1.5 : 1.0,
+          ),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: selected ? colorScheme.primary : Colors.grey[700],
+              size: 22,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                color: selected ? colorScheme.primary : Colors.grey[800],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final posState = ref.watch(posNotifierProvider);
@@ -324,7 +367,33 @@ class _MobileCartScreenState extends ConsumerState<MobileCartScreen> {
         ],
       ),
       body: posState.cartItems.isEmpty
-          ? const Center(child: Text('Keranjang Belanja Kosong'))
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.shopping_cart_outlined,
+                    size: 64,
+                    color: Colors.grey.withOpacity(0.5),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Keranjang Belanja Kosong',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.arrow_back),
+                    label: const Text('Mulai Belanja'),
+                  ),
+                ],
+              ),
+            )
           : Column(
               children: [
                 // 1. List Cart Items (Vertical list, 1 card per row, no images)
@@ -358,94 +427,121 @@ class _MobileCartScreenState extends ConsumerState<MobileCartScreen> {
                         },
                         child: Card(
                           child: Padding(
-                            padding: const EdgeInsets.all(12.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            child: Row(
                               children: [
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                // Left side info
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        cartItem.item.itemName,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Row(
                                         children: [
                                           Text(
-                                            cartItem.item.itemName,
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            _formatRupiah(cartItem.price),
+                                            '${cartItem.qty} x ${_formatRupiah(cartItem.price)}',
                                             style: TextStyle(
-                                              color: Theme.of(context).colorScheme.primary,
-                                              fontWeight: FontWeight.w500,
+                                              fontSize: 11,
+                                              color: Colors.grey[600],
                                             ),
                                           ),
-                                          if (cartItem.discount > 0)
-                                            Text(
-                                              'Disc: -${_formatRupiah(cartItem.discount)}',
-                                              style: const TextStyle(color: Colors.red, fontSize: 11),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            _formatRupiah(cartItem.subtotal),
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: Theme.of(context).colorScheme.primary,
                                             ),
-                                          if (cartItem.note.isNotEmpty)
-                                            Text(
-                                              '* Note: ${cartItem.note}',
-                                              style: const TextStyle(color: Colors.grey, fontSize: 11, fontStyle: FontStyle.italic),
-                                            ),
+                                          ),
                                         ],
+                                      ),
+                                      if (cartItem.discount > 0 || cartItem.note.isNotEmpty) ...[
+                                        const SizedBox(height: 2),
+                                        Row(
+                                          children: [
+                                            if (cartItem.discount > 0)
+                                              Padding(
+                                                padding: const EdgeInsets.only(right: 6.0),
+                                                child: Text(
+                                                  'Disc: -${_formatRupiah(cartItem.discount)}',
+                                                  style: const TextStyle(color: Colors.red, fontSize: 10),
+                                                ),
+                                              ),
+                                            if (cartItem.note.isNotEmpty)
+                                              Expanded(
+                                                child: Text(
+                                                  '* ${cartItem.note}',
+                                                  style: const TextStyle(color: Colors.grey, fontSize: 10, fontStyle: FontStyle.italic),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                
+                                // Right side: Edit Note and Qty Adjuster
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.edit_note, size: 22),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      onPressed: () => _openItemNoteAndDiscountDialog(cartItem),
+                                      tooltip: 'Tambah Catatan / Diskon',
+                                    ),
+                                    const SizedBox(width: 6),
+                                    IconButton(
+                                      icon: const Icon(Icons.remove, size: 16),
+                                      padding: const EdgeInsets.all(4),
+                                      constraints: const BoxConstraints(),
+                                      onPressed: () {
+                                        ref.read(posNotifierProvider.notifier).updateQty(
+                                              cartItem.item.itemNo,
+                                              cartItem.qty - 1,
+                                            );
+                                      },
+                                    ),
+                                    InkWell(
+                                      onTap: () => _showEditQtyDialog(cartItem),
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: Container(
+                                        constraints: const BoxConstraints(minWidth: 26),
+                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          '${cartItem.qty}',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                        ),
                                       ),
                                     ),
                                     IconButton(
-                                      icon: const Icon(Icons.edit_note),
-                                      onPressed: () => _openItemNoteAndDiscountDialog(cartItem),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Sub: ${_formatRupiah(cartItem.subtotal)}',
-                                      style: const TextStyle(fontWeight: FontWeight.bold),
-                                    ),
-                                    Row(
-                                      children: [
-                                        IconButton(
-                                          icon: const Icon(Icons.remove_circle_outline, size: 24),
-                                          onPressed: () {
-                                            ref.read(posNotifierProvider.notifier).updateQty(
-                                                  cartItem.item.itemNo,
-                                                  cartItem.qty - 1,
-                                                );
-                                          },
-                                        ),
-                                        InkWell(
-                                          onTap: () => _showEditQtyDialog(cartItem),
-                                          borderRadius: BorderRadius.circular(4),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                            decoration: BoxDecoration(
-                                              border: Border.all(color: Colors.grey.withOpacity(0.3)),
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              '${cartItem.qty}',
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                            ),
-                                          ),
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.add_circle_outline, size: 24),
-                                          onPressed: () {
-                                            ref.read(posNotifierProvider.notifier).updateQty(
-                                                  cartItem.item.itemNo,
-                                                  cartItem.qty + 1,
-                                                );
-                                          },
-                                        ),
-                                      ],
+                                      icon: const Icon(Icons.add, size: 16),
+                                      padding: const EdgeInsets.all(4),
+                                      constraints: const BoxConstraints(),
+                                      onPressed: () {
+                                        ref.read(posNotifierProvider.notifier).updateQty(
+                                              cartItem.item.itemNo,
+                                              cartItem.qty + 1,
+                                            );
+                                      },
                                     ),
                                   ],
                                 ),
@@ -536,68 +632,81 @@ class _MobileCartScreenState extends ConsumerState<MobileCartScreen> {
                                 mainAxisSize: MainAxisSize.min,
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Text('Total Barang:', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                                      Text(
-                                        '${posState.cartItems.length} Jenis (${posState.cartItems.fold<int>(0, (sum, item) => sum + item.qty)} Pcs)',
-                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Text('Subtotal:', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                                      Text(
-                                        _formatRupiah(posState.subtotal),
-                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Text('Diskon Transaksi:', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                                      InkWell(
-                                        onTap: _openDiscountDialog,
-                                        child: Text(
-                                          posState.totalDiscount > 0
-                                              ? '-${_formatRupiah(posState.totalDiscount)}'
-                                              : 'Tambah Diskon',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: posState.totalDiscount > 0 ? Colors.red : Theme.of(context).colorScheme.primary,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.withOpacity(0.05),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: Colors.grey.withOpacity(0.12)),
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            const Text('Total Barang:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                            Text(
+                                              '${posState.cartItems.length} Jenis (${posState.cartItems.fold<int>(0, (sum, item) => sum + item.qty)} Pcs)',
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                            ),
+                                          ],
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            const Text('Subtotal:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                            Text(
+                                              _formatRupiah(posState.subtotal),
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            const Text('Diskon Transaksi:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                            InkWell(
+                                              onTap: _openDiscountDialog,
+                                              child: Text(
+                                                posState.totalDiscount > 0
+                                                    ? '-${_formatRupiah(posState.totalDiscount)}'
+                                                    : 'Tambah Diskon',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: posState.totalDiscount > 0 ? Colors.red : Theme.of(context).colorScheme.primary,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (posState.enableServiceCharge && posState.serviceCharge > 0) ...[
+                                          const SizedBox(height: 6),
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text('Service Charge (${posState.serviceChargePercentage.toInt()}%):', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                              Text(_formatRupiah(posState.serviceCharge), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                                            ],
+                                          ),
+                                        ],
+                                        if (posState.enableTax && posState.tax > 0) ...[
+                                          const SizedBox(height: 6),
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text('Pajak PPN (${posState.taxPercentage.toInt()}%):', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                              Text(_formatRupiah(posState.tax), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                                            ],
+                                          ),
+                                        ],
+                                      ],
+                                    ),
                                   ),
-                                  if (posState.enableServiceCharge && posState.serviceCharge > 0) ...[
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text('Service Charge (${posState.serviceChargePercentage.toInt()}%):', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                        Text(_formatRupiah(posState.serviceCharge), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-                                      ],
-                                    ),
-                                  ],
-                                  if (posState.enableTax && posState.tax > 0) ...[
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text('Pajak PPN (${posState.taxPercentage.toInt()}%):', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                        Text(_formatRupiah(posState.tax), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-                                      ],
-                                    ),
-                                  ],
-                                  const Divider(height: 12),
+                                  const SizedBox(height: 12),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
@@ -625,32 +734,29 @@ class _MobileCartScreenState extends ConsumerState<MobileCartScreen> {
                                               Row(
                                                 children: [
                                                   Expanded(
-                                                    child: ChoiceChip(
-                                                      label: const Text('Tunai'),
+                                                    child: _buildPaymentMethodCard(
+                                                      method: 'cash',
+                                                      label: 'Tunai',
+                                                      icon: Icons.money_rounded,
                                                       selected: _selectedMethod == 'cash',
-                                                      onSelected: (val) {
-                                                        if (val) setState(() => _selectedMethod = 'cash');
-                                                      },
                                                     ),
                                                   ),
                                                   const SizedBox(width: 8),
                                                   Expanded(
-                                                    child: ChoiceChip(
-                                                      label: const Text('QRIS'),
+                                                    child: _buildPaymentMethodCard(
+                                                      method: 'qris',
+                                                      label: 'QRIS',
+                                                      icon: Icons.qr_code_rounded,
                                                       selected: _selectedMethod == 'qris',
-                                                      onSelected: (val) {
-                                                        if (val) setState(() => _selectedMethod = 'qris');
-                                                      },
                                                     ),
                                                   ),
                                                   const SizedBox(width: 8),
                                                   Expanded(
-                                                    child: ChoiceChip(
-                                                      label: const Text('Card/EDC'),
+                                                    child: _buildPaymentMethodCard(
+                                                      method: 'bank',
+                                                      label: 'Transfer',
+                                                      icon: Icons.account_balance_rounded,
                                                       selected: _selectedMethod == 'bank',
-                                                      onSelected: (val) {
-                                                        if (val) setState(() => _selectedMethod = 'bank');
-                                                      },
                                                     ),
                                                   ),
                                                 ],
@@ -772,7 +878,15 @@ class _MobileCartScreenState extends ConsumerState<MobileCartScreen> {
                                     padding: const EdgeInsets.symmetric(vertical: 14),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                   ),
-                                  onPressed: _isProcessing ? null : () => _processCheckout(grandTotal),
+                                  onPressed: _isProcessing
+                                      ? null
+                                      : () {
+                                          if (!_isPaymentSectionExpanded) {
+                                            setState(() => _isPaymentSectionExpanded = true);
+                                          } else {
+                                            _processCheckout(grandTotal);
+                                          }
+                                        },
                                   icon: _isProcessing
                                       ? const SizedBox(
                                           width: 20,

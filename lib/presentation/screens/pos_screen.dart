@@ -1,4 +1,4 @@
-import 'dart:ui';
+import 'dart:ui' as ui;
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -122,20 +122,97 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     final item = await ref.read(itemsNotifierProvider.notifier).fetchItemByBarcode(barcode);
     if (item != null) {
       ref.read(posNotifierProvider.notifier).addToCart(item);
-      _showSuccessToast('Produk ${item.itemName} ditambahkan');
+      _showSuccessToast('Produk ${item.itemName}');
     } else {
       _showUnregisteredBarcodeDialog(barcode);
     }
   }
 
   void _showSuccessToast(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    ScaffoldMessenger.of(context).clearSnackBars();
+    final width = MediaQuery.of(context).size.width;
+    final isDesktop = width >= 900;
+
+    if (isDesktop) {
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: msg.toUpperCase(),
+          style: const TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.5,
+          ),
+        ),
+        maxLines: 1,
+        textDirection: ui.TextDirection.ltr,
+      )..layout();
+
+      final contentWidth = (textPainter.width + 80 + 52).clamp(350.0, width - 128);
+      final sideMargin = (width - contentWidth) / 2;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    msg.toUpperCase(),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                const Icon(
+                  Icons.check_circle_outline_rounded,
+                  color: Colors.white,
+                  size: 36,
+                ),
+              ],
+            ),
+          ),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          margin: EdgeInsets.only(bottom: 64, left: sideMargin, right: sideMargin),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Expanded(
+                child: Text(
+                  msg,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.check_circle_outline_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+            ],
+          ),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   void _showErrorToast(String msg) {
@@ -760,42 +837,59 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 ),
               if (isLargeScreen) ...[
                 const SizedBox(width: 12),
-                IconButton.filled(
-                  style: IconButton.styleFrom(
-                    padding: const EdgeInsets.all(16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                Tooltip(
+                  message: 'Scan Barcode Kamera (F2)',
+                  child: IconButton.filledTonal(
+                    style: IconButton.styleFrom(
+                      padding: const EdgeInsets.all(14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.qr_code_scanner, size: 20),
+                    onPressed: _openCameraScanner,
                   ),
-                  icon: const Icon(Icons.qr_code_scanner),
-                  onPressed: _openCameraScanner,
-                  tooltip: 'Scan Barcode Kamera (F2)',
                 ),
-              ],
-              if (isLargeScreen) ...[
-                const SizedBox(width: 12),
-                IconButton.filled(
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    padding: const EdgeInsets.all(16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: 'Lanjutkan Transaksi Ditahan',
+                  child: IconButton.filledTonal(
+                    style: IconButton.styleFrom(
+                      foregroundColor: Colors.orange[800],
+                      backgroundColor: Colors.orange.withOpacity(0.12),
+                      padding: const EdgeInsets.all(14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.hourglass_empty_rounded, size: 20),
+                    onPressed: _openResumeDialog,
                   ),
-                  icon: const Icon(Icons.hourglass_empty_rounded),
-                  onPressed: _openResumeDialog,
-                  tooltip: 'Lanjutkan Transaksi Ditahan',
                 ),
-                const SizedBox(width: 12),
-                IconButton.filled(
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.blueGrey,
-                    padding: const EdgeInsets.all(16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: 'Muat Ulang Katalog (Refresh)',
+                  child: IconButton.filledTonal(
+                    style: IconButton.styleFrom(
+                      padding: const EdgeInsets.all(14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.refresh, size: 20),
+                    onPressed: () {
+                      ref.read(itemsNotifierProvider.notifier).initCatalog();
+                    },
                   ),
-                  icon: const Icon(Icons.refresh),
-                  onPressed: () {
-                    ref.read(itemsNotifierProvider.notifier).initCatalog();
-                  },
-                  tooltip: 'Muat Ulang Katalog (Refresh)',
                 ),
-                
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: 'Panduan Penggunaan & Shortcut Keyboard',
+                  child: IconButton.filledTonal(
+                    style: IconButton.styleFrom(
+                      foregroundColor: Colors.teal[800],
+                      backgroundColor: Colors.teal.withOpacity(0.12),
+                      padding: const EdgeInsets.all(14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.help_outline, size: 20),
+                    onPressed: _showKeyboardShortcutsGuide,
+                  ),
+                ),
               ],
               
 
@@ -807,8 +901,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           ScrollConfiguration(
             behavior: ScrollConfiguration.of(context).copyWith(
               dragDevices: {
-                PointerDeviceKind.touch,
-                PointerDeviceKind.mouse,
+                ui.PointerDeviceKind.touch,
+                ui.PointerDeviceKind.mouse,
               },
             ),
             child: Scrollbar(
@@ -872,21 +966,58 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                       ChoiceChip(
                         label: const Text('Semua Produk'),
                         selected: state.selectedCategoryId == null,
+                        selectedColor: Theme.of(context).colorScheme.primary,
+                        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
+                        labelStyle: TextStyle(
+                          color: state.selectedCategoryId == null
+                              ? Colors.white
+                              : Theme.of(context).colorScheme.onSurface,
+                          fontWeight: state.selectedCategoryId == null ? FontWeight.bold : FontWeight.normal,
+                          fontSize: 13,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          side: BorderSide(
+                            color: state.selectedCategoryId == null
+                                ? Theme.of(context).colorScheme.primary
+                                : Colors.grey.withOpacity(0.25),
+                          ),
+                        ),
+                        showCheckmark: false,
                         onSelected: (val) {
                           if (val) ref.read(itemsNotifierProvider.notifier).selectCategory(null);
                         },
                       ),
                       ...state.categories.map((cat) {
+                        final isSelected = state.selectedCategoryId == cat.id;
                         return Padding(
-                          padding: const EdgeInsets.only(left: 8.0),
-                          child: ChoiceChip(
-                            label: Text(cat.name),
-                            selected: state.selectedCategoryId == cat.id,
-                            onSelected: (val) {
-                              if (val) ref.read(itemsNotifierProvider.notifier).selectCategory(cat.id);
-                            },
-                          ),
-                        );
+                           padding: const EdgeInsets.only(left: 8.0),
+                           child: ChoiceChip(
+                             label: Text(cat.name),
+                             selected: isSelected,
+                             selectedColor: Theme.of(context).colorScheme.primary,
+                             backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
+                             labelStyle: TextStyle(
+                               color: isSelected
+                                   ? Colors.white
+                                   : Theme.of(context).colorScheme.onSurface,
+                               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                               fontSize: 13,
+                             ),
+                             shape: RoundedRectangleBorder(
+                               borderRadius: BorderRadius.circular(10),
+                               side: BorderSide(
+                                 color: isSelected
+                                     ? Theme.of(context).colorScheme.primary
+                                     : Colors.grey.withOpacity(0.25),
+                               ),
+                             ),
+                             showCheckmark: false,
+                             onSelected: (val) {
+                               if (val) ref.read(itemsNotifierProvider.notifier).selectCategory(cat.id);
+                             },
+                           ),
+                         );
                       }),
                     ],
                   ),
@@ -966,73 +1097,125 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                             return const Card(child: Center(child: CircularProgressIndicator()));
                           }
                           final product = displayItems[index];
-                          return InkWell(
-                            onTap: () {
-                              ref.read(posNotifierProvider.notifier).addToCart(product);
-                            },
-                            onLongPress: () => _showEditProductDialog(product),
-                            borderRadius: BorderRadius.circular(16),
-                            child: Card(
-                              child: Padding(
-                                padding: const EdgeInsets.all(12.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // Mock Image / Initials Placeholder
-                                    Container(
-                                      width: double.infinity,
-                                      height: 80,
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(context).colorScheme.primary.withOpacity(0.05),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: Text(
-                                        product.itemName[0].toUpperCase(),
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 24,
-                                          color: Theme.of(context).colorScheme.primary.withOpacity(0.6),
+                          final isOutOfStock = product.obQuantity <= 0;
+                          final isLowStock = product.obQuantity > 0 && product.obQuantity <= 5;
+
+                          return Material(
+                            color: Colors.transparent,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surface,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.grey.withOpacity(0.12)),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.02),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: InkWell(
+                                onTap: () {
+                                  ref.read(posNotifierProvider.notifier).addToCart(product);
+                                },
+                                onLongPress: () => _showEditProductDialog(product),
+                                borderRadius: BorderRadius.circular(16),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      // Mock Image / Initials Placeholder
+                                      Container(
+                                        width: double.infinity,
+                                        height: 80,
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context).colorScheme.primary.withOpacity(0.05),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        alignment: Alignment.center,
+                                        child: Text(
+                                          product.itemName[0].toUpperCase(),
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 24,
+                                            color: Theme.of(context).colorScheme.primary.withOpacity(0.6),
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            product.itemName,
-                                            maxLines: 3,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            'SKU: ${product.itemNo}  |  Stok: ${product.obQuantity.toStringAsFixed(0)}',
-                                            style: const TextStyle(fontSize: 10, color: Colors.grey),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          Text(
-                                            'UPC: ${product.itemUPC}',
-                                            style: const TextStyle(fontSize: 10, color: Colors.grey),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const Spacer(),
-                                          Text(
-                                            _formatRupiah(product.price),
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 13,
-                                              color: Theme.of(context).colorScheme.primary,
+                                      const SizedBox(height: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              product.itemName,
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                                             ),
-                                          ),
-                                        ],
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              'SKU: ${product.itemNo}',
+                                              style: const TextStyle(fontSize: 9.5, color: Colors.grey),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 2),
+                                            // Stock Alert Badge
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                  isOutOfStock
+                                                      ? Icons.cancel_outlined
+                                                      : isLowStock
+                                                          ? Icons.warning_amber_rounded
+                                                          : Icons.check_circle_outline_rounded,
+                                                  size: 11,
+                                                  color: isOutOfStock
+                                                      ? Colors.red
+                                                      : isLowStock
+                                                          ? Colors.orange
+                                                          : Colors.green,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Expanded(
+                                                  child: Text(
+                                                    isOutOfStock
+                                                        ? 'Habis'
+                                                        : isLowStock
+                                                            ? '${product.obQuantity.toStringAsFixed(0)} (Tipis)'
+                                                            : 'Stok: ${product.obQuantity.toStringAsFixed(0)}',
+                                                    style: TextStyle(
+                                                      fontSize: 9.5,
+                                                      fontWeight: isLowStock || isOutOfStock ? FontWeight.bold : FontWeight.normal,
+                                                      color: isOutOfStock
+                                                          ? Colors.red
+                                                          : isLowStock
+                                                              ? Colors.orange
+                                                              : Colors.grey[600],
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const Spacer(),
+                                            Text(
+                                              _formatRupiah(product.price),
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                                color: Theme.of(context).colorScheme.primary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -1054,49 +1237,102 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                             );
                           }
                           final product = displayItems[index];
-                          return Card(
-                            margin: EdgeInsets.zero,
-                            child: InkWell(
-                              onTap: () {
-                                ref.read(posNotifierProvider.notifier).addToCart(product);
-                                _showSuccessToast('${product.itemName} ditambahkan');
-                              },
-                              onLongPress: () => _showEditProductDialog(product),
-                              borderRadius: BorderRadius.circular(12),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            product.itemName,
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(height: 3),
-                                          Text(
-                                            'SKU: ${product.itemNo}  •  Stok: ${product.obQuantity.toStringAsFixed(0)}',
-                                            style: const TextStyle(fontSize: 10.5, color: Colors.grey),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
+                          final isOutOfStock = product.obQuantity <= 0;
+                          final isLowStock = product.obQuantity > 0 && product.obQuantity <= 5;
+
+                          return Material(
+                            color: Colors.transparent,
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surface,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.grey.withOpacity(0.12)),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.01),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                              child: InkWell(
+                                onTap: () {
+                                  ref.read(posNotifierProvider.notifier).addToCart(product);
+                                  _showSuccessToast('${product.itemName}');
+                                },
+                                onLongPress: () => _showEditProductDialog(product),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              product.itemName,
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  'SKU: ${product.itemNo}',
+                                                  style: const TextStyle(fontSize: 10.5, color: Colors.grey),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text('•', style: const TextStyle(fontSize: 10.5, color: Colors.grey)),
+                                                const SizedBox(width: 8),
+                                                Icon(
+                                                  isOutOfStock
+                                                      ? Icons.cancel_outlined
+                                                      : isLowStock
+                                                          ? Icons.warning_amber_rounded
+                                                          : Icons.check_circle_outline_rounded,
+                                                  size: 11,
+                                                  color: isOutOfStock
+                                                      ? Colors.red
+                                                      : isLowStock
+                                                          ? Colors.orange
+                                                          : Colors.green,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  isOutOfStock
+                                                      ? 'Habis'
+                                                      : isLowStock
+                                                          ? 'Stok: ${product.obQuantity.toStringAsFixed(0)} (Tipis)'
+                                                          : 'Stok: ${product.obQuantity.toStringAsFixed(0)}',
+                                                  style: TextStyle(
+                                                    fontSize: 10.5,
+                                                    fontWeight: isLowStock || isOutOfStock ? FontWeight.bold : FontWeight.normal,
+                                                    color: isOutOfStock
+                                                        ? Colors.red
+                                                        : isLowStock
+                                                            ? Colors.orange
+                                                            : Colors.grey[600],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      _formatRupiah(product.price),
-                                      style: TextStyle(
-                                        color: Theme.of(context).colorScheme.primary,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13.5,
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        _formatRupiah(product.price),
+                                        style: TextStyle(
+                                          color: Theme.of(context).colorScheme.primary,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13.5,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -1434,10 +1670,198 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     );
   }
 
-  void _openQuickMappingWizard(String barcode) async {
-    final selectedProduct = await showDialog<ItemModel>(
+  void _showKeyboardShortcutsGuide() {
+    showDialog(
       context: context,
-      builder: (context) => const _QuickMappingSearchDialog(),
+      builder: (context) {
+        final colorScheme = Theme.of(context).colorScheme;
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.keyboard_outlined, color: colorScheme.primary),
+              const SizedBox(width: 12),
+              const Text('Panduan & Shortcut Keyboard'),
+            ],
+          ),
+          content: SizedBox(
+            width: 550,
+            child: DefaultTabController(
+              length: 2,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TabBar(
+                    labelColor: colorScheme.primary,
+                    unselectedLabelColor: Colors.grey,
+                    indicatorColor: colorScheme.primary,
+                    tabs: const [
+                      Tab(
+                        icon: Icon(Icons.keyboard),
+                        text: 'Shortcut Keyboard',
+                      ),
+                      Tab(
+                        icon: Icon(Icons.menu_book),
+                        text: 'Panduan POS',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 320,
+                    child: TabBarView(
+                      children: [
+                        // Section 1: Shortcut Keyboard
+                        ListView(
+                          shrinkWrap: true,
+                          children: [
+                            _buildShortcutRow(context, 'F2', 'Buka kamera pemindai barcode / QR code.'),
+                            _buildShortcutRow(context, 'F3', 'Arahkan fokus kursor langsung ke kolom pencarian produk.'),
+                            _buildShortcutRow(context, 'F4', 'Buka modal pembayaran transaksi (Checkout).'),
+                            _buildShortcutRow(context, 'F8', 'Cetak ulang struk/nota pembayaran terakhir.'),
+                            _buildShortcutRow(context, 'ESC / Escape', 'Kosongkan keranjang belanja (Void semua item).'),
+                          ],
+                        ),
+                        // Section 2: Panduan POS
+                        ListView(
+                          shrinkWrap: true,
+                          children: [
+                            _buildGuideStep(
+                              context,
+                              '1',
+                              'Pencarian & Scan',
+                              'Ketik nama produk di kolom pencarian atau scan barcode produk menggunakan scanner hardware (langsung) atau scanner kamera (F2).',
+                            ),
+                            _buildGuideStep(
+                              context,
+                              '2',
+                              'Kelola Keranjang',
+                              'Tekan produk untuk menambahkan ke keranjang. Di sisi kanan, Anda bisa menekan item keranjang untuk mengubah kuantitas atau menghapus produk.',
+                            ),
+                            _buildGuideStep(
+                              context,
+                              '3',
+                              'Diskon & Transaksi',
+                              'Tambahkan diskon per item di dalam keranjang, atau berikan diskon global di panel ringkasan belanja.',
+                            ),
+                            _buildGuideStep(
+                              context,
+                              '4',
+                              'Pembayaran',
+                              'Tekan tombol "Bayar" (F4), masukkan nominal uang yang diterima pelanggan, lalu selesaikan transaksi untuk mencetak nota.',
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Tutup'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildShortcutRow(BuildContext context, String keyText, String description) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 100,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: colorScheme.primary.withOpacity(0.3)),
+            ),
+            child: Center(
+              child: Text(
+                keyText,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onPrimaryContainer,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: Text(
+                description,
+                style: const TextStyle(fontSize: 13, height: 1.3),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGuideStep(BuildContext context, String stepNumber, String title, String description) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 12,
+            backgroundColor: colorScheme.secondaryContainer,
+            child: Text(
+              stepNumber,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSecondaryContainer,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  description,
+                  style: TextStyle(fontSize: 12, color: Colors.grey[700], height: 1.3),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openQuickMappingWizard(String barcode) async {
+    final selectedProduct = await showModalBottomSheet<ItemModel>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+      builder: (context) => const _QuickMappingSearchBottomSheet(),
     );
 
     if (selectedProduct == null) return;
@@ -1452,15 +1876,25 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     showDialog(
       context: context,
       builder: (context) {
+        final isSmallScreen = MediaQuery.of(context).size.width < 600;
         return AlertDialog(
-          title: const Text('Konfirmasi Pemetaan Barcode'),
+          title: Text(
+            'Konfirmasi Pemetaan Barcode',
+            style: TextStyle(
+              fontSize: isSmallScreen ? 16 : 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Produk: ${product.itemName}',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: isSmallScreen ? 13 : 16,
+                ),
               ),
               const SizedBox(height: 16),
               TextField(
@@ -1796,14 +2230,14 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   }
 }
 
-class _QuickMappingSearchDialog extends ConsumerStatefulWidget {
-  const _QuickMappingSearchDialog();
+class _QuickMappingSearchBottomSheet extends ConsumerStatefulWidget {
+  const _QuickMappingSearchBottomSheet();
 
   @override
-  ConsumerState<_QuickMappingSearchDialog> createState() => _QuickMappingSearchDialogState();
+  ConsumerState<_QuickMappingSearchBottomSheet> createState() => _QuickMappingSearchBottomSheetState();
 }
 
-class _QuickMappingSearchDialogState extends ConsumerState<_QuickMappingSearchDialog> {
+class _QuickMappingSearchBottomSheetState extends ConsumerState<_QuickMappingSearchBottomSheet> {
   String _searchQuery = '';
   List<ItemModel> _filteredItems = [];
   bool _isLoading = false;
@@ -1837,6 +2271,10 @@ class _QuickMappingSearchDialogState extends ConsumerState<_QuickMappingSearchDi
 
   Future<void> _filter(String val) async {
     final query = val.trim();
+    if (query.isEmpty) {
+      _fetchItems();
+      return;
+    }
     setState(() {
       _searchQuery = query;
       _isLoading = true;
@@ -1844,7 +2282,7 @@ class _QuickMappingSearchDialogState extends ConsumerState<_QuickMappingSearchDi
     });
 
     try {
-      final items = await ref.read(itemsRepositoryProvider).searchItems(query, page: 1, limit: 100);
+      final items = await _performMultiWordSearch(query, page: 1, limit: 100);
       if (_searchQuery == query) {
         setState(() {
           _filteredItems = items;
@@ -1861,15 +2299,161 @@ class _QuickMappingSearchDialogState extends ConsumerState<_QuickMappingSearchDi
     }
   }
 
+  Future<List<ItemModel>> _performMultiWordSearch(String query, {required int page, required int limit}) async {
+    final queryWords = query
+        .toLowerCase()
+        .split(' ')
+        .map((w) => w.trim())
+        .where((w) => w.isNotEmpty)
+        .toList();
+
+    if (queryWords.isEmpty) return [];
+
+    final allResults = <ItemModel>[];
+    final seenIds = <String>{};
+    final itemsRepository = ref.read(itemsRepositoryProvider);
+
+    // If single word, query directly. Otherwise, merge results of all query words.
+    if (queryWords.length == 1) {
+      try {
+        final results = await itemsRepository.searchItems(
+          queryWords[0],
+          page: 1,
+          limit: limit * 3, // Fetch more to enable local filtering/sorting
+        );
+        for (final item in results) {
+          if (seenIds.add(item.itemNo)) {
+            allResults.add(item);
+          }
+        }
+      } catch (e) {
+        debugPrint('Error searching for single word: $e');
+      }
+    } else {
+      for (final word in queryWords) {
+        try {
+          final results = await itemsRepository.searchItems(
+            word,
+            page: 1,
+            limit: limit * 3, // Fetch more to enable local filtering/sorting
+          );
+          for (final item in results) {
+            if (seenIds.add(item.itemNo)) {
+              allResults.add(item);
+            }
+          }
+        } catch (e) {
+          debugPrint('Error searching for word "$word": $e');
+        }
+      }
+    }
+
+    // Filter: MUST contain ALL query words (case-insensitive)
+    final filteredResults = <ItemModel>[];
+    for (final item in allResults) {
+      final name = item.itemName.toLowerCase();
+      bool matchesAll = true;
+      for (final word in queryWords) {
+        if (!name.contains(word)) {
+          matchesAll = false;
+          break;
+        }
+      }
+      if (matchesAll) {
+        filteredResults.add(item);
+      }
+    }
+
+    // Sort by relevance:
+    // 1. Contiguous match (matches exact query phrase)
+    // 2. Index of exact match (closer to start of name is better)
+    // 3. Length of name (shorter name = tighter match)
+    // 4. Alphabetical
+    filteredResults.sort((a, b) {
+      final aName = a.itemName.toLowerCase();
+      final bName = b.itemName.toLowerCase();
+      final q = query.toLowerCase();
+
+      final aExact = aName.contains(q);
+      final bExact = bName.contains(q);
+
+      if (aExact && !bExact) return -1;
+      if (!aExact && bExact) return 1;
+
+      if (aExact && bExact) {
+        final aIdx = aName.indexOf(q);
+        final bIdx = bName.indexOf(q);
+        if (aIdx != bIdx) {
+          return aIdx.compareTo(bIdx);
+        }
+      }
+
+      if (aName.length != bName.length) {
+        return aName.length.compareTo(bName.length);
+      }
+
+      return aName.compareTo(bName);
+    });
+
+    // Local pagination
+    final startIndex = (page - 1) * limit;
+    if (startIndex < filteredResults.length) {
+      return filteredResults.skip(startIndex).take(limit).toList();
+    }
+    return [];
+  }
+
+  String _formatRupiah(double val) {
+    final formatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
+    return formatter.format(val);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Pilih Produk untuk Barcode'),
-      content: SizedBox(
-        width: double.maxFinite,
-        height: 400,
+    final double keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    final double height = MediaQuery.of(context).size.height * 0.75;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: keyboardHeight),
+      child: Container(
+        height: height,
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Drag handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Pilih Produk untuk Barcode',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            
+            // Search Input
             TextField(
               autofocus: true,
               decoration: const InputDecoration(
@@ -1878,7 +2462,9 @@ class _QuickMappingSearchDialogState extends ConsumerState<_QuickMappingSearchDi
               ),
               onChanged: _filter,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
+            
+            // Results List
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
@@ -1904,15 +2490,53 @@ class _QuickMappingSearchDialogState extends ConsumerState<_QuickMappingSearchDi
                         )
                       : _filteredItems.isEmpty
                           ? const Center(child: Text('Produk tidak ditemukan'))
-                          : ListView.builder(
+                          : ListView.separated(
                               itemCount: _filteredItems.length,
+                              separatorBuilder: (context, index) => const SizedBox(height: 2),
                               itemBuilder: (context, index) {
-                                final item = _filteredItems[index];
-                                return ListTile(
-                                  title: Text(item.itemName),
-                                  subtitle: Text('SKU: ${item.itemNo}  |  Stok: ${item.obQuantity.toStringAsFixed(0)}'),
-                                  trailing: Text('Rp ${item.price.toStringAsFixed(0)}'),
-                                  onTap: () => Navigator.of(context).pop(item),
+                                final product = _filteredItems[index];
+                                return Card(
+                                  margin: EdgeInsets.zero,
+                                  child: InkWell(
+                                    onTap: () => Navigator.of(context).pop(product),
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  product.itemName,
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(height: 3),
+                                                Text(
+                                                  'SKU: ${product.itemNo}  •  Stok: ${product.obQuantity.toStringAsFixed(0)}',
+                                                  style: const TextStyle(fontSize: 10.5, color: Colors.grey),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Text(
+                                            _formatRupiah(product.price),
+                                            style: TextStyle(
+                                              color: Theme.of(context).colorScheme.primary,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13.5,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
                                 );
                               },
                             ),
@@ -1920,12 +2544,6 @@ class _QuickMappingSearchDialogState extends ConsumerState<_QuickMappingSearchDi
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Batal'),
-        ),
-      ],
     );
   }
 }

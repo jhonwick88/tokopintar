@@ -25,6 +25,7 @@ class MainLayout extends ConsumerStatefulWidget {
 
 class _MainLayoutState extends ConsumerState<MainLayout> {
   late final TextEditingController _searchController;
+  bool _isSidebarCollapsed = false;
 
   @override
   void initState() {
@@ -154,31 +155,60 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
         body: Row(
           children: [
             // Sidebar Navigation
-            Container(
-              width: 240,
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              width: _isSidebarCollapsed ? 72 : 240,
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surfaceContainerLow,
                 border: Border(right: BorderSide(color: Colors.grey.withOpacity(0.12))),
               ),
               child: Column(
                 children: [
-                  // App Brand Logo
+                  // App Brand Logo & Collapse Toggle button
                   Container(
-                    padding: const EdgeInsets.all(24),
-                    alignment: Alignment.centerLeft,
-                    child: Row(
-                      children: [
-                        Icon(Icons.storefront_rounded, color: Theme.of(context).colorScheme.primary, size: 32),
-                        const SizedBox(width: 12),
-                        const Text(
-                          'TokoPintar',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-                        ),
-                      ],
+                    padding: EdgeInsets.symmetric(
+                      vertical: 16,
+                      horizontal: _isSidebarCollapsed ? 8 : 16,
                     ),
+                    height: 72,
+                    child: _isSidebarCollapsed
+                        ? Center(
+                            child: IconButton(
+                              icon: Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.primary),
+                              onPressed: () {
+                                setState(() {
+                                  _isSidebarCollapsed = false;
+                                });
+                              },
+                              tooltip: 'Perluas Sidebar',
+                            ),
+                          )
+                        : Row(
+                            children: [
+                              Icon(Icons.storefront_rounded, color: Theme.of(context).colorScheme.primary, size: 28),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'TokoPintar',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.chevron_left, size: 20),
+                                onPressed: () {
+                                  setState(() {
+                                    _isSidebarCollapsed = true;
+                                  });
+                                },
+                                tooltip: 'Sembunyikan Sidebar',
+                              ),
+                            ],
+                          ),
                   ),
                   const Divider(height: 1),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   
                   // Nav Options
                   Expanded(
@@ -187,6 +217,36 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                       itemBuilder: (context, index) {
                         final item = navItems[index];
                         final isSelected = activeIndex == index;
+                        
+                        if (_isSidebarCollapsed) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                            child: Tooltip(
+                              message: item.label,
+                              child: InkWell(
+                                onTap: () => context.go(item.route),
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? Theme.of(context).colorScheme.primary.withOpacity(0.08)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(
+                                    item.icon,
+                                    color: isSelected
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Colors.grey[700],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+
                         return Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                           child: ListTile(
@@ -217,43 +277,78 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                   const Divider(height: 1),
                   if (authState.currentUser != null)
                     Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                            child: Text(
-                              authState.currentUser!.fullname[0].toUpperCase(),
-                              style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                      padding: EdgeInsets.all(_isSidebarCollapsed ? 8.0 : 16.0),
+                      child: _isSidebarCollapsed
+                          ? Column(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(
-                                  authState.currentUser!.fullname,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                  overflow: TextOverflow.ellipsis,
+                                Tooltip(
+                                  message: '${authState.currentUser!.fullname} (${authState.currentUser!.role.toUpperCase()})',
+                                  child: CircleAvatar(
+                                    radius: 20,
+                                    backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                                    child: Text(
+                                      authState.currentUser!.fullname[0].toUpperCase(),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Theme.of(context).colorScheme.primary,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                                Text(
-                                  authState.currentUser!.role.toUpperCase(),
-                                  style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                const SizedBox(height: 8),
+                                IconButton(
+                                  icon: const Icon(Icons.logout, size: 18, color: Colors.redAccent),
+                                  onPressed: () {
+                                    ref.read(authNotifierProvider.notifier).logout();
+                                    context.go('/login');
+                                  },
+                                  tooltip: 'Keluar Akun',
+                                ),
+                              ],
+                            )
+                          : Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                                  child: Text(
+                                    authState.currentUser!.fullname[0].toUpperCase(),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(context).colorScheme.primary,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        authState.currentUser!.fullname,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Text(
+                                        authState.currentUser!.role.toUpperCase(),
+                                        style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.logout, size: 18),
+                                  onPressed: () {
+                                    ref.read(authNotifierProvider.notifier).logout();
+                                    context.go('/login');
+                                  },
+                                  tooltip: 'Keluar Akun',
                                 ),
                               ],
                             ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.logout, size: 18),
-                            onPressed: () {
-                              ref.read(authNotifierProvider.notifier).logout();
-                              context.go('/login');
-                            },
-                            tooltip: 'Keluar Akun',
-                          ),
-                        ],
-                      ),
                     ),
                 ],
               ),
