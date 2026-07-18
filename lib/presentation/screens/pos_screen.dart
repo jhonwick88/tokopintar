@@ -244,6 +244,13 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     } else if (key == LogicalKeyboardKey.f8) {
       _reprintLastNota();
       return true;
+    } else if (key == LogicalKeyboardKey.f5) {
+      if (_searchController.text.isNotEmpty) {
+        _searchController.clear();
+        ref.read(itemsNotifierProvider.notifier).search('');
+        _searchFocusNode.requestFocus();
+        return true;
+      }
     } else if (key == LogicalKeyboardKey.escape) {
       _voidCurrentCart();
       return true;
@@ -823,6 +830,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                       suffixIcon: state.searchQuery.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.clear),
+                              tooltip: 'Hapus Pencarian (F5)',
                               onPressed: () {
                                 _searchController.clear();
                                 ref.read(itemsNotifierProvider.notifier).search('');
@@ -1102,25 +1110,28 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
                           return Material(
                             color: Colors.transparent,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.surface,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.grey.withOpacity(0.12)),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.02),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: InkWell(
-                                onTap: () {
-                                  ref.read(posNotifierProvider.notifier).addToCart(product);
-                                },
-                                onLongPress: () => _showEditProductDialog(product),
-                                borderRadius: BorderRadius.circular(16),
+                            child: InkWell(
+                              onTap: () {
+                                ref.read(posNotifierProvider.notifier).addToCart(product);
+                              },
+                              onLongPress: () => _showEditProductDialog(product),
+                              borderRadius: BorderRadius.circular(16),
+                              hoverColor: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+                              focusColor: Theme.of(context).colorScheme.primary.withOpacity(0.15),
+                              highlightColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                              child: Ink(
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: Colors.grey.withOpacity(0.12)),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.02),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
                                 child: Padding(
                                   padding: const EdgeInsets.all(12.0),
                                   child: Column(
@@ -1242,27 +1253,29 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
                           return Material(
                             color: Colors.transparent,
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.surface,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.grey.withOpacity(0.12)),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.01),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 1),
-                                  ),
-                                ],
-                              ),
-                              child: InkWell(
-                                onTap: () {
-                                  ref.read(posNotifierProvider.notifier).addToCart(product);
-                                  _showSuccessToast('${product.itemName}');
-                                },
-                                onLongPress: () => _showEditProductDialog(product),
-                                borderRadius: BorderRadius.circular(12),
+                            child: InkWell(
+                              onTap: () {
+                                ref.read(posNotifierProvider.notifier).addToCart(product);
+                                _showSuccessToast('${product.itemName}');
+                              },
+                              onLongPress: () => _showEditProductDialog(product),
+                              borderRadius: BorderRadius.circular(12),
+                              hoverColor: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+                              focusColor: Theme.of(context).colorScheme.primary.withOpacity(0.15),
+                              highlightColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                              child: Ink(
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.grey.withOpacity(0.12)),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.01),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 1),
+                                    ),
+                                  ],
+                                ),
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
                                   child: Row(
@@ -1717,6 +1730,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                             _buildShortcutRow(context, 'F2', 'Buka kamera pemindai barcode / QR code.'),
                             _buildShortcutRow(context, 'F3', 'Arahkan fokus kursor langsung ke kolom pencarian produk.'),
                             _buildShortcutRow(context, 'F4', 'Buka modal pembayaran transaksi (Checkout).'),
+                            _buildShortcutRow(context, 'F5', 'Hapus kata kunci pencarian aktif jika kolom pencarian ada isinya.'),
+                            _buildShortcutRow(context, 'F6', 'Selesaikan transaksi dan tutup dialog sukses transaksi.'),
                             _buildShortcutRow(context, 'F8', 'Cetak ulang struk/nota pembayaran terakhir.'),
                             _buildShortcutRow(context, 'ESC / Escape', 'Kosongkan keranjang belanja (Void semua item).'),
                           ],

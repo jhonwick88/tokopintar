@@ -2,6 +2,7 @@ import 'dart:developer' as dev;
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -138,84 +139,99 @@ class _TransactionSuccessDialogState extends ConsumerState<TransactionSuccessDia
   @override
   Widget build(BuildContext context) {
     final sale = widget.sale;
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      content: Container(
-        width: 380,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.green, size: 72),
-            const SizedBox(height: 16),
-            const Text(
-              'Transaksi Sukses!',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              sale.invoiceNo,
-              style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 24),
-            
-            // Details Grid
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(12),
+    return Focus(
+      autofocus: true,
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.f8) {
+            _printReceiptDirect(sale);
+            return KeyEventResult.handled;
+          } else if (event.logicalKey == LogicalKeyboardKey.f6) {
+            Navigator.of(context).pop();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+      child: AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Container(
+          width: 380,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.green, size: 72),
+              const SizedBox(height: 16),
+              const Text(
+                'Transaksi Sukses!',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
-              child: Column(
+              const SizedBox(height: 8),
+              Text(
+                sale.invoiceNo,
+                style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 24),
+              
+              // Details Grid
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    _buildSummaryRow('Total Belanja', _formatRupiah(sale.grandTotal)),
+                    const SizedBox(height: 8),
+                    _buildSummaryRow('Total Bayar', _formatRupiah(sale.paidAmount)),
+                    const SizedBox(height: 8),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    _buildSummaryRow(
+                      'Kembalian',
+                      _formatRupiah(sale.changeAmount),
+                      valueColor: Colors.green,
+                      bold: true,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              Row(
                 children: [
-                  _buildSummaryRow('Total Belanja', _formatRupiah(sale.grandTotal)),
-                  const SizedBox(height: 8),
-                  _buildSummaryRow('Total Bayar', _formatRupiah(sale.paidAmount)),
-                  const SizedBox(height: 8),
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  _buildSummaryRow(
-                    'Kembalian',
-                    _formatRupiah(sale.changeAmount),
-                    valueColor: Colors.green,
-                    bold: true,
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () {
+                        _printReceiptDirect(sale);
+                      },
+                      icon: const Icon(Icons.print),
+                      label: const Text('Cetak Ulang(F8)'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      child: const Text('Selesai(F6)'),
+                    ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 24),
-            
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () {
-                      _printReceiptDirect(sale);
-                    },
-                    icon: const Icon(Icons.print),
-                    label: const Text('Cetak Ulang'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text('Selesai'),
-                  ),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -7,6 +7,7 @@ import '../../data/models/settings_model.dart';
 import '../../domain/services/printer_service.dart';
 import 'auth_provider.dart';
 import 'settings_provider.dart';
+import 'sales_history_provider.dart';
 
 class CartItem {
   final ItemModel item;
@@ -366,6 +367,9 @@ class PosNotifier extends StateNotifier<PosState> {
     try {
       // 1. Save to Firestore
       await _ref.read(salesRepositoryProvider).saveSale(sale);
+
+      // Refresh sales history local state to keep it updated with the new transaction
+      _ref.read(salesHistoryNotifierProvider.notifier).fetchSales();
 
       // 2. Log Activity
       await _ref.read(auditRepositoryProvider).logActivity(
