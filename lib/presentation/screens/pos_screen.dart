@@ -20,6 +20,7 @@ import 'mobile_cart_screen.dart';
 import '../providers/quick_items_provider.dart';
 import 'quick_add_item_settings_screen.dart';
 import '../widgets/voice_search_button.dart';
+import '../widgets/floating_calculator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/settings_provider.dart';
 
@@ -48,6 +49,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     _loadViewPreference();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndPromptPermissions();
+      if (mounted) {
+        FloatingCalculatorService.show(context);
+      }
     });
   }
 
@@ -94,6 +98,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
   @override
   void dispose() {
+    FloatingCalculatorService.hide();
     HardwareKeyboard.instance.removeHandler(_handleGlobalKeyEvent);
     _searchFocusNode.dispose();
     _keyboardFocusNode.dispose();
