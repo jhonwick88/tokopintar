@@ -7,6 +7,7 @@ import '../../data/models/sale_model.dart';
 import '../providers/sales_history_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/reconciliation_provider.dart';
 import '../widgets/main_layout.dart';
 
 class SalesHistoryScreen extends ConsumerStatefulWidget {
@@ -1074,6 +1075,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                         );
                     
                     if (success) {
+                      ref.read(reconciliationProvider.notifier).fetchReconciliations();
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Rekonsiliasi kas berhasil disimpan ke Firestore'),

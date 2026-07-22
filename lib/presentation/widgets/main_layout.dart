@@ -8,6 +8,8 @@ import '../screens/mobile_cart_screen.dart';
 import '../widgets/camera_scanner_dialog.dart';
 import '../widgets/app_permissions_dialog.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../widgets/voice_search_button.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class MainLayout extends ConsumerStatefulWidget {
   final Widget child;
@@ -25,6 +27,7 @@ class MainLayout extends ConsumerStatefulWidget {
 
 class _MainLayoutState extends ConsumerState<MainLayout> {
   late final TextEditingController _searchController;
+  final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isSidebarCollapsed = false;
 
   @override
@@ -37,7 +40,43 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
   @override
   void dispose() {
     _searchController.dispose();
+    _audioPlayer.dispose();
     super.dispose();
+  }
+
+  void _handleVoiceSearchResult(String words) async {
+    if (words.trim().isEmpty) return;
+    
+    final itemsState = ref.read(itemsNotifierProvider);
+    final query = words.toLowerCase().trim();
+    
+    final exactMatches = itemsState.items.where((i) {
+      return i.itemName.toLowerCase() == query || i.itemNo.toLowerCase() == query;
+    }).toList();
+
+    if (exactMatches.length == 1) {
+      final matchedItem = exactMatches.first;
+      ref.read(posNotifierProvider.notifier).addToCart(matchedItem);
+      
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Produk ${matchedItem.itemName} ditambahkan', style: const TextStyle(fontWeight: FontWeight.bold)),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      
+      try {
+        await _audioPlayer.play(AssetSource('sounds/scanner-beep.mp3'));
+      } catch (_) {}
+      
+      _searchController.clear();
+      ref.read(itemsNotifierProvider.notifier).search('');
+    } else {
+      _searchController.text = words;
+      ref.read(itemsNotifierProvider.notifier).search(words);
+    }
   }
 
   void _openCameraScanner(BuildContext context, WidgetRef ref) async {
@@ -383,6 +422,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                               ref.read(itemsNotifierProvider.notifier).search('');
                             },
                           ),
+                        VoiceSearchButton(onResult: _handleVoiceSearchResult),
                         IconButton(
                           icon: const Icon(Icons.qr_code_scanner, size: 20),
                           onPressed: () => _openCameraScanner(context, ref),

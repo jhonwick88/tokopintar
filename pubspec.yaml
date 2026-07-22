@@ -52,6 +52,7 @@ dependencies:
   pdf: ^3.12.0
   firebase_auth: ^5.7.0
   permission_handler: ^12.0.3
+  speech_to_text: ^7.4.0
 
 dev_dependencies:
   flutter_test:

@@ -19,6 +19,7 @@ import '../widgets/payment_modal.dart';
 import 'mobile_cart_screen.dart';
 import '../providers/quick_items_provider.dart';
 import 'quick_add_item_settings_screen.dart';
+import '../widgets/voice_search_button.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/settings_provider.dart';
 
@@ -223,6 +224,35 @@ class _PosScreenState extends ConsumerState<PosScreen> {
         duration: const Duration(seconds: 3),
       ),
     );
+  }
+
+  void _handleVoiceSearchResult(String words) async {
+    if (words.trim().isEmpty) return;
+    
+    final itemsState = ref.read(itemsNotifierProvider);
+    final query = words.toLowerCase().trim();
+    
+    // exact match check
+    final exactMatches = itemsState.items.where((i) {
+      return i.itemName.toLowerCase() == query || i.itemNo.toLowerCase() == query;
+    }).toList();
+
+    if (exactMatches.length == 1) {
+      // Auto Add to Cart
+      final matchedItem = exactMatches.first;
+      ref.read(posNotifierProvider.notifier).addToCart(matchedItem);
+      _showSuccessToast('Produk ${matchedItem.itemName}');
+      try {
+        await _audioPlayer.play(AssetSource('sounds/scanner-beep.mp3'));
+      } catch (_) {}
+      
+      _searchController.clear();
+      ref.read(itemsNotifierProvider.notifier).search('');
+    } else {
+      // Fallback to normal search filter
+      _searchController.text = words;
+      ref.read(itemsNotifierProvider.notifier).search(words);
+    }
   }
 
   // --- KEYBOARD SHORTCUTS CONTROLLER ---
@@ -827,16 +857,21 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                       prefixIcon: const Icon(Icons.search),
                       hintText: 'Cari produk berdasarkan nama... (F3)',
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                      suffixIcon: state.searchQuery.isNotEmpty
-                          ? IconButton(
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (state.searchQuery.isNotEmpty)
+                            IconButton(
                               icon: const Icon(Icons.clear),
                               tooltip: 'Hapus Pencarian (F5)',
                               onPressed: () {
                                 _searchController.clear();
                                 ref.read(itemsNotifierProvider.notifier).search('');
                               },
-                            )
-                          : null,
+                            ),
+                          VoiceSearchButton(onResult: _handleVoiceSearchResult),
+                        ],
+                      ),
                     ),
                     onChanged: (val) {
                       ref.read(itemsNotifierProvider.notifier).search(val.trim());
