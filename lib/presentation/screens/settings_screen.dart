@@ -45,6 +45,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   int _printerPaperSize = 58;
   int _printReceiptCopies = 1;
   bool _autoPrintOnCheckout = false;
+  bool _enableFloatingCalculator = true;
 
   String _printerType = 'LAN';
   String _printerMacAddress = '';
@@ -81,6 +82,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _printerPaperSize = settings.printerPaperSize;
     _printReceiptCopies = settings.printReceiptCopies;
     _autoPrintOnCheckout = settings.autoPrintOnCheckout;
+    _enableFloatingCalculator = settings.enableFloatingCalculator;
 
     // Check if the current user is already an Admin to unlock editing
     final currentUser = ref.read(authNotifierProvider).currentUser;
@@ -277,6 +279,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       printerPaperSize: _printerPaperSize,
       printReceiptCopies: _printReceiptCopies,
       autoPrintOnCheckout: _autoPrintOnCheckout,
+      enableFloatingCalculator: _enableFloatingCalculator,
     );
 
     await ref.read(settingsNotifierProvider.notifier).updateSettings(updated);
@@ -1071,6 +1074,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ref.read(themeModeProvider.notifier).state =
                               val ? ThemeMode.dark : ThemeMode.light;
                         },
+                      ),
+                    ),
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.calculate_rounded, color: Colors.blue),
+                      title: const Text('Kalkulator Melayang (POS)'),
+                      subtitle: const Text('Tampilkan kalkulator yang bisa digeser di layar kasir'),
+                      trailing: Switch(
+                        value: _enableFloatingCalculator,
+                        onChanged: _isEditingUnlocked
+                            ? (val) {
+                                setState(() {
+                                  _enableFloatingCalculator = val;
+                                });
+                              }
+                            : null,
                       ),
                     ),
                     const Divider(),

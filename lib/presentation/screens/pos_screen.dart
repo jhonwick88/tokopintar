@@ -50,7 +50,10 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndPromptPermissions();
       if (mounted) {
-        FloatingCalculatorService.show(context);
+        final settings = ref.read(settingsNotifierProvider);
+        if (settings.enableFloatingCalculator) {
+          FloatingCalculatorService.show(context);
+        }
       }
     });
   }
@@ -806,6 +809,16 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       if (next != null) {
         _onBarcodeScanned(next);
         ref.read(scannedBarcodeProvider.notifier).state = null;
+      }
+    });
+
+    ref.listen(settingsNotifierProvider, (previous, next) {
+      if (previous?.enableFloatingCalculator != next.enableFloatingCalculator) {
+        if (next.enableFloatingCalculator) {
+          FloatingCalculatorService.show(context);
+        } else {
+          FloatingCalculatorService.hide();
+        }
       }
     });
 

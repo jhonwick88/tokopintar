@@ -399,9 +399,9 @@ class _MobileCartScreenState extends ConsumerState<MobileCartScreen> {
                 // 1. List Cart Items (Vertical list, 1 card per row, no images)
                 Expanded(
                   child: ListView.separated(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     itemCount: posState.cartItems.length,
-                    separatorBuilder: (c, i) => const SizedBox(height: 8),
+                    separatorBuilder: (c, i) => const SizedBox(height: 4),
                     itemBuilder: (context, index) {
                       final cartItem = posState.cartItems[index];
                       return Dismissible(
@@ -426,8 +426,14 @@ class _MobileCartScreenState extends ConsumerState<MobileCartScreen> {
                           );
                         },
                         child: Card(
+                          margin: EdgeInsets.zero,
+                          elevation: 1,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            side: BorderSide(color: Colors.grey.withOpacity(0.1)),
+                          ),
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                             child: Row(
                               children: [
                                 // Left side info
@@ -496,52 +502,61 @@ class _MobileCartScreenState extends ConsumerState<MobileCartScreen> {
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.edit_note, size: 22),
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
-                                      onPressed: () => _openItemNoteAndDiscountDialog(cartItem),
-                                      tooltip: 'Tambah Catatan / Diskon',
+                                    InkWell(
+                                      onTap: () => _openItemNoteAndDiscountDialog(cartItem),
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: const Padding(
+                                        padding: EdgeInsets.all(6.0),
+                                        child: Icon(Icons.edit_note, size: 20, color: Colors.grey),
+                                      ),
                                     ),
-                                    const SizedBox(width: 6),
-                                    IconButton(
-                                      icon: const Icon(Icons.remove, size: 16),
-                                      padding: const EdgeInsets.all(4),
-                                      constraints: const BoxConstraints(),
-                                      onPressed: () {
+                                    const SizedBox(width: 4),
+                                    InkWell(
+                                      onTap: () {
                                         ref.read(posNotifierProvider.notifier).updateQty(
                                               cartItem.item.itemNo,
                                               cartItem.qty - 1,
                                             );
                                       },
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.withOpacity(0.15),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: const Icon(Icons.remove, size: 16),
+                                      ),
                                     ),
+                                    const SizedBox(width: 8),
                                     InkWell(
                                       onTap: () => _showEditQtyDialog(cartItem),
-                                      borderRadius: BorderRadius.circular(4),
                                       child: Container(
-                                        constraints: const BoxConstraints(minWidth: 26),
-                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                        constraints: const BoxConstraints(minWidth: 20),
                                         alignment: Alignment.center,
-                                        decoration: BoxDecoration(
-                                          border: Border.all(color: Colors.grey.withOpacity(0.3)),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
                                         child: Text(
                                           '${cartItem.qty}',
                                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                         ),
                                       ),
                                     ),
-                                    IconButton(
-                                      icon: const Icon(Icons.add, size: 16),
-                                      padding: const EdgeInsets.all(4),
-                                      constraints: const BoxConstraints(),
-                                      onPressed: () {
+                                    const SizedBox(width: 8),
+                                    InkWell(
+                                      onTap: () {
                                         ref.read(posNotifierProvider.notifier).updateQty(
                                               cartItem.item.itemNo,
                                               cartItem.qty + 1,
                                             );
                                       },
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context).colorScheme.primary.withOpacity(0.15),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Icon(Icons.add, size: 16, color: Theme.of(context).colorScheme.primary),
+                                      ),
                                     ),
                                   ],
                                 ),

@@ -405,42 +405,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
       return Scaffold(
         appBar: showOuterAppBar
             ? AppBar(
-                title: TextField(
-                  controller: _searchController,
-                  style: const TextStyle(fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: 'Cari produk... (F3)',
-                    prefixIcon: const Icon(Icons.search, size: 20),
-                    suffixIcon: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (searchVal.isNotEmpty)
-                          IconButton(
-                            icon: const Icon(Icons.clear, size: 20),
-                            onPressed: () {
-                              _searchController.clear();
-                              ref.read(itemsNotifierProvider.notifier).search('');
-                            },
-                          ),
-                        VoiceSearchButton(onResult: _handleVoiceSearchResult),
-                        IconButton(
-                          icon: const Icon(Icons.qr_code_scanner, size: 20),
-                          onPressed: () => _openCameraScanner(context, ref),
-                        ),
-                      ],
-                    ),
-                    filled: true,
-                    fillColor: Theme.of(context).colorScheme.surfaceContainer,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(30),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  onChanged: (val) {
-                    ref.read(itemsNotifierProvider.notifier).search(val.trim());
-                  },
-                ),
+                title: const Text('TokoPintar POS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                 actions: [
                   IconButton(
                     icon: const Icon(Icons.hourglass_empty_rounded, color: Colors.orange),
@@ -471,7 +436,63 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                 ],
               )
             : null,
-        body: widget.child,
+        body: Stack(
+          children: [
+            widget.child,
+            if (showOuterAppBar)
+              Positioned(
+                bottom: 16,
+                left: 16,
+                right: 16,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Cari produk... (F3)',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (searchVal.isNotEmpty)
+                            IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchController.clear();
+                                ref.read(itemsNotifierProvider.notifier).search('');
+                              },
+                            ),
+                          VoiceSearchButton(onResult: _handleVoiceSearchResult),
+                          IconButton(
+                            icon: const Icon(Icons.qr_code_scanner),
+                            onPressed: () => _openCameraScanner(context, ref),
+                          ),
+                        ],
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(30),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    ),
+                    onChanged: (val) {
+                      ref.read(itemsNotifierProvider.notifier).search(val.trim());
+                    },
+                  ),
+                ),
+              ),
+          ],
+        ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: activeIndex,
           onDestinationSelected: (idx) {

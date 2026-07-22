@@ -19,6 +19,7 @@ class SettingsModel {
   final int printerPaperSize; // 58 or 80
   final int printReceiptCopies;
   final bool autoPrintOnCheckout;
+  final bool enableFloatingCalculator;
 
   SettingsModel({
     this.shopName = 'Toko Pintar',
@@ -39,6 +40,7 @@ class SettingsModel {
     this.printerPaperSize = 58,
     this.printReceiptCopies = 1,
     this.autoPrintOnCheckout = false,
+    this.enableFloatingCalculator = true,
   });
 
   factory SettingsModel.fromJson(Map<String, dynamic> json) {
@@ -61,6 +63,7 @@ class SettingsModel {
       printerPaperSize: json['printer_paper_size'] as int? ?? 58,
       printReceiptCopies: json['print_receipt_copies'] as int? ?? 1,
       autoPrintOnCheckout: json['auto_print_on_checkout'] as bool? ?? false,
+      enableFloatingCalculator: json['enable_floating_calculator'] as bool? ?? true,
     );
   }
 
@@ -84,6 +87,7 @@ class SettingsModel {
       'printer_paper_size': printerPaperSize,
       'print_receipt_copies': printReceiptCopies,
       'auto_print_on_checkout': autoPrintOnCheckout,
+      'enable_floating_calculator': enableFloatingCalculator,
     };
   }
 
@@ -106,6 +110,7 @@ class SettingsModel {
     int? printerPaperSize,
     int? printReceiptCopies,
     bool? autoPrintOnCheckout,
+    bool? enableFloatingCalculator,
   }) {
     return SettingsModel(
       shopName: shopName ?? this.shopName,
@@ -126,6 +131,7 @@ class SettingsModel {
       printerPaperSize: printerPaperSize ?? this.printerPaperSize,
       printReceiptCopies: printReceiptCopies ?? this.printReceiptCopies,
       autoPrintOnCheckout: autoPrintOnCheckout ?? this.autoPrintOnCheckout,
+      enableFloatingCalculator: enableFloatingCalculator ?? this.enableFloatingCalculator,
     );
   }
 }

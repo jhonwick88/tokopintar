@@ -57,6 +57,7 @@ class _VoiceSearchButtonState extends State<VoiceSearchButton> with SingleTicker
           onResult: (val) {
             _textNotifier.value = val.recognizedWords;
           },
+          localeId: 'id_ID', // Memaksa pengenalan suara bahasa Indonesia
         );
         _showListeningDialog();
       } else {
