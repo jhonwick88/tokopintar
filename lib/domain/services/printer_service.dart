@@ -29,9 +29,9 @@ class PrinterService {
     builder.boldOff();
 
     // Shop details
-    builder.text(settings.shopAddress);
-    builder.text('Telp: ${settings.shopPhone}');
-    builder.text(settings.receiptHeader);
+    if (settings.shopAddress.isNotEmpty) builder.text(settings.shopAddress);
+    if (settings.shopPhone.isNotEmpty) builder.text('Telp: ${settings.shopPhone}');
+    if (settings.receiptHeader.isNotEmpty) builder.text(settings.receiptHeader);
     builder.feed(1);
 
     // 3. Invoice Metadata (Left aligned)
@@ -80,11 +80,13 @@ class PrinterService {
 
     // 6. Footer
     builder.alignCenter();
-    builder.text(settings.receiptFooter);
+    if (settings.receiptFooter.isNotEmpty) builder.text(settings.receiptFooter);
     builder.text('Terima Kasih');
     
     // 7. Cut paper and feed
-    builder.feed(3);
+    // Perintah cut (GS V 65 0) biasanya sudah otomatis memajukan kertas ke posisi cutter,
+    // sehingga feed(3) sebelumnya menyebabkan space kosong yang terlalu lebar.
+    builder.feed(1); // Sisakan 1 baris saja atau bisa dihapus jika masih terlalu lebar
     builder.cut();
 
     return builder.bytes;
@@ -177,22 +179,25 @@ class PrinterService {
                   alignment: pw.Alignment.center,
                   child: pw.Text(settings.shopName, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
                 ),
-                 pw.Align(
-                   alignment: pw.Alignment.center,
-                   child: pw.Text(
-                     settings.shopAddress,
-                     textAlign: pw.TextAlign.center,
-                     style: const pw.TextStyle(fontSize: 8),
-                   ),
-                 ),
-                pw.Align(
-                  alignment: pw.Alignment.center,
-                  child: pw.Text('Telp: ${settings.shopPhone}', style: const pw.TextStyle(fontSize: 8)),
-                ),
-                pw.Align(
-                  alignment: pw.Alignment.center,
-                  child: pw.Text(settings.receiptHeader, style: const pw.TextStyle(fontSize: 8)),
-                ),
+                if (settings.shopAddress.isNotEmpty)
+                  pw.Align(
+                    alignment: pw.Alignment.center,
+                    child: pw.Text(
+                      settings.shopAddress,
+                      textAlign: pw.TextAlign.center,
+                      style: const pw.TextStyle(fontSize: 8),
+                    ),
+                  ),
+                if (settings.shopPhone.isNotEmpty)
+                  pw.Align(
+                    alignment: pw.Alignment.center,
+                    child: pw.Text('Telp: ${settings.shopPhone}', style: const pw.TextStyle(fontSize: 8)),
+                  ),
+                if (settings.receiptHeader.isNotEmpty)
+                  pw.Align(
+                    alignment: pw.Alignment.center,
+                    child: pw.Text(settings.receiptHeader, style: const pw.TextStyle(fontSize: 8)),
+                  ),
                 pw.SizedBox(height: 4),
                 pw.Text('Invoice : ${sale.invoiceNo}', style: const pw.TextStyle(fontSize: 8)),
                 pw.Text('Tanggal : ${_formatDateTime(sale.date)}', style: const pw.TextStyle(fontSize: 8)),
@@ -235,10 +240,11 @@ class PrinterService {
                 _buildPdfRow('Kembali', _formatCurrency(sale.changeAmount)),
                 pw.Divider(thickness: 0.5),
                 
-                pw.Align(
-                  alignment: pw.Alignment.center,
-                  child: pw.Text(settings.receiptFooter, style: const pw.TextStyle(fontSize: 8)),
-                ),
+                if (settings.receiptFooter.isNotEmpty)
+                  pw.Align(
+                    alignment: pw.Alignment.center,
+                    child: pw.Text(settings.receiptFooter, style: const pw.TextStyle(fontSize: 8)),
+                  ),
                 pw.Align(
                   alignment: pw.Alignment.center,
                   child: pw.Text('Terima Kasih', style: const pw.TextStyle(fontSize: 8)),
@@ -389,7 +395,13 @@ class EscPosBuilder {
 
   void text(String text) {
     // Write text encoded in latin1 or ascii
-    _bytes.addAll(latin1.encode('$text\n'));
+    try {
+      _bytes.addAll(latin1.encode('$text\n'));
+    } catch (e) {
+      // Fallback: replace characters not in latin1 with '?' to prevent crash
+      final safeText = text.replaceAll(RegExp(r'[^\x00-\xFF]'), '?');
+      _bytes.addAll(latin1.encode('$safeText\n'));
+    }
   }
 
   void feed(int lines) {

@@ -1700,37 +1700,143 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.orange),
-              SizedBox(width: 8),
-              Text('UPC Unregister'),
-            ],
+        final colorScheme = Theme.of(context).colorScheme;
+        
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 420),
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 30,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Top Icon
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.qr_code_scanner_rounded,
+                      color: Colors.orange,
+                      size: 48,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                // Title
+                const Text(
+                  'Barcode Tidak Dikenal',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                
+                // Subtitle
+                Text(
+                  'Sistem tidak menemukan produk untuk barcode ini:',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Barcode Container
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.barcode_reader, size: 20, color: colorScheme.primary),
+                      const SizedBox(width: 12),
+                      Text(
+                        barcode,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 2,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+                
+                // Action Buttons
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _openAddProductPage(barcode: barcode);
+                  },
+                  icon: const Icon(Icons.add_circle_outline),
+                  label: const Text('Daftarkan Produk Baru', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _openQuickMappingWizard(barcode);
+                  },
+                  icon: const Icon(Icons.link_rounded),
+                  label: const Text('Petakan ke Produk', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    side: BorderSide(color: colorScheme.primary.withOpacity(0.5)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: Text(
+                    'Batal',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
           ),
-          content: Text(
-            'Barcode "$barcode" belum terdaftar di sistem.\n\nPilih tindakan yang ingin Anda lakukan:',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Batal'),
-            ),
-            OutlinedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _openQuickMappingWizard(barcode);
-              },
-              child: const Text('Petakan ke Produk'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _openAddProductPage(barcode: barcode);
-              },
-              child: const Text('Tambah Baru'),
-            ),
-          ],
         );
       },
     );
@@ -2663,122 +2769,187 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final categories = ref.watch(itemsNotifierProvider).categories;
     if (_selectedCategoryId == null && categories.isNotEmpty) {
       _selectedCategoryId = categories.first.id;
     }
 
+    InputDecoration buildInputDecoration(String label, String hint, IconData prefixIcon, {Widget? suffixIcon, String? prefixText}) {
+      return InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixIcon: Icon(prefixIcon, color: colorScheme.primary),
+        prefixText: prefixText,
+        suffixIcon: suffixIcon,
+        filled: true,
+        fillColor: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: colorScheme.primary, width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      );
+    }
+
     return Scaffold(
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Tambah Produk Baru', style: TextStyle(fontWeight: FontWeight.bold)),
+        elevation: 0,
+        backgroundColor: colorScheme.surface,
+        scrolledUnderElevation: 0,
+        title: const Text('Tambah Produk Baru', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: -0.5)),
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
+      body: SafeArea(
         child: Form(
           key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
             children: [
-              const Text(
-                'Informasi Produk',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              // Header Card
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: colorScheme.primary.withOpacity(0.2)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.inventory_2_rounded, color: Colors.white, size: 28),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Informasi Produk',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: colorScheme.onSurface),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Lengkapi detail produk untuk menambahkannya ke inventaris toko.',
+                            style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+              
+              TextFormField(
+                controller: _nameController,
+                decoration: buildInputDecoration(
+                  'Nama Produk *',
+                  'Contoh: Aqua Botol 600ml',
+                  Icons.shopping_bag_rounded,
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) return 'Nama produk tidak boleh kosong';
+                  return null;
+                },
               ),
               const SizedBox(height: 20),
               
               TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Nama Produk *',
-                  prefixIcon: Icon(Icons.shopping_bag_outlined),
-                  hintText: 'Contoh: Aqua Botol 600ml',
-                ),
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) {
-                    return 'Nama produk tidak boleh kosong';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              
-              TextFormField(
                 controller: _skuController,
-                decoration: InputDecoration(
-                  labelText: 'SKU / Kode Item *',
-                  prefixIcon: const Icon(Icons.inventory_2_outlined),
-                  hintText: 'Contoh: AQUA-600',
+                decoration: buildInputDecoration(
+                  'SKU / Kode Item *',
+                  'Contoh: AQUA-600',
+                  Icons.vpn_key_rounded,
                   suffixIcon: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.auto_awesome, color: Colors.blue),
+                        icon: const Icon(Icons.auto_awesome, color: Colors.amber),
                         onPressed: () {
                           _skuController.text = generateSKUFromName(_nameController.text);
                         },
                         tooltip: 'Generate SKU Otomatis',
                       ),
                       IconButton(
-                        icon: const Icon(Icons.help_outline, color: Colors.grey),
+                        icon: Icon(Icons.help_outline, color: colorScheme.primary),
                         onPressed: () => _showSKUGuideDialog(context),
                         tooltip: 'Panduan Aturan SKU',
                       ),
+                      const SizedBox(width: 8),
                     ],
                   ),
                 ),
                 validator: (val) {
-                  if (val == null || val.trim().isEmpty) {
-                    return 'SKU tidak boleh kosong';
-                  }
+                  if (val == null || val.trim().isEmpty) return 'SKU tidak boleh kosong';
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               
               TextFormField(
                 controller: _barcodeController,
-                decoration: InputDecoration(
-                  labelText: 'Barcode / UPC',
-                  prefixIcon: const Icon(Icons.qr_code_scanner_outlined),
-                  hintText: 'Scan atau ketik barcode',
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.qr_code_scanner),
-                    onPressed: () async {
-                      var status = await Permission.camera.status;
-                      if (status != PermissionStatus.granted) {
-                        if (context.mounted) {
-                          await AppPermissionsDialog.show(context);
-                        }
-                        status = await Permission.camera.status;
+                decoration: buildInputDecoration(
+                  'Barcode / UPC',
+                  'Scan atau ketik barcode',
+                  Icons.qr_code_scanner_rounded,
+                  suffixIcon: Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: IconButton(
+                      icon: Icon(Icons.camera_alt_rounded, color: colorScheme.primary),
+                      onPressed: () async {
+                        var status = await Permission.camera.status;
                         if (status != PermissionStatus.granted) {
-                          return;
+                          if (context.mounted) {
+                            await AppPermissionsDialog.show(context);
+                          }
+                          status = await Permission.camera.status;
+                          if (status != PermissionStatus.granted) return;
                         }
-                      }
-                      
-                      if (!context.mounted) return;
-                      final scanned = await showDialog<String>(
-                        context: context,
-                        builder: (context) => const CameraScannerDialog(),
-                      );
-                      if (scanned != null) {
-                        _barcodeController.text = scanned;
-                      }
-                    },
-                    tooltip: 'Scan Barcode',
+                        
+                        if (!context.mounted) return;
+                        final scanned = await showDialog<String>(
+                          context: context,
+                          builder: (context) => const CameraScannerDialog(),
+                        );
+                        if (scanned != null) {
+                          _barcodeController.text = scanned;
+                        }
+                      },
+                      tooltip: 'Scan Barcode',
+                    ),
                   ),
                 ),
+              ),
+              const SizedBox(height: 32),
+              
+              const Text(
+                'Kategori & Harga',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               const SizedBox(height: 16),
 
               DropdownButtonFormField<int>(
                 value: _selectedCategoryId,
-                decoration: const InputDecoration(
-                  labelText: 'Kategori Produk *',
-                  prefixIcon: Icon(Icons.category_outlined),
+                decoration: buildInputDecoration(
+                  'Kategori Produk *',
+                  'Pilih kategori',
+                  Icons.category_rounded,
                 ),
+                icon: const Icon(Icons.keyboard_arrow_down_rounded),
                 items: categories.map((cat) {
                   return DropdownMenuItem<int>(
                     value: cat.id,
@@ -2792,55 +2963,57 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
                 },
                 validator: (val) => val == null ? 'Kategori wajib dipilih' : null,
               ),
-              const SizedBox(height: 16),
-
-              TextFormField(
-                controller: _priceController,
-                decoration: const InputDecoration(
-                  labelText: 'Harga Jual (Price) *',
-                  prefixIcon: Icon(Icons.monetization_on_outlined),
-                  prefixText: 'Rp ',
-                ),
-                keyboardType: TextInputType.number,
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) {
-                    return 'Harga jual wajib diisi';
-                  }
-                  if (double.tryParse(val) == null) {
-                    return 'Format harga tidak valid';
-                  }
-                  return null;
-                },
+              const SizedBox(height: 20),
+              
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _priceController,
+                      decoration: buildInputDecoration(
+                        'Harga Jual *',
+                        '0',
+                        Icons.payments_rounded,
+                        prefixText: 'Rp ',
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) return 'Wajib diisi';
+                        if (double.tryParse(val) == null) return 'Format tidak valid';
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _stockController,
+                      decoration: buildInputDecoration(
+                        'Stok Awal *',
+                        '0',
+                        Icons.inventory_rounded,
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) return 'Wajib diisi';
+                        if (double.tryParse(val) == null) return 'Format tidak valid';
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-
-              TextFormField(
-                controller: _stockController,
-                decoration: const InputDecoration(
-                  labelText: 'Stok Awal (obquantity) *',
-                  prefixIcon: Icon(Icons.warehouse_outlined),
-                ),
-                keyboardType: TextInputType.number,
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) {
-                    return 'Stok awal wajib diisi';
-                  }
-                  if (double.tryParse(val) == null) {
-                    return 'Format stok tidak valid';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 32),
+              
+              const SizedBox(height: 48),
               
               SizedBox(
                 width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                height: 56,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 0,
                   ),
                   onPressed: () async {
                     if (!_formKey.currentState!.validate()) return;
@@ -2882,12 +3055,14 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
                       );
                     }
                   },
-                  child: const Text(
+                  icon: const Icon(Icons.check_circle_rounded),
+                  label: const Text(
                     'Simpan Produk',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 0.5),
                   ),
                 ),
               ),
+              const SizedBox(height: 32),
             ],
           ),
         ),

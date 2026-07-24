@@ -79,23 +79,24 @@ class _BarcodeKeyboardListenerState extends State<BarcodeKeyboardListener> {
         final barcode = _buffer.toString().trim();
         _buffer.clear();
         if (barcode.length >= 3) {
-          widget.onBarcodeScanned(barcode);
+          // Notify ALL listeners in the service, which includes widget.onBarcodeScanned
+          BarcodeService.instance.notifyBarcodeScanned(barcode);
           return true; // Consume Enter key so it doesn't submit other focused text fields
         }
       }
     } else {
-      // Intercept numeric and alphanumeric characters
+      // Intercept numeric and alphanumeric characters, plus hyphen/underscore for Code 128
       final char = event.character;
-      if (char != null && char.isNotEmpty && RegExp(r'^[a-zA-Z0-9]$').hasMatch(char)) {
+      if (char != null && char.isNotEmpty && RegExp(r'^[a-zA-Z0-9\-_]$').hasMatch(char)) {
         _buffer.write(char);
-        // If keys are typed extremely fast, it is definitely a barcode scanner.
+        // If keys are typed fast, it is a barcode scanner.
         // Consume the key event so it doesn't get typed into focused inputs.
-        if (elapsed < 35) {
+        if (elapsed < 50) {
           return true; 
         }
-      } else if (logicalKey.keyLabel.isNotEmpty && logicalKey.keyLabel.length == 1 && RegExp(r'^[a-zA-Z0-9]$').hasMatch(logicalKey.keyLabel)) {
+      } else if (logicalKey.keyLabel.isNotEmpty && logicalKey.keyLabel.length == 1 && RegExp(r'^[a-zA-Z0-9\-_]$').hasMatch(logicalKey.keyLabel)) {
         _buffer.write(logicalKey.keyLabel);
-        if (elapsed < 35) {
+        if (elapsed < 50) {
           return true;
         }
       }
