@@ -41,7 +41,7 @@ class ReconciliationAnalysisScreen extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // ROW 1: Filters Bar
-                          _buildFiltersBar(context, ref, state),
+                          const _ReconciliationFiltersBar(),
                           const SizedBox(height: 20),
 
                           // ROW 2: Statistics Overview
@@ -102,149 +102,7 @@ class ReconciliationAnalysisScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildFiltersBar(BuildContext context, WidgetRef ref, ReconciliationState state) {
-    final startStr = state.customStartDate != null ? DateFormat('dd/MM/yyyy').format(state.customStartDate!) : '';
-    final endStr = state.customEndDate != null ? DateFormat('dd/MM/yyyy').format(state.customEndDate!) : '';
-    final rangeText = state.filterType == 'custom' && state.customStartDate != null
-        ? ' ($startStr - $endStr)'
-        : '';
 
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      alignment: WrapAlignment.spaceBetween,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        // Segmented Control for Quick Filters
-        Container(
-          padding: const EdgeInsets.all(4.0),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildSegmentItem(
-                context: context,
-                label: 'Hari Ini',
-                isSelected: state.filterType == 'today',
-                onTap: () => ref.read(reconciliationProvider.notifier).setFilterType('today'),
-              ),
-              _buildSegmentItem(
-                context: context,
-                label: 'Minggu Ini',
-                isSelected: state.filterType == 'weekly',
-                onTap: () => ref.read(reconciliationProvider.notifier).setFilterType('weekly'),
-              ),
-              _buildSegmentItem(
-                context: context,
-                label: 'Bulan Ini',
-                isSelected: state.filterType == 'monthly',
-                onTap: () => ref.read(reconciliationProvider.notifier).setFilterType('monthly'),
-              ),
-            ],
-          ),
-        ),
-
-        // Custom Date Range Picker Button
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () async {
-              final picked = await showDateRangePicker(
-                context: context,
-                firstDate: DateTime(2025),
-                lastDate: DateTime(2030),
-                initialDateRange: state.customStartDate != null && state.customEndDate != null
-                    ? DateTimeRange(start: state.customStartDate!, end: state.customEndDate!)
-                    : null,
-              );
-              if (picked != null) {
-                ref.read(reconciliationProvider.notifier).setCustomDateRange(picked.start, picked.end);
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: state.filterType == 'custom'
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: state.filterType == 'custom'
-                    ? [
-                        BoxShadow(
-                          color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        )
-                      ]
-                    : null,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.date_range_rounded,
-                    size: 16,
-                    color: state.filterType == 'custom' ? Colors.white : Theme.of(context).colorScheme.onSurface,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    state.filterType == 'custom' ? 'Kustom$rangeText' : 'Tanggal',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: state.filterType == 'custom' ? Colors.white : Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSegmentItem({
-    required BuildContext context,
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? Theme.of(context).colorScheme.surface : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  )
-                ]
-              : null,
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            color: isSelected
-                ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildStatsRow(BuildContext context, bool isLarge, ReconciliationState state, NumberFormat currencyFormatter) {
     final double accuracy = state.averageAccuracy;
@@ -698,5 +556,202 @@ class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(covariant _StickyHeaderDelegate oldDelegate) {
     return child != oldDelegate.child || height != oldDelegate.height;
+  }
+}
+
+class _ReconciliationFiltersBar extends ConsumerStatefulWidget {
+  const _ReconciliationFiltersBar({Key? key}) : super(key: key);
+
+  @override
+  ConsumerState<_ReconciliationFiltersBar> createState() => _ReconciliationFiltersBarState();
+}
+
+class _ReconciliationFiltersBarState extends ConsumerState<_ReconciliationFiltersBar> {
+  final ScrollController _scrollController = ScrollController();
+  final List<GlobalKey> _keys = List.generate(4, (index) => GlobalKey());
+
+  void _scrollToItem(int index) {
+    if (!_scrollController.hasClients) return;
+    final keyContext = _keys[index].currentContext;
+    if (keyContext != null) {
+      Scrollable.ensureVisible(
+        keyContext,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        alignment: 0.0,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(reconciliationProvider);
+    final startStr = state.customStartDate != null ? DateFormat('dd/MM/yy').format(state.customStartDate!) : '';
+    final endStr = state.customEndDate != null ? DateFormat('dd/MM/yy').format(state.customEndDate!) : '';
+    final rangeText = state.filterType == 'custom' && state.customStartDate != null
+        ? ' ($startStr - $endStr)'
+        : '';
+
+    return SingleChildScrollView(
+      controller: _scrollController,
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: [
+          _buildFilterChip(
+            key: _keys[0],
+            context: context,
+            label: 'Hari Ini',
+            icon: Icons.today_rounded,
+            isSelected: state.filterType == 'today',
+            onTap: () {
+              ref.read(reconciliationProvider.notifier).setFilterType('today');
+              _scrollToItem(0);
+            },
+          ),
+          const SizedBox(width: 8),
+          _buildFilterChip(
+            key: _keys[1],
+            context: context,
+            label: 'Minggu Ini',
+            icon: Icons.date_range_rounded,
+            isSelected: state.filterType == 'weekly',
+            onTap: () {
+              ref.read(reconciliationProvider.notifier).setFilterType('weekly');
+              _scrollToItem(1);
+            },
+          ),
+          const SizedBox(width: 8),
+          _buildFilterChip(
+            key: _keys[2],
+            context: context,
+            label: 'Bulan Ini',
+            icon: Icons.calendar_month_rounded,
+            isSelected: state.filterType == 'monthly',
+            onTap: () {
+              ref.read(reconciliationProvider.notifier).setFilterType('monthly');
+              _scrollToItem(2);
+            },
+          ),
+          const SizedBox(width: 8),
+          Container(
+            height: 24,
+            width: 1,
+            color: Theme.of(context).dividerColor.withOpacity(0.5),
+          ),
+          const SizedBox(width: 8),
+          _buildFilterChip(
+            key: _keys[3],
+            context: context,
+            label: state.filterType == 'custom' ? 'Kustom$rangeText' : 'Pilih Tanggal',
+            icon: Icons.edit_calendar_rounded,
+            isSelected: state.filterType == 'custom',
+            isCustom: true,
+            onTap: () async {
+              final picked = await showDateRangePicker(
+                context: context,
+                firstDate: DateTime(2025),
+                lastDate: DateTime(2030),
+                initialDateRange: state.customStartDate != null && state.customEndDate != null
+                    ? DateTimeRange(start: state.customStartDate!, end: state.customEndDate!)
+                    : null,
+                builder: (context, child) {
+                  return Theme(
+                    data: Theme.of(context).copyWith(
+                      colorScheme: Theme.of(context).colorScheme.copyWith(
+                        primary: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    child: child!,
+                  );
+                },
+              );
+              if (picked != null) {
+                ref.read(reconciliationProvider.notifier).setCustomDateRange(picked.start, picked.end);
+                _scrollToItem(3);
+              } else {
+                if (state.filterType == 'custom') {
+                  _scrollToItem(3);
+                }
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip({
+    required Key key,
+    required BuildContext context,
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+    bool isCustom = false,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    return Material(
+      key: key,
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected 
+                ? (isCustom ? colorScheme.secondary : colorScheme.primary) 
+                : colorScheme.surfaceContainerHighest.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: isSelected 
+                  ? Colors.transparent 
+                  : colorScheme.outlineVariant.withOpacity(0.5),
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: (isCustom ? colorScheme.secondary : colorScheme.primary).withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    )
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected 
+                  ? (isCustom ? colorScheme.onSecondary : colorScheme.onPrimary) 
+                  : colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                  color: isSelected 
+                    ? (isCustom ? colorScheme.onSecondary : colorScheme.onPrimary) 
+                    : colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
