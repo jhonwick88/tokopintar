@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
@@ -29,6 +30,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
   late final TextEditingController _searchController;
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isSidebarCollapsed = false;
+  bool _isSearchVisible = true;
 
   @override
   void initState() {
@@ -438,10 +440,22 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
             : null,
         body: Stack(
           children: [
-            widget.child,
+            NotificationListener<UserScrollNotification>(
+              onNotification: (notification) {
+                if (notification.direction == ScrollDirection.reverse) {
+                  if (_isSearchVisible) setState(() => _isSearchVisible = false);
+                } else if (notification.direction == ScrollDirection.forward) {
+                  if (!_isSearchVisible) setState(() => _isSearchVisible = true);
+                }
+                return false;
+              },
+              child: widget.child,
+            ),
             if (showOuterAppBar)
-              Positioned(
-                bottom: 16,
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+                bottom: _isSearchVisible ? 16 : -100,
                 left: 16,
                 right: 16,
                 child: Container(
@@ -459,7 +473,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                   child: TextField(
                     controller: _searchController,
                     decoration: InputDecoration(
-                      hintText: 'Cari produk... (F3)',
+                      hintText: 'Cari produk...',
                       prefixIcon: const Icon(Icons.search),
                       suffixIcon: Row(
                         mainAxisSize: MainAxisSize.min,
