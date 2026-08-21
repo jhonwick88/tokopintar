@@ -166,7 +166,13 @@ class PrinterService {
       // Paper size 58mm or 80mm
       // Windows printer drivers typically have smaller printable widths (e.g. 72mm for 80mm roll, 48mm for 58mm roll)
       final double width = settings.printerPaperSize == 80 ? 72 * PdfPageFormat.mm : 48 * PdfPageFormat.mm;
-      final format = PdfPageFormat(width, double.infinity, marginAll: 2 * PdfPageFormat.mm);
+      // Set marginBottom to 0 to prevent any extra blank space at the end of the document
+      final format = PdfPageFormat(width, double.infinity, 
+        marginLeft: 2 * PdfPageFormat.mm,
+        marginTop: 2 * PdfPageFormat.mm,
+        marginRight: 2 * PdfPageFormat.mm,
+        marginBottom: 0,
+      );
 
       doc.addPage(
         pw.Page(
@@ -274,7 +280,12 @@ class PrinterService {
     try {
       final doc = pw.Document();
       final double width = settings.printerPaperSize == 80 ? 72 * PdfPageFormat.mm : 48 * PdfPageFormat.mm;
-      final format = PdfPageFormat(width, double.infinity, marginAll: 2 * PdfPageFormat.mm);
+      final format = PdfPageFormat(width, double.infinity, 
+        marginLeft: 2 * PdfPageFormat.mm,
+        marginTop: 2 * PdfPageFormat.mm,
+        marginRight: 2 * PdfPageFormat.mm,
+        marginBottom: 0,
+      );
 
       doc.addPage(
         pw.Page(
