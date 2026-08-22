@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/datasources/api_client.dart';
-import '../../data/datasources/firestore_client.dart';
 import '../../data/models/settings_model.dart';
 import '../../data/repositories/audit_repository_impl.dart';
 import '../../data/repositories/auth_repository_impl.dart';
@@ -14,18 +13,14 @@ import '../../domain/repositories/sales_repository.dart';
 import '../../domain/repositories/settings_repository.dart';
 
 // --- DATA SOURCE PROVIDERS ---
-final firestoreClientProvider = Provider<FirestoreClient>((ref) {
-  return FirestoreClient();
-});
-
 final apiClientProvider = Provider<ApiClient>((ref) {
-  final settings = ref.watch(settingsNotifierProvider);
-  return ApiClient(baseUrl: settings.restApiUrl);
+  final restApiUrl = ref.watch(settingsNotifierProvider.select((s) => s.restApiUrl));
+  return ApiClient(baseUrl: restApiUrl);
 });
 
 // --- REPOSITORY PROVIDERS ---
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  return AuthRepositoryImpl(ref.watch(firestoreClientProvider));
+  return AuthRepositoryImpl(ref.watch(apiClientProvider));
 });
 
 final itemsRepositoryProvider = Provider<ItemsRepository>((ref) {
@@ -33,15 +28,15 @@ final itemsRepositoryProvider = Provider<ItemsRepository>((ref) {
 });
 
 final salesRepositoryProvider = Provider<SalesRepository>((ref) {
-  return SalesRepositoryImpl(ref.watch(firestoreClientProvider));
+  return SalesRepositoryImpl(ref.watch(apiClientProvider));
 });
 
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
-  return SettingsRepositoryImpl(ref.watch(firestoreClientProvider));
+  return SettingsRepositoryImpl();
 });
 
 final auditRepositoryProvider = Provider<AuditRepository>((ref) {
-  return AuditRepositoryImpl(ref.watch(firestoreClientProvider));
+  return AuditRepositoryImpl(ref.watch(apiClientProvider));
 });
 
 // --- SETTINGS NOTIFIER ---

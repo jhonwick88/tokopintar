@@ -25,19 +25,19 @@ class QuickItemModel {
       'icon_name': iconName,
       'color_hex': colorHex,
       'display_order': displayOrder,
-      'is_active': isActive,
+      'is_active': isActive ? 1 : 0,
     };
   }
 
   factory QuickItemModel.fromJson(Map<String, dynamic> json) {
     return QuickItemModel(
       id: json['id'] as String? ?? '',
-      itemNo: json['item_no'] as String? ?? '',
-      itemName: json['item_name'] as String? ?? '',
+      itemNo: json['itemno'] as String? ?? json['item_no'] as String? ?? '',
+      itemName: json['itemname'] as String? ?? json['item_name'] as String? ?? '',
       iconName: json['icon_name'] as String?,
       colorHex: json['color_hex'] as String?,
-      displayOrder: json['display_order'] as int? ?? 0,
-      isActive: json['is_active'] as bool? ?? true,
+      displayOrder: (json['display_order'] as num?)?.toInt() ?? 0,
+      isActive: json['is_active'] == 1 || json['is_active'] == true,
     );
   }
 

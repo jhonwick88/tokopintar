@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class AuditLogModel {
   final String id;
   final DateTime timestamp;
@@ -20,8 +18,7 @@ class AuditLogModel {
   factory AuditLogModel.fromJson(Map<String, dynamic> json) {
     DateTime parseDateTime(dynamic val) {
       if (val == null) return DateTime.now();
-      if (val is Timestamp) return val.toDate();
-      if (val is String) return DateTime.parse(val);
+      if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
       return DateTime.now();
     }
 
@@ -38,7 +35,7 @@ class AuditLogModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'timestamp': Timestamp.fromDate(timestamp),
+      'timestamp': timestamp.toIso8601String(),
       'user_id': userId,
       'username': username,
       'action': action,

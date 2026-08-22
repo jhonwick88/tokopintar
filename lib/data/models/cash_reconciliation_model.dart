@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class CashReconciliationModel {
   final String id;
   final DateTime date;
@@ -24,8 +22,7 @@ class CashReconciliationModel {
   factory CashReconciliationModel.fromJson(Map<String, dynamic> json) {
     DateTime parseDateTime(dynamic val) {
       if (val == null) return DateTime.now();
-      if (val is Timestamp) return val.toDate();
-      if (val is String) return DateTime.parse(val);
+      if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
       return DateTime.now();
     }
 
@@ -44,7 +41,7 @@ class CashReconciliationModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'date': Timestamp.fromDate(date),
+      'date': date.toIso8601String(),
       'cashier_name': cashierName,
       'system_revenue': systemRevenue,
       'actual_drawer_cash': actualDrawerCash,

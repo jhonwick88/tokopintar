@@ -1,6 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class SaleModel {
+  final String? id;
   final String invoiceNo;
   final DateTime date;
   final String cashier;
@@ -19,9 +18,11 @@ class SaleModel {
   final String? refundReason;
   final DateTime? refundedAt;
   final String? refundedBy;
+  final int? customerId;
   final List<SaleItemModel> items;
 
   SaleModel({
+    this.id,
     required this.invoiceNo,
     required this.date,
     required this.cashier,
@@ -40,65 +41,79 @@ class SaleModel {
     this.refundReason,
     this.refundedAt,
     this.refundedBy,
+    this.customerId,
     this.items = const [],
   });
 
   factory SaleModel.fromJson(Map<String, dynamic> json, [List<SaleItemModel> items = const []]) {
     DateTime parseDateTime(dynamic val) {
       if (val == null) return DateTime.now();
-      if (val is Timestamp) return val.toDate();
-      if (val is String) return DateTime.parse(val);
+      if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
       return DateTime.now();
     }
 
+    List<SaleItemModel> parsedItems = List.from(items);
+    if (json['items'] != null && json['items'] is List) {
+      parsedItems = (json['items'] as List)
+          .map((e) => SaleItemModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+
     return SaleModel(
-      invoiceNo: json['invoice_no'] as String? ?? '',
-      date: parseDateTime(json['date']),
-      cashier: json['cashier'] as String? ?? 'Admin',
+      id: json['id'] as String?,
+      invoiceNo: json['receipt_no'] as String? ?? json['invoice_no'] as String? ?? '',
+      date: parseDateTime(json['sale_date'] ?? json['date']),
+      cashier: json['cashier_id'] as String? ?? json['cashier'] as String? ?? 'Admin',
       subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0.0,
       discount: (json['discount'] as num?)?.toDouble() ?? 0.0,
-      grandTotal: (json['grand_total'] as num?)?.toDouble() ?? 0.0,
+      grandTotal: (json['total'] as num?)?.toDouble() ?? (json['grand_total'] as num?)?.toDouble() ?? 0.0,
       tax: (json['tax'] as num?)?.toDouble() ?? 0.0,
       serviceCharge: (json['service_charge'] as num?)?.toDouble() ?? 0.0,
       paymentMethod: json['payment_method'] as String? ?? 'cash',
-      paidAmount: (json['paid_amount'] as num?)?.toDouble() ?? 0.0,
-      changeAmount: (json['change_amount'] as num?)?.toDouble() ?? 0.0,
-      status: json['status'] as String? ?? 'completed',
+      paidAmount: (json['cash_tendered'] as num?)?.toDouble() ?? (json['paid_amount'] as num?)?.toDouble() ?? 0.0,
+      changeAmount: (json['change_due'] as num?)?.toDouble() ?? (json['change_amount'] as num?)?.toDouble() ?? 0.0,
+      status: ((json['is_void'] as num?)?.toInt() == 1) ? 'voided' : (json['status'] as String? ?? 'completed'),
       voidReason: json['void_reason'] as String?,
       voidedAt: json['voided_at'] != null ? parseDateTime(json['voided_at']) : null,
       voidedBy: json['voided_by'] as String?,
       refundReason: json['refund_reason'] as String?,
       refundedAt: json['refunded_at'] != null ? parseDateTime(json['refunded_at']) : null,
       refundedBy: json['refunded_by'] as String?,
-      items: items,
+      customerId: (json['customer_id'] as num?)?.toInt(),
+      items: parsedItems,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'invoice_no': invoiceNo,
-      'date': Timestamp.fromDate(date),
-      'cashier': cashier,
+      if (id != null) 'id': id,
+      'receipt_no': invoiceNo,
+      'sale_date': date.toIso8601String(),
+      'cashier_id': cashier,
       'subtotal': subtotal,
       'discount': discount,
-      'grand_total': grandTotal,
+      'total': grandTotal,
       'tax': tax,
       'service_charge': serviceCharge,
       'payment_method': paymentMethod,
-      'paid_amount': paidAmount,
-      'change_amount': changeAmount,
+      'cash_tendered': paidAmount,
+      'change_due': changeAmount,
+      'is_void': status == 'voided' ? 1 : 0,
       'status': status,
-      'void_reason': voidReason,
-      'voided_at': voidedAt != null ? Timestamp.fromDate(voidedAt!) : null,
-      'voided_by': voidedBy,
-      'refund_reason': refundReason,
-      'refunded_at': refundedAt != null ? Timestamp.fromDate(refundedAt!) : null,
-      'refunded_by': refundedBy,
+      if (voidReason != null) 'void_reason': voidReason,
+      if (voidedAt != null) 'voided_at': voidedAt?.toIso8601String(),
+      if (voidedBy != null) 'voided_by': voidedBy,
+      if (refundReason != null) 'refund_reason': refundReason,
+      if (refundedAt != null) 'refunded_at': refundedAt?.toIso8601String(),
+      if (refundedBy != null) 'refunded_by': refundedBy,
+      if (customerId != null) 'customer_id': customerId,
+      'items': items.map((e) => e.toJson()).toList(), 
     };
   }
 }
 
 class SaleItemModel {
+  final int? id;
   final String itemNo;
   final String itemUPC;
   final String itemName;
@@ -109,6 +124,7 @@ class SaleItemModel {
   final double discount;
 
   SaleItemModel({
+    this.id,
     required this.itemNo,
     required this.itemUPC,
     required this.itemName,
@@ -121,12 +137,13 @@ class SaleItemModel {
 
   factory SaleItemModel.fromJson(Map<String, dynamic> json) {
     return SaleItemModel(
+      id: (json['id'] as num?)?.toInt(),
       itemNo: json['itemno'] as String? ?? '',
       itemUPC: json['itemupc'] as String? ?? '',
       itemName: json['itemname'] as String? ?? '',
-      qty: json['qty'] as int? ?? 1,
+      qty: (json['qty'] as num?)?.toInt() ?? 1,
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
-      subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0.0,
+      subtotal: (json['total'] as num?)?.toDouble() ?? (json['subtotal'] as num?)?.toDouble() ?? 0.0,
       note: json['note'] as String? ?? '',
       discount: (json['discount'] as num?)?.toDouble() ?? 0.0,
     );
@@ -134,12 +151,13 @@ class SaleItemModel {
 
   Map<String, dynamic> toJson() {
     return {
+      if (id != null) 'id': id,
       'itemno': itemNo,
       'itemupc': itemUPC,
       'itemname': itemName,
       'qty': qty,
       'price': price,
-      'subtotal': subtotal,
+      'total': subtotal,
       'note': note,
       'discount': discount,
     };

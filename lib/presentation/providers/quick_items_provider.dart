@@ -5,7 +5,7 @@ import '../../domain/repositories/quick_items_repository.dart';
 import 'settings_provider.dart';
 
 final quickItemsRepositoryProvider = Provider<QuickItemsRepository>((ref) {
-  final client = ref.watch(firestoreClientProvider);
+  final client = ref.watch(apiClientProvider);
   return QuickItemsRepositoryImpl(client);
 });
 

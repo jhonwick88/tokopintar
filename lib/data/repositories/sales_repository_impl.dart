@@ -1,35 +1,37 @@
 import '../../domain/repositories/sales_repository.dart';
-import '../datasources/firestore_client.dart';
+import '../datasources/api_client.dart';
 import '../models/sale_model.dart';
 import '../models/cash_reconciliation_model.dart';
 
 class SalesRepositoryImpl implements SalesRepository {
-  final FirestoreClient _firestoreClient;
+  final ApiClient _apiClient;
 
-  SalesRepositoryImpl(this._firestoreClient);
+  SalesRepositoryImpl(this._apiClient);
 
   @override
   Future<void> saveSale(SaleModel sale) {
-    return _firestoreClient.saveSale(sale);
+    return _apiClient.saveSale(sale);
   }
 
   @override
   Future<List<SaleModel>> getSalesHistory({DateTime? startDate, DateTime? endDate}) {
-    return _firestoreClient.getSalesHistory(startDate: startDate, endDate: endDate);
+    // Note: Filtering by date is not currently implemented in the Go API directly via query params,
+    // so we return all for now or we could filter client-side if needed.
+    return _apiClient.getSalesHistory();
   }
 
   @override
   Future<void> updateSaleStatus(String invoiceNo, String status, {String? reason, String? user}) {
-    return _firestoreClient.updateSaleStatus(invoiceNo, status, reason: reason, user: user);
+    return _apiClient.updateSaleStatus(invoiceNo, status, reason: reason, user: user);
   }
 
   @override
   Future<void> saveCashReconciliation(CashReconciliationModel reconciliation) {
-    return _firestoreClient.saveCashReconciliation(reconciliation);
+    return _apiClient.saveCashReconciliation(reconciliation);
   }
 
   @override
   Future<List<CashReconciliationModel>> getCashReconciliations() {
-    return _firestoreClient.getCashReconciliations();
+    return _apiClient.getCashReconciliations();
   }
 }

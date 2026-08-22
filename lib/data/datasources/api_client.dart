@@ -2,6 +2,12 @@ import 'package:dio/dio.dart';
 import 'dart:developer' as dev;
 import '../models/category_model.dart';
 import '../models/item_model.dart';
+import '../models/sale_model.dart';
+import '../models/cash_reconciliation_model.dart';
+import '../models/audit_log_model.dart';
+import '../models/quick_item_model.dart';
+import '../models/user_model.dart';
+import '../models/settings_model.dart';
 
 class ApiClient {
   final Dio _dio;
@@ -205,6 +211,223 @@ class ApiClient {
       throw Exception(response.data?['message'] ?? 'Gagal menambahkan produk baru');
     } catch (e) {
       dev.log('Error in createItem: $e');
+      rethrow;
+    }
+  }
+
+  // --- Sales ---
+
+  Future<List<SaleModel>> getSalesHistory() async {
+    try {
+      final response = await _dio.get('/api/sales');
+      if (response.statusCode == 200 && response.data != null) {
+        final success = response.data['success'] as bool? ?? false;
+        if (success) {
+          final list = response.data['data'] as List?;
+          if (list != null) {
+            return list.map((e) => SaleModel.fromJson(e as Map<String, dynamic>)).toList();
+          }
+        }
+      }
+      return [];
+    } catch (e) {
+      dev.log('Error in getSalesHistory: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> saveSale(SaleModel sale) async {
+    try {
+      final response = await _dio.post('/api/sales', data: sale.toJson());
+      if (response.statusCode != 200) {
+        throw Exception(response.data?['message'] ?? 'Gagal menyimpan transaksi');
+      }
+    } catch (e) {
+      dev.log('Error in saveSale: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateSaleStatus(String invoiceNo, String status, {String? reason, String? user}) async {
+    try {
+      final response = await _dio.patch(
+        '/api/sales/$invoiceNo/status',
+        data: {
+          'status': status,
+          if (reason != null) 'reason': reason,
+          if (user != null) 'user': user,
+        },
+      );
+      if (response.statusCode != 200) {
+        throw Exception('Failed to update sale status');
+      }
+    } catch (e) {
+      dev.log('Error in updateSaleStatus: $e');
+      rethrow;
+    }
+  }
+
+  // --- Cash Reconciliations ---
+
+  Future<List<CashReconciliationModel>> getCashReconciliations() async {
+    try {
+      final response = await _dio.get('/api/cash-reconciliations');
+      if (response.statusCode == 200 && response.data != null) {
+        final success = response.data['success'] as bool? ?? false;
+        if (success) {
+          final list = response.data['data'] as List?;
+          if (list != null) {
+            return list.map((e) => CashReconciliationModel.fromJson(e as Map<String, dynamic>)).toList();
+          }
+        }
+      }
+      return [];
+    } catch (e) {
+      dev.log('Error in getCashReconciliations: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> saveCashReconciliation(CashReconciliationModel reconciliation) async {
+    try {
+      final response = await _dio.post('/api/cash-reconciliations', data: reconciliation.toJson());
+      if (response.statusCode != 200) {
+        throw Exception(response.data?['message'] ?? 'Gagal menyimpan laporan tutup kasir');
+      }
+    } catch (e) {
+      dev.log('Error in saveCashReconciliation: $e');
+      rethrow;
+    }
+  }
+
+  // --- Audit Logs ---
+
+  Future<List<AuditLogModel>> getAuditLogs() async {
+    try {
+      final response = await _dio.get('/api/audit-logs');
+      if (response.statusCode == 200 && response.data != null) {
+        final success = response.data['success'] as bool? ?? false;
+        if (success) {
+          final list = response.data['data'] as List?;
+          if (list != null) {
+            return list.map((e) => AuditLogModel.fromJson(e as Map<String, dynamic>)).toList();
+          }
+        }
+      }
+      return [];
+    } catch (e) {
+      dev.log('Error in getAuditLogs: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> logActivity(AuditLogModel logModel) async {
+    try {
+      final response = await _dio.post('/api/audit-logs', data: logModel.toJson());
+      if (response.statusCode != 200) {
+        throw Exception(response.data?['message'] ?? 'Gagal menyimpan log audit');
+      }
+    } catch (e) {
+      dev.log('Error in logActivity: $e');
+      rethrow;
+    }
+  }
+
+  // --- Quick Items ---
+
+  Future<List<QuickItemModel>> getQuickItems() async {
+    try {
+      final response = await _dio.get('/api/quick-items');
+      if (response.statusCode == 200 && response.data != null) {
+        final success = response.data['success'] as bool? ?? false;
+        if (success) {
+          final list = response.data['data'] as List?;
+          if (list != null) {
+            return list.map((e) => QuickItemModel.fromJson(e as Map<String, dynamic>)).toList();
+          }
+        }
+      }
+      return [];
+    } catch (e) {
+      dev.log('Error in getQuickItems: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> saveQuickItem(QuickItemModel item) async {
+    try {
+      final response = await _dio.post('/api/quick-items', data: item.toJson());
+      if (response.statusCode != 200) {
+        throw Exception(response.data?['message'] ?? 'Gagal menyimpan quick item');
+      }
+    } catch (e) {
+      dev.log('Error in saveQuickItem: $e');
+      rethrow;
+    }
+  }
+
+  // --- Users ---
+
+  Future<List<UserModel>> getUsers() async {
+    try {
+      final response = await _dio.get('/api/users');
+      if (response.statusCode == 200 && response.data != null) {
+        final success = response.data['success'] as bool? ?? false;
+        if (success) {
+          final list = response.data['data'] as List?;
+          if (list != null) {
+            return list.map((e) => UserModel.fromJson(e as Map<String, dynamic>)).toList();
+          }
+        }
+      }
+      return [];
+    } catch (e) {
+      dev.log('Error in getUsers: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> saveUser(UserModel user) async {
+    try {
+      final response = await _dio.post('/api/users', data: user.toJson());
+      if (response.statusCode != 200) {
+        throw Exception(response.data?['message'] ?? 'Gagal menyimpan user');
+      }
+    } catch (e) {
+      dev.log('Error in saveUser: $e');
+      rethrow;
+    }
+  }
+
+  // --- Settings / Company ---
+
+  Future<SettingsModel> getCompanySettings() async {
+    try {
+      final response = await _dio.get('/api/company');
+      if (response.statusCode == 200 && response.data != null) {
+        final success = response.data['success'] as bool? ?? false;
+        if (success) {
+          final data = response.data['data'];
+          if (data != null && data is Map<String, dynamic>) {
+            return SettingsModel.fromJson(data);
+          }
+        }
+      }
+      return SettingsModel(); // Return defaults if failed
+    } catch (e) {
+      dev.log('Error in getCompanySettings: $e');
+      return SettingsModel(); // Return defaults on error
+    }
+  }
+
+  Future<void> updateCompanySettings(SettingsModel settings) async {
+    try {
+      final response = await _dio.put('/api/company', data: settings.toJson());
+      if (response.statusCode != 200) {
+        throw Exception(response.data?['message'] ?? 'Gagal menyimpan data perusahaan');
+      }
+    } catch (e) {
+      dev.log('Error in updateCompanySettings: $e');
       rethrow;
     }
   }

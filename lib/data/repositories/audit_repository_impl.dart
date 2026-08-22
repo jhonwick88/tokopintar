@@ -1,19 +1,29 @@
 import '../../domain/repositories/audit_repository.dart';
-import '../datasources/firestore_client.dart';
+import '../datasources/api_client.dart';
 import '../models/audit_log_model.dart';
+import 'package:uuid/uuid.dart';
 
 class AuditRepositoryImpl implements AuditRepository {
-  final FirestoreClient _firestoreClient;
+  final ApiClient _apiClient;
+  final Uuid _uuid = const Uuid();
 
-  AuditRepositoryImpl(this._firestoreClient);
+  AuditRepositoryImpl(this._apiClient);
 
   @override
   Future<void> logActivity(String userId, String username, String action, String details) {
-    return _firestoreClient.logActivity(userId, username, action, details);
+    final logModel = AuditLogModel(
+      id: _uuid.v4(),
+      timestamp: DateTime.now(),
+      userId: userId,
+      username: username,
+      action: action,
+      details: details,
+    );
+    return _apiClient.logActivity(logModel);
   }
 
   @override
   Future<List<AuditLogModel>> getAuditLogs() {
-    return _firestoreClient.getAuditLogs();
+    return _apiClient.getAuditLogs();
   }
 }

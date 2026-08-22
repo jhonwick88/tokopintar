@@ -2,7 +2,10 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
+import '../../data/models/settings_model.dart';
 import '../providers/auth_provider.dart';
+import '../providers/settings_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -14,6 +17,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final List<String> _pin = [];
   final int _pinLength = 4;
+  bool _isDialogOpen = false;
 
   @override
   void initState() {
@@ -28,6 +32,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   bool _handleGlobalKeyEvent(KeyEvent event) {
+    if (_isDialogOpen) return false; // Let text field handle input
     if (event is! KeyDownEvent) return false;
 
     final key = event.logicalKey;
@@ -106,9 +111,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  void _showServerUrlDialog(BuildContext context, SettingsModel settings, WidgetRef ref) async {
+    setState(() => _isDialogOpen = true);
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return _ServerUrlDialog(
+          initialUrl: settings.restApiUrl,
+          onSave: (newUrl) async {
+            if (newUrl.isNotEmpty) {
+              final updated = settings.copyWith(restApiUrl: newUrl);
+              await ref.read(settingsNotifierProvider.notifier).updateSettings(updated);
+            }
+          },
+        );
+      },
+    );
+    if (mounted) setState(() => _isDialogOpen = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
+    final settings = ref.watch(settingsNotifierProvider);
 
     return Scaffold(
       body: Stack(
@@ -142,6 +168,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
               child: const SizedBox(),
+            ),
+          ),
+          Positioned(
+            top: 40,
+            right: 20,
+            child: Tooltip(
+              message: 'Konfigurasi Darurat (Ubah URL Server)',
+              child: IconButton(
+                icon: Icon(Icons.settings_ethernet, size: 28, color: Theme.of(context).colorScheme.primary.withOpacity(0.6)),
+                onPressed: () => _showServerUrlDialog(context, settings, ref),
+              ),
             ),
           ),
           Center(
@@ -182,13 +219,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: 16),
                     // Header text
-                    const Text(
-                      'Toko Pintar POS',
-                      style: TextStyle(
+                    Text(
+                      settings.shopName.isNotEmpty ? settings.shopName : 'Toko Pintar POS',
+                      style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.5,
                       ),
+                      textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -357,6 +395,168 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ServerUrlDialog extends StatefulWidget {
+  final String initialUrl;
+  final Future<void> Function(String) onSave;
+
+  const _ServerUrlDialog({required this.initialUrl, required this.onSave});
+
+  @override
+  State<_ServerUrlDialog> createState() => _ServerUrlDialogState();
+}
+
+class _ServerUrlDialogState extends State<_ServerUrlDialog> {
+  late TextEditingController _controller;
+  bool _isTesting = false;
+  bool _isSaving = false;
+  String? _testResult;
+  bool _testSuccess = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialUrl);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _testConnection() async {
+    final url = _controller.text.trim();
+    if (url.isEmpty) return;
+
+    setState(() {
+      _isTesting = true;
+      _testResult = null;
+      _testSuccess = false;
+    });
+
+    try {
+      final dio = Dio(BaseOptions(
+        baseUrl: url,
+        connectTimeout: const Duration(seconds: 3),
+        receiveTimeout: const Duration(seconds: 3),
+      ));
+      final response = await dio.get('/api/company');
+      setState(() {
+        _testSuccess = response.statusCode == 200;
+        _testResult = _testSuccess ? 'Koneksi Berhasil!' : 'Koneksi gagal (Status: ${response.statusCode})';
+      });
+    } catch (e) {
+      setState(() {
+        _testSuccess = false;
+        _testResult = 'Gagal terhubung ke server.';
+      });
+    } finally {
+      setState(() {
+        _isTesting = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Row(
+        children: [
+          Icon(Icons.warning_amber_rounded, color: Colors.orange),
+          SizedBox(width: 10),
+          Text('Pengaturan Darurat'),
+        ],
+      ),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('Gunakan menu ini jika Anda tidak bisa login karena aplikasi terhubung ke IP/URL Server yang salah.'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _controller,
+              decoration: const InputDecoration(
+                labelText: 'URL Server API',
+                hintText: 'http://192.168.x.x:8080',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.link),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _isTesting || _isSaving ? null : _testConnection,
+                    icon: _isTesting
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.wifi_find),
+                    label: const Text('Tes Koneksi'),
+                  ),
+                ),
+              ],
+            ),
+            if (_testResult != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _testSuccess ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _testSuccess ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _testSuccess ? Icons.check_circle : Icons.error,
+                      color: _testSuccess ? Colors.green : Colors.red,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _testResult!,
+                        style: TextStyle(
+                          color: _testSuccess ? Colors.green[700] : Colors.red[700],
+                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isTesting || _isSaving ? null : () => Navigator.pop(context),
+          child: const Text('Batal'),
+        ),
+        ElevatedButton(
+          onPressed: _isTesting || _isSaving
+              ? null
+              : () async {
+                  setState(() => _isSaving = true);
+                  await widget.onSave(_controller.text.trim());
+                  if (context.mounted) Navigator.pop(context);
+                },
+          child: _isSaving
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Text('Simpan URL'),
+        ),
+      ],
     );
   }
 }
