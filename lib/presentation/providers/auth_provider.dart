@@ -53,7 +53,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
         return false;
       }
     } catch (e) {
-      state = AuthState(errorMessage: 'Gagal login: $e', isLoading: false);
+      String errorStr = e.toString().toLowerCase();
+      String errMsg = 'Gagal login: $e';
+      if (errorStr.contains('connection') || errorStr.contains('timeout') || errorStr.contains('dioexception') || errorStr.contains('socketexception') || errorStr.contains('network')) {
+        errMsg = 'Koneksi gagal. Pastikan aplikasi server sudah berjalan.';
+      }
+      state = AuthState(errorMessage: errMsg, isLoading: false);
       return false;
     }
   }
