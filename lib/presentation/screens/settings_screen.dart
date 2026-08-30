@@ -630,7 +630,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           child: _buildTextField(
                             controller: _apiUrlController,
                             label: 'Base URL API Golang',
-                            hint: 'http://localhost:8080',
+                            hint: 'http://localhost:8181',
                             validator: (val) => val!.isEmpty ? 'URL REST API wajib diisi' : null,
                           ),
                         ),

@@ -1,3 +1,4 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
 import '../../domain/repositories/settings_repository.dart';
@@ -11,10 +12,15 @@ class SettingsRepositoryImpl implements SettingsRepository {
     final prefs = await SharedPreferences.getInstance();
     
     // 1. Get local rest api url
-    final localUrl = prefs.getString('local_rest_api_url') ?? 'http://localhost:8080';
+    final localUrl = prefs.getString('local_rest_api_url') ?? dotenv.env['API_BASE_URL'] ?? 'http://localhost:8181';
     
     // 2. Fetch global settings from REST API manually here to avoid circular Riverpod deps
-    SettingsModel globalSettings = SettingsModel(restApiUrl: localUrl);
+    SettingsModel globalSettings = SettingsModel(
+      restApiUrl: localUrl,
+      shopName: dotenv.env['SHOP_NAME'] ?? 'Toko Pintar',
+      shopAddress: dotenv.env['SHOP_ADDRESS'] ?? 'Jl. Kaliurang KM 5, Yogyakarta',
+      shopPhone: dotenv.env['SHOP_PHONE'] ?? '081234567890',
+    );
     try {
         final dio = Dio(BaseOptions(baseUrl: localUrl, connectTimeout: const Duration(seconds: 3)));
         final response = await dio.get('/api/company');

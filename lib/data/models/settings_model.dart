@@ -1,3 +1,4 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 class SettingsModel {
   final String shopName;
   final String shopAddress;
@@ -27,7 +28,8 @@ class SettingsModel {
     this.shopPhone = '081234567890',
     this.receiptHeader = 'Selamat Datang di Toko Pintar!',
     this.receiptFooter = 'Terima Kasih atas Kunjungan Anda',
-    this.restApiUrl = 'http://localhost:8080',
+    // this.restApiUrl will be initialized in the constructor body if empty
+    this.restApiUrl = '',
     this.printerIp = '192.168.1.100',
     this.printerPort = 9100,
     this.printerType = 'LAN',
@@ -45,12 +47,12 @@ class SettingsModel {
 
   factory SettingsModel.fromJson(Map<String, dynamic> json) {
     return SettingsModel(
-      shopName: json['shop_name'] as String? ?? 'Toko Pintar',
-      shopAddress: json['shop_address'] as String? ?? 'Jl. Kaliurang KM 5, Yogyakarta',
-      shopPhone: json['shop_phone'] as String? ?? '081234567890',
+      shopName: json['shop_name'] as String? ?? dotenv.env['SHOP_NAME'] ?? 'Toko Pintar',
+      shopAddress: json['shop_address'] as String? ?? dotenv.env['SHOP_ADDRESS'] ?? 'Jl. Kaliurang KM 5, Yogyakarta',
+      shopPhone: json['shop_phone'] as String? ?? dotenv.env['SHOP_PHONE'] ?? '081234567890',
       receiptHeader: json['receipt_header'] as String? ?? 'Selamat Datang di Toko Pintar!',
       receiptFooter: json['receipt_footer'] as String? ?? 'Terima Kasih atas Kunjungan Anda',
-      restApiUrl: json['rest_api_url'] as String? ?? 'http://localhost:8080',
+      restApiUrl: json['rest_api_url'] as String? ?? dotenv.env['API_BASE_URL'] ?? 'http://localhost:8181',
       printerIp: json['printer_ip'] as String? ?? '192.168.1.100',
       printerPort: json['printer_port'] as int? ?? 9100,
       printerType: json['printer_type'] as String? ?? 'LAN',

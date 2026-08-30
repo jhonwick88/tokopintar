@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../presentation/providers/auth_provider.dart';
+import '../../presentation/providers/license_provider.dart';
+import '../../presentation/screens/activation_screen.dart';
 import '../../presentation/screens/dashboard_screen.dart';
 import '../../presentation/screens/login_screen.dart';
 import '../../presentation/screens/pos_screen.dart';
@@ -11,25 +13,48 @@ import '../../presentation/screens/reconciliation_analysis_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authNotifierProvider);
+  final licenseState = ref.watch(licenseProvider);
 
   return GoRouter(
-    initialLocation: '/login',
+    initialLocation: '/activation',
     redirect: (context, state) {
+      if (!licenseState.hasInitialized) {
+        return null;
+      }
+
+      final isActivated = licenseState.isActivated;
+      final isActivating = state.matchedLocation == '/activation';
+
+      if (!isActivated && !isActivating) {
+        return '/activation';
+      }
+
+      if (isActivated && isActivating) {
+        return '/login';
+      }
+
       final isLoggedIn = authState.currentUser != null;
       final isLoggingIn = state.matchedLocation == '/login';
 
-      if (!isLoggedIn && !isLoggingIn) {
-        return '/login';
+      if (isActivated) {
+        if (!isLoggedIn && !isLoggingIn && !isActivating) {
+          return '/login';
+        }
+        if (isLoggedIn && isLoggingIn) {
+          return '/pos'; 
+        }
       }
-      if (isLoggedIn && isLoggingIn) {
-        return '/pos'; // Redirect to POS screen after successful login
-      }
+
       if (state.matchedLocation == '/reconciliation-analysis' && authState.currentUser?.role != 'admin') {
         return '/pos';
       }
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/activation',
+        builder: (context, state) => const ActivationScreen(),
+      ),
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),

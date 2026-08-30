@@ -217,9 +217,13 @@ class ApiClient {
 
   // --- Sales ---
 
-  Future<List<SaleModel>> getSalesHistory() async {
+  Future<List<SaleModel>> getSalesHistory({String? startDate, String? endDate}) async {
     try {
-      final response = await _dio.get('/api/sales');
+      final queryParams = <String, dynamic>{'limit': '999999'}; // Bypass pagination for accurate summary
+      if (startDate != null) queryParams['start_date'] = startDate;
+      if (endDate != null) queryParams['end_date'] = endDate;
+
+      final response = await _dio.get('/api/sales', queryParameters: queryParams);
       if (response.statusCode == 200 && response.data != null) {
         final success = response.data['success'] as bool? ?? false;
         if (success) {
@@ -271,7 +275,7 @@ class ApiClient {
 
   Future<List<CashReconciliationModel>> getCashReconciliations() async {
     try {
-      final response = await _dio.get('/api/cash-reconciliations');
+      final response = await _dio.get('/api/cash-reconciliations', queryParameters: {'limit': '999999'}); // Bypass pagination for accurate summary
       if (response.statusCode == 200 && response.data != null) {
         final success = response.data['success'] as bool? ?? false;
         if (success) {

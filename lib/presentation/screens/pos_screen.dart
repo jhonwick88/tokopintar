@@ -10,6 +10,7 @@ import '../../domain/services/barcode_service.dart';
 import '../../data/models/item_model.dart';
 import '../providers/items_provider.dart';
 import '../providers/pos_provider.dart';
+import '../providers/license_provider.dart';
 import '../providers/sales_history_provider.dart';
 import '../widgets/camera_scanner_dialog.dart';
 import '../widgets/app_permissions_dialog.dart';

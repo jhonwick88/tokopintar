@@ -15,9 +15,10 @@ class SalesRepositoryImpl implements SalesRepository {
 
   @override
   Future<List<SaleModel>> getSalesHistory({DateTime? startDate, DateTime? endDate}) {
-    // Note: Filtering by date is not currently implemented in the Go API directly via query params,
-    // so we return all for now or we could filter client-side if needed.
-    return _apiClient.getSalesHistory();
+    return _apiClient.getSalesHistory(
+      startDate: startDate?.toIso8601String(),
+      endDate: endDate?.toIso8601String(),
+    );
   }
 
   @override

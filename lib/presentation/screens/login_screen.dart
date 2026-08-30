@@ -484,7 +484,7 @@ class _ServerUrlDialogState extends State<_ServerUrlDialog> {
               controller: _controller,
               decoration: const InputDecoration(
                 labelText: 'URL Server API',
-                hintText: 'http://192.168.x.x:8080',
+                hintText: 'http://192.168.x.x:8181',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.link),
               ),
