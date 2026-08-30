@@ -20,7 +20,12 @@ class SettingsModel {
   final int printerPaperSize; // 58 or 80
   final int printReceiptCopies;
   final bool autoPrintOnCheckout;
+
   final bool enableFloatingCalculator;
+  final bool autoBackupEnabled;
+  final int autoBackupIntervalDays;
+  final String autoBackupLocation;
+  final DateTime? lastBackupDate;
 
   SettingsModel({
     this.shopName = 'Toko Pintar',
@@ -42,7 +47,12 @@ class SettingsModel {
     this.printerPaperSize = 58,
     this.printReceiptCopies = 1,
     this.autoPrintOnCheckout = false,
+
     this.enableFloatingCalculator = true,
+    this.autoBackupEnabled = false,
+    this.autoBackupIntervalDays = 1,
+    this.autoBackupLocation = '',
+    this.lastBackupDate,
   });
 
   factory SettingsModel.fromJson(Map<String, dynamic> json) {
@@ -65,7 +75,12 @@ class SettingsModel {
       printerPaperSize: json['printer_paper_size'] as int? ?? 58,
       printReceiptCopies: json['print_receipt_copies'] as int? ?? 1,
       autoPrintOnCheckout: json['auto_print_on_checkout'] as bool? ?? false,
+
       enableFloatingCalculator: json['enable_floating_calculator'] as bool? ?? true,
+      autoBackupEnabled: json['auto_backup_enabled'] as bool? ?? false,
+      autoBackupIntervalDays: json['auto_backup_interval_days'] as int? ?? 1,
+      autoBackupLocation: json['auto_backup_location'] as String? ?? '',
+      lastBackupDate: json['last_backup_date'] != null ? DateTime.tryParse(json['last_backup_date']) : null,
     );
   }
 
@@ -89,7 +104,12 @@ class SettingsModel {
       'printer_paper_size': printerPaperSize,
       'print_receipt_copies': printReceiptCopies,
       'auto_print_on_checkout': autoPrintOnCheckout,
+
       'enable_floating_calculator': enableFloatingCalculator,
+      'auto_backup_enabled': autoBackupEnabled,
+      'auto_backup_interval_days': autoBackupIntervalDays,
+      'auto_backup_location': autoBackupLocation,
+      'last_backup_date': lastBackupDate?.toIso8601String(),
     };
   }
 
@@ -112,7 +132,12 @@ class SettingsModel {
     int? printerPaperSize,
     int? printReceiptCopies,
     bool? autoPrintOnCheckout,
+
     bool? enableFloatingCalculator,
+    bool? autoBackupEnabled,
+    int? autoBackupIntervalDays,
+    String? autoBackupLocation,
+    DateTime? lastBackupDate,
   }) {
     return SettingsModel(
       shopName: shopName ?? this.shopName,
@@ -133,7 +158,12 @@ class SettingsModel {
       printerPaperSize: printerPaperSize ?? this.printerPaperSize,
       printReceiptCopies: printReceiptCopies ?? this.printReceiptCopies,
       autoPrintOnCheckout: autoPrintOnCheckout ?? this.autoPrintOnCheckout,
+
       enableFloatingCalculator: enableFloatingCalculator ?? this.enableFloatingCalculator,
+      autoBackupEnabled: autoBackupEnabled ?? this.autoBackupEnabled,
+      autoBackupIntervalDays: autoBackupIntervalDays ?? this.autoBackupIntervalDays,
+      autoBackupLocation: autoBackupLocation ?? this.autoBackupLocation,
+      lastBackupDate: lastBackupDate ?? this.lastBackupDate,
     );
   }
 }

@@ -435,4 +435,26 @@ class ApiClient {
       rethrow;
     }
   }
+  // ================= SYSTEM (BACKUP/RESTORE) =================
+
+  Future<void> downloadBackup(String savePath) async {
+    try {
+      await _dio.download('/api/backup', savePath);
+    } on DioException catch (e) {
+      dev.log('API Error: ');
+    }
+  }
+
+  Future<String> restoreBackup(String filePath) async {
+    try {
+      final formData = FormData.fromMap({
+        'database': await MultipartFile.fromFile(filePath, filename: 'toko_pintar.db'),
+      });
+      final response = await _dio.post('/api/restore', data: formData);
+      return response.data['message'] ?? 'Restore berhasil';
+    } on DioException catch (e) {
+      dev.log('API Error: ');
+      throw Exception('Gagal melakukan restore');
+    }
+  }
 }

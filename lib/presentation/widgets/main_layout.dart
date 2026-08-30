@@ -3,6 +3,9 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
+import '../providers/settings_provider.dart';
+import '../providers/license_provider.dart';
+import 'dart:io';
 import '../providers/items_provider.dart';
 import '../providers/pos_provider.dart';
 import '../screens/mobile_cart_screen.dart';
@@ -35,6 +38,9 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAutoBackup();
+    });
     final query = ref.read(itemsNotifierProvider).searchQuery;
     _searchController = TextEditingController(text: query);
   }
@@ -44,6 +50,57 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
     _searchController.dispose();
     _audioPlayer.dispose();
     super.dispose();
+  }
+
+  void _checkAutoBackup() async {
+    final settings = ref.read(settingsNotifierProvider);
+    final features = ref.read(licenseProvider).features;
+    
+    // Check if auto backup is enabled and license is PRO
+    if (settings.autoBackupEnabled && features != null && features['automatic_backup'] == true) {
+      if (settings.autoBackupLocation.isNotEmpty) {
+        final lastBackup = settings.lastBackupDate;
+        final now = DateTime.now();
+        
+        bool shouldBackup = false;
+        if (lastBackup == null) {
+          shouldBackup = true;
+        } else {
+          final difference = now.difference(lastBackup).inDays;
+          if (difference >= settings.autoBackupIntervalDays) {
+            shouldBackup = true;
+          }
+        }
+        
+        if (shouldBackup) {
+          try {
+            final apiClient = ref.read(apiClientProvider);
+            final fileName = 'tokopintar_autobackup_${now.millisecondsSinceEpoch}.db';
+            final savePath = '${settings.autoBackupLocation}\\$fileName';
+            
+            await apiClient.downloadBackup(savePath);
+            
+            // Update last backup date
+            ref.read(settingsNotifierProvider.notifier).updateSettings(
+              settings.copyWith(lastBackupDate: now),
+            );
+            
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Auto-Backup Berhasil Disimpan'),
+                  backgroundColor: Colors.green,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            }
+          } catch (e) {
+            // Silently fail or log
+            debugPrint('Auto backup failed: ');
+          }
+        }
+      }
+    }
   }
 
   void _handleVoiceSearchResult(String words) async {
