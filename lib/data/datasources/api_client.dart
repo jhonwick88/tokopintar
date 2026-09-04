@@ -1,13 +1,18 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'dart:developer' as dev;
+import '../../utils/web_download.dart';
 import '../models/category_model.dart';
 import '../models/item_model.dart';
+import '../models/unit_model.dart';
 import '../models/sale_model.dart';
 import '../models/cash_reconciliation_model.dart';
 import '../models/audit_log_model.dart';
 import '../models/quick_item_model.dart';
 import '../models/user_model.dart';
 import '../models/settings_model.dart';
+import '../models/supplier_model.dart';
+import '../models/stock_ledger_model.dart';
 
 class ApiClient {
   final Dio _dio;
@@ -151,20 +156,25 @@ class ApiClient {
     }
   }
 
-  Future<ItemModel> updateItemKeys({
-    required String originalItemNo,
-    required String newItemNo,
-    required String itemUPC,
-    required double price,
-    required String itemName,
-  }) async {
+  Future<ItemModel> updateItem(String originalItemNo, ItemModel item) async {
     try {
       final response = await _dio.put('/api/items/$originalItemNo', data: {
-        'new_itemno': newItemNo,
-        'itemupc': itemUPC,
-        'price': price,
-        'itemname': itemName,
+        'new_itemno': item.itemNo,
+        'itemupc': item.itemUPC,
+        'def_unitprice1': item.price,
+        'def_unitprice2': item.defUnitPrice2,
+        'def_unitprice3': item.defUnitPrice3,
+        'itemname': item.itemName,
+        'itemname_short': item.itemNameShort,
+        'notes': item.notes,
+        'attribute': item.attribute,
+        'unit1': item.unit1,
+        'unit2': item.unit2,
+        'unit3': item.unit3,
+        'ratio2': item.ratio2,
+        'ratio3': item.ratio3,
       });
+
       if (response.statusCode == 200 && response.data != null) {
         final success = response.data['success'] as bool? ?? false;
         if (success) {
@@ -174,30 +184,111 @@ class ApiClient {
           }
         }
       }
-      throw Exception(response.data?['message'] ?? 'Gagal memperbarui barcode dan SKU produk');
+      throw Exception(response.data?['message'] ?? 'Gagal memperbarui produk');
     } catch (e) {
-      dev.log('Error in updateItemKeys: $e');
+      dev.log('Error in updateItem: $e');
+      throw Exception('Gagal memperbarui produk: $e');
+    }
+  }
+
+  Future<List<StockLedgerModel>> getStockLedger(String itemNo) async {
+    try {
+      final response = await _dio.get('/api/stock-ledger/$itemNo');
+      if (response.statusCode == 200 && response.data != null) {
+        final success = response.data['success'] as bool? ?? false;
+        if (success) {
+          final list = response.data['data'] as List?;
+          if (list != null) {
+            return list.map((e) => StockLedgerModel.fromJson(e as Map<String, dynamic>)).toList();
+          }
+        }
+      }
+      return [];
+    } catch (e) {
+      dev.log('Error in getStockLedger: $e');
       rethrow;
     }
   }
 
-  Future<ItemModel> createItem({
-    required String itemNo,
-    required String itemName,
-    required String itemUPC,
-    required int categoryId,
-    required double price,
-    required double obQuantity,
-  }) async {
+  // --- Supplier APIs ---
+  Future<List<SupplierModel>> getSuppliers() async {
+    try {
+      final response = await _dio.get('/api/suppliers');
+      if (response.statusCode == 200 && response.data != null) {
+        final success = response.data['success'] as bool? ?? false;
+        if (success) {
+          final list = response.data['data'] as List?;
+          if (list != null) {
+            return list.map((e) => SupplierModel.fromJson(e as Map<String, dynamic>)).toList();
+          }
+        }
+      }
+      return [];
+    } catch (e) {
+      dev.log('Error in getSuppliers: $e');
+      rethrow;
+    }
+  }
+
+  Future<bool> createSupplier(SupplierModel supplier) async {
+    try {
+      final response = await _dio.post('/api/suppliers', data: supplier.toJson());
+      if (response.statusCode == 201 && response.data != null) {
+        return response.data['success'] as bool? ?? false;
+      }
+      return false;
+    } catch (e) {
+      dev.log('Error in createSupplier: $e');
+      rethrow;
+    }
+  }
+
+  Future<bool> updateSupplier(SupplierModel supplier) async {
+    try {
+      final response = await _dio.put('/api/suppliers/${supplier.id}', data: supplier.toJson());
+      if (response.statusCode == 200 && response.data != null) {
+        return response.data['success'] as bool? ?? false;
+      }
+      return false;
+    } catch (e) {
+      dev.log('Error in updateSupplier: $e');
+      rethrow;
+    }
+  }
+
+  Future<bool> deleteSupplier(int id) async {
+    try {
+      final response = await _dio.delete('/api/suppliers/$id');
+      if (response.statusCode == 200 && response.data != null) {
+        return response.data['success'] as bool? ?? false;
+      }
+      return false;
+    } catch (e) {
+      dev.log('Error in deleteSupplier: $e');
+      rethrow;
+    }
+  }
+
+  Future<ItemModel> createItem(ItemModel item) async {
     try {
       final response = await _dio.post('/api/items', data: {
-        'itemno': itemNo,
-        'itemname': itemName,
-        'itemupc': itemUPC,
-        'categoryid': categoryId,
-        'price': price,
+        'itemno': item.itemNo,
+        'itemname': item.itemName,
+        'itemname_short': item.itemNameShort,
+        'itemupc': item.itemUPC,
+        'categoryid': item.categoryId,
+        'def_unitprice1': item.price,
+        'def_unitprice2': item.defUnitPrice2,
+        'def_unitprice3': item.defUnitPrice3,
         'itemtype': 0,
-        'obquantity': obQuantity,
+        'obquantity': item.obQuantity,
+        'notes': item.notes,
+        'attribute': item.attribute,
+        'unit1': item.unit1,
+        'unit2': item.unit2,
+        'unit3': item.unit3,
+        'ratio2': item.ratio2,
+        'ratio3': item.ratio3,
       });
       if (response.statusCode == 200 && response.data != null) {
         final success = response.data['success'] as bool? ?? false;
@@ -211,6 +302,55 @@ class ApiClient {
       throw Exception(response.data?['message'] ?? 'Gagal menambahkan produk baru');
     } catch (e) {
       dev.log('Error in createItem: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteItem(String itemNo) async {
+    try {
+      final response = await _dio.delete('/api/items/$itemNo');
+      if (response.statusCode != 200) {
+        throw Exception(response.data?['message'] ?? 'Gagal menghapus produk');
+      }
+    } catch (e) {
+      dev.log('Error in deleteItem: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateStock(String itemNo, double obQuantity, {String? notes}) async {
+    try {
+      final response = await _dio.put(
+        '/api/items/$itemNo/stock',
+        data: {
+          'obquantity': obQuantity,
+          if (notes != null) 'notes': notes,
+        },
+      );
+      if (response.statusCode != 200) {
+        throw Exception(response.data?['message'] ?? 'Gagal memperbarui stok');
+      }
+    } catch (e) {
+      dev.log('Error in updateStock: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<ItemModel>> getItemsByBarcode(String barcode) async {
+    try {
+      final response = await _dio.get('/api/items/barcode/$barcode');
+      if (response.statusCode == 200 && response.data != null) {
+        final success = response.data['success'] as bool? ?? false;
+        if (success) {
+          final list = response.data['data'] as List?;
+          if (list != null) {
+            return list.map((e) => ItemModel.fromJson(e as Map<String, dynamic>)).toList();
+          }
+        }
+      }
+      return [];
+    } catch (e) {
+      dev.log('Error in getItemsByBarcode: $e');
       rethrow;
     }
   }
@@ -441,7 +581,26 @@ class ApiClient {
     try {
       await _dio.download('/api/backup', savePath);
     } on DioException catch (e) {
-      dev.log('API Error: ');
+      dev.log('API Error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> downloadBackupWeb() async {
+    try {
+      final response = await _dio.get(
+        '/api/backup',
+        options: Options(responseType: ResponseType.bytes),
+      );
+      if (response.statusCode == 200) {
+        final bytes = response.data as List<int>;
+        downloadFileWeb(bytes, 'toko_pintar.db');
+      } else {
+        throw Exception('Failed to download backup');
+      }
+    } catch (e) {
+      dev.log('API Error: $e');
+      rethrow;
     }
   }
 
@@ -452,9 +611,66 @@ class ApiClient {
       });
       final response = await _dio.post('/api/restore', data: formData);
       return response.data['message'] ?? 'Restore berhasil';
-    } on DioException catch (e) {
-      dev.log('API Error: ');
-      throw Exception('Gagal melakukan restore');
+    } catch (e) {
+      dev.log('Error in restoreBackup: $e');
+      rethrow;
+    }
+  }
+
+  Future<String> restoreBackupBytes(List<int> bytes, String filename) async {
+    try {
+      final formData = FormData.fromMap({
+        'database': MultipartFile.fromBytes(bytes, filename: filename),
+      });
+      final response = await _dio.post('/api/restore', data: formData);
+      return response.data['message'] ?? 'Restore berhasil';
+    } catch (e) {
+      dev.log('Error in restoreBackupBytes: $e');
+      rethrow;
+    }
+  }
+
+  // Unit Methods
+  Future<List<UnitModel>> getUnits() async {
+    try {
+      final response = await _dio.get('/api/units');
+      final data = response.data['data'] as List;
+      return data.map((json) => UnitModel.fromJson(json)).toList();
+    } catch (e) {
+      dev.log('Error in getUnits: $e');
+      rethrow;
+    }
+  }
+
+  Future<UnitModel> createUnit(String name) async {
+    try {
+      final response = await _dio.post('/api/units', data: {'name': name});
+      return UnitModel.fromJson(response.data['data']);
+    } catch (e) {
+      dev.log('Error in createUnit: $e');
+      rethrow;
+    }
+  }
+
+  Future<UnitModel> updateUnit(int id, String name) async {
+    try {
+      final response = await _dio.put('/api/units/$id', data: {'name': name});
+      return UnitModel.fromJson(response.data['data']);
+    } catch (e) {
+      dev.log('Error in updateUnit: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteUnit(int id) async {
+    try {
+      final response = await _dio.delete('/api/units/$id');
+      if (response.statusCode != 200) {
+        throw Exception('Gagal menghapus satuan');
+      }
+    } catch (e) {
+      dev.log('Error in deleteUnit: $e');
+      rethrow;
     }
   }
 }

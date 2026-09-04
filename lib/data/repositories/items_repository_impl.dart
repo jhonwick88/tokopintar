@@ -34,38 +34,27 @@ class ItemsRepositoryImpl implements ItemsRepository {
   }
 
   @override
-  Future<ItemModel> updateItemKeys({
-    required String originalItemNo,
-    required String newItemNo,
-    required String itemUPC,
-    required double price,
-    required String itemName,
-  }) {
-    return _apiClient.updateItemKeys(
-      originalItemNo: originalItemNo,
-      newItemNo: newItemNo,
-      itemUPC: itemUPC,
-      price: price,
-      itemName: itemName,
-    );
+  Future<ItemModel> updateItem(String originalItemNo, ItemModel item) {
+    return _apiClient.updateItem(originalItemNo, item);
   }
 
   @override
-  Future<ItemModel> createItem({
-    required String itemNo,
-    required String itemName,
-    required String itemUPC,
-    required int categoryId,
-    required double price,
-    required double obQuantity,
-  }) {
-    return _apiClient.createItem(
-      itemNo: itemNo,
-      itemName: itemName,
-      itemUPC: itemUPC,
-      categoryId: categoryId,
-      price: price,
-      obQuantity: obQuantity,
-    );
+  Future<ItemModel> createItem(ItemModel item) {
+    return _apiClient.createItem(item);
+  }
+
+  @override
+  Future<void> deleteItem(String itemNo) {
+    return _apiClient.deleteItem(itemNo);
+  }
+
+  @override
+  Future<void> updateStock(String itemNo, double obQuantity, {String? notes}) async {
+    return await _apiClient.updateStock(itemNo, obQuantity, notes: notes);
+  }
+
+  @override
+  Future<List<ItemModel>> getItemsByBarcode(String barcode) {
+    return _apiClient.getItemsByBarcode(barcode);
   }
 }

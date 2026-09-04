@@ -31,8 +31,20 @@ class SalesHistoryState {
 
   List<SaleModel> get filteredSales {
     final list = sales.where((s) {
-      final matchesQuery = searchQuery.isEmpty || 
+      bool matchesQuery = searchQuery.isEmpty || 
           s.invoiceNo.toLowerCase().contains(searchQuery.toLowerCase());
+          
+      if (!matchesQuery && searchQuery.isNotEmpty) {
+        // Also search in items
+        final query = searchQuery.toLowerCase();
+        for (var item in s.items) {
+          if (item.itemName.toLowerCase().contains(query) || 
+              item.itemNo.toLowerCase().contains(query)) {
+            matchesQuery = true;
+            break;
+          }
+        }
+      }
       
       final matchesPayment = selectedPaymentMethod == 'all' || 
           s.paymentMethod.toLowerCase() == selectedPaymentMethod.toLowerCase();

@@ -27,6 +27,7 @@ class LicenseState {
     bool? isActivated,
     String? token,
     String? machineFingerprint,
+    Map<String, dynamic>? features,
     bool? isLoading,
     String? errorMessage,
     bool? hasInitialized,
@@ -35,6 +36,7 @@ class LicenseState {
       isActivated: isActivated ?? this.isActivated,
       token: token ?? this.token,
       machineFingerprint: machineFingerprint ?? this.machineFingerprint,
+      features: features ?? this.features,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage, 
       hasInitialized: hasInitialized ?? this.hasInitialized,
@@ -57,13 +59,53 @@ class LicenseNotifier extends StateNotifier<LicenseState> {
     }
 
     final token = prefs.getString('license_token');
+    final featuresStr = prefs.getString('license_features');
+    Map<String, dynamic> features = {};
+    if (featuresStr != null) {
+      try {
+        features = jsonDecode(featuresStr);
+      } catch (_) {}
+    }
 
     state = state.copyWith(
       machineFingerprint: fingerprint,
-      token: 'activated',
+      token: token,
       isActivated: token != null && token.isNotEmpty,
+      features: features,
       hasInitialized: true,
     );
+
+    // Refresh from backend to ensure features are up-to-date
+    _fetchStatus();
+  }
+
+  Future<void> _fetchStatus() async {
+    try {
+      final dio = Dio(BaseOptions(
+        baseUrl: 'http://localhost:8181',
+        connectTimeout: const Duration(seconds: 5),
+        receiveTimeout: const Duration(seconds: 3),
+      ));
+      final response = await dio.get('/api/license/status');
+      
+      final bool isActivated = response.data['is_activated'] == true;
+      if (isActivated) {
+        final Map<String, dynamic> features = response.data['features'] ?? {};
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('license_token', 'activated');
+        await prefs.setString('license_features', jsonEncode(features));
+        
+        state = state.copyWith(
+          isActivated: true,
+          token: 'activated',
+          features: features,
+        );
+      } else {
+        await deactivate();
+      }
+    } catch (_) {
+      // If server is down, just use the local cached state
+    }
   }
 
   Future<bool> activate(String licenseKey) async {
@@ -89,6 +131,12 @@ class LicenseNotifier extends StateNotifier<LicenseState> {
       
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('license_token', 'activated');
+      
+      Map<String, dynamic> features = {};
+      if (response.data['features'] != null) {
+        features = response.data['features'];
+        await prefs.setString('license_features', jsonEncode(features));
+      }
 
       state = state.copyWith(isLoading: false);
       
@@ -96,6 +144,7 @@ class LicenseNotifier extends StateNotifier<LicenseState> {
         state = state.copyWith(
           token: 'activated',
           isActivated: true,
+          features: features,
         );
       });
 
@@ -122,7 +171,8 @@ class LicenseNotifier extends StateNotifier<LicenseState> {
   Future<void> deactivate() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('license_token');
-    state = state.copyWith(isActivated: false, token: null);
+    await prefs.remove('license_features');
+    state = state.copyWith(isActivated: false, token: null, features: {});
   }
 }
 

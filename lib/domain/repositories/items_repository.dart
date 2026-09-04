@@ -7,19 +7,9 @@ abstract class ItemsRepository {
   Future<ItemModel?> getItemByNo(String itemNo);
   Future<List<ItemModel>> searchItems(String query, {required int page, int limit = 50});
   Future<List<ItemModel>> getItemsByCategory(int categoryId, {required int page, int limit = 50});
-  Future<ItemModel> updateItemKeys({
-    required String originalItemNo,
-    required String newItemNo,
-    required String itemUPC,
-    required double price,
-    required String itemName,
-  });
-  Future<ItemModel> createItem({
-    required String itemNo,
-    required String itemName,
-    required String itemUPC,
-    required int categoryId,
-    required double price,
-    required double obQuantity,
-  });
+  Future<ItemModel> updateItem(String originalItemNo, ItemModel item);
+  Future<ItemModel> createItem(ItemModel item);
+  Future<void> deleteItem(String itemNo);
+  Future<void> updateStock(String itemNo, double obQuantity, {String? notes});
+  Future<List<ItemModel>> getItemsByBarcode(String barcode);
 }

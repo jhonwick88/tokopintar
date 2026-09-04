@@ -347,47 +347,46 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
     await loadItems(refresh: true);
   }
 
-  Future<ItemModel?> fetchItemByBarcode(String barcode) async {
-    // 1. Check local state cache first
-    for (var item in state.items) {
-      if (item.itemUPC == barcode || item.itemNo == barcode) {
-        return item;
-      }
+  Future<List<ItemModel>> fetchItemsByBarcode(String barcode) async {
+    // 1. Try local exact matches first
+    final localMatches = state.items.where((item) => item.itemUPC == barcode || item.itemNo == barcode).toList();
+    if (localMatches.isNotEmpty) {
+      return localMatches;
     }
     
-    // 2. Try fetching by SKU/itemNo directly
+    // 2. Try fetching list by UPC/itemNo from backend
     try {
-      final item = await _itemsRepository.getItemByNo(barcode);
-      if (item != null) return item;
+      final results = await _itemsRepository.getItemsByBarcode(barcode);
+      if (results.isNotEmpty) return results;
     } catch (_) {}
     
-    // 3. Search database using REST API search endpoint (searches itemUPC, itemNo, itemName)
-    try {
-      final results = await _itemsRepository.searchItems(barcode, page: 1, limit: 10);
-      for (var item in results) {
-        if (item.itemUPC == barcode || item.itemNo == barcode) {
-          return item;
-        }
-      }
-    } catch (_) {}
-    
+    return [];
+  }
+
+  Future<ItemModel?> fetchItemByBarcode(String barcode) async {
+    final results = await fetchItemsByBarcode(barcode);
+    if (results.isNotEmpty) {
+      return results.first;
+    }
     return null;
   }
 
-  Future<ItemModel> updateItemKeys({
-    required String originalItemNo,
-    required String newItemNo,
-    required String itemUPC,
-    required double price,
-    required String itemName,
-  }) async {
-    final updated = await _itemsRepository.updateItemKeys(
-      originalItemNo: originalItemNo,
-      newItemNo: newItemNo,
-      itemUPC: itemUPC,
-      price: price,
-      itemName: itemName,
-    );
+  Future<void> deleteItem(String itemNo) async {
+    await _itemsRepository.deleteItem(itemNo);
+    state = state.copyWith(items: state.items.where((item) => item.itemNo != itemNo).toList());
+  }
+
+  Future<void> updateStock(String itemNo, double obQuantity, {String? notes}) async {
+    try {
+      await _itemsRepository.updateStock(itemNo, obQuantity, notes: notes);
+      await loadItems(refresh: true);
+    } catch (e) {
+      throw Exception('Gagal memperbarui stok: $e');
+    }
+  }
+
+  Future<ItemModel> updateItem(String originalItemNo, ItemModel item) async {
+    final updated = await _itemsRepository.updateItem(originalItemNo, item);
 
     final updatedList = state.items.map((item) {
       if (item.itemNo == originalItemNo) {
@@ -400,22 +399,8 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
     return updated;
   }
 
-  Future<ItemModel> createItem({
-    required String itemNo,
-    required String itemName,
-    required String itemUPC,
-    required int categoryId,
-    required double price,
-    required double obQuantity,
-  }) async {
-    final newItem = await _itemsRepository.createItem(
-      itemNo: itemNo,
-      itemName: itemName,
-      itemUPC: itemUPC,
-      categoryId: categoryId,
-      price: price,
-      obQuantity: obQuantity,
-    );
+  Future<ItemModel> createItem(ItemModel item) async {
+    final newItem = await _itemsRepository.createItem(item);
 
     final newList = [...state.items, newItem];
     state = state.copyWith(items: newList);

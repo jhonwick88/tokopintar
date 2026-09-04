@@ -8,6 +8,8 @@ import '../../data/models/sale_model.dart';
 import '../../domain/services/printer_service.dart';
 import '../widgets/transaction_success_dialog.dart';
 import 'pos_screen.dart';
+import '../../core/utils/unit_helper.dart';
+import '../providers/unit_provider.dart';
 
 class MobileCartScreen extends ConsumerStatefulWidget {
   const MobileCartScreen({super.key});
@@ -348,6 +350,7 @@ class _MobileCartScreenState extends ConsumerState<MobileCartScreen> {
   @override
   Widget build(BuildContext context) {
     final posState = ref.watch(posNotifierProvider);
+    final unitsState = ref.watch(unitsProvider);
     final grandTotal = posState.grandTotal;
     final change = _cashPaid - grandTotal;
 

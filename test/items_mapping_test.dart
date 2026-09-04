@@ -38,48 +38,35 @@ class MockItemsRepository implements ItemsRepository {
   }
 
   @override
-  Future<ItemModel> updateItemKeys({
-    required String originalItemNo,
-    required String newItemNo,
-    required String itemUPC,
-    required double price,
-    required String itemName,
-  }) async {
-    final idx = db.indexWhere((it) => it.itemNo == originalItemNo);
-    if (idx < 0) {
-      throw Exception('Not found');
-    }
-    final existing = db[idx];
-    final updated = ItemModel(
-      itemNo: newItemNo,
-      itemUPC: itemUPC,
-      itemName: itemName,
-      categoryId: existing.categoryId,
-      price: price,
-    );
-    db[idx] = updated;
-    return updated;
+  Future<List<ItemModel>> getItemsByBarcode(String barcode) async {
+    return db.where((it) => it.itemUPC == barcode).toList();
   }
 
   @override
-  Future<ItemModel> createItem({
-    required String itemNo,
-    required String itemName,
-    required String itemUPC,
-    required int categoryId,
-    required double price,
-    required double obQuantity,
-  }) async {
-    final newItem = ItemModel(
-      itemNo: itemNo,
-      itemName: itemName,
-      itemUPC: itemUPC,
-      categoryId: categoryId,
-      price: price,
-      obQuantity: obQuantity,
-    );
-    db.add(newItem);
-    return newItem;
+  Future<void> deleteItem(String itemNo) async {
+    db.removeWhere((it) => it.itemNo == itemNo);
+  }
+
+  @override
+  Future<void> updateStock(String itemNo, double quantity, {String? notes}) async {
+    final idx = db.indexWhere((it) => it.itemNo == itemNo);
+    if (idx >= 0) {
+      db[idx] = db[idx].copyWith(obQuantity: quantity);
+    }
+  }
+
+  @override
+  Future<ItemModel> updateItem(String originalItemNo, ItemModel item) async {
+    final idx = db.indexWhere((it) => it.itemNo == originalItemNo);
+    if (idx < 0) throw Exception('Not found');
+    db[idx] = item;
+    return item;
+  }
+
+  @override
+  Future<ItemModel> createItem(ItemModel item) async {
+    db.add(item);
+    return item;
   }
 }
 
@@ -109,15 +96,18 @@ void main() {
       notifier = ItemsNotifier(mockRepo);
     });
 
-    test('updateItemKeys successfully updates SKU and Barcode in repository and local cache state', () async {
+    test('updateItem successfully updates SKU and Barcode in repository and local cache state', () async {
       notifier.state = notifier.state.copyWith(items: mockRepo.db);
 
-      final result = await notifier.updateItemKeys(
-        originalItemNo: 'SKU_1',
-        newItemNo: 'SKU_1_NEW',
-        itemUPC: '8991111',
-        price: 15000,
-        itemName: 'Item Satu Baru',
+      final originalItem = mockRepo.db.first;
+      final result = await notifier.updateItem(
+        'SKU_1',
+        originalItem.copyWith(
+          itemNo: 'SKU_1_NEW',
+          itemUPC: '8991111',
+          price: 15000,
+          itemName: 'Item Satu Baru',
+        ),
       );
 
       expect(result.itemNo, 'SKU_1_NEW');
@@ -137,12 +127,14 @@ void main() {
       notifier.state = notifier.state.copyWith(items: mockRepo.db);
 
       final result = await notifier.createItem(
-        itemNo: 'SKU_NEW_PROD',
-        itemName: 'Item Baru',
-        itemUPC: '8993333',
-        categoryId: 2,
-        price: 35000,
-        obQuantity: 10,
+        ItemModel(
+          itemNo: 'SKU_NEW_PROD',
+          itemName: 'Item Baru',
+          itemUPC: '8993333',
+          categoryId: 2,
+          price: 35000,
+          obQuantity: 10,
+        ),
       );
 
       expect(result.itemNo, 'SKU_NEW_PROD');

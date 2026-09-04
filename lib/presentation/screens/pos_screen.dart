@@ -24,6 +24,8 @@ import '../widgets/voice_search_button.dart';
 import '../widgets/floating_calculator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/settings_provider.dart';
+import '../../core/utils/unit_helper.dart';
+import '../providers/unit_provider.dart';
 
 class PosScreen extends ConsumerStatefulWidget {
   const PosScreen({super.key});
@@ -129,13 +131,55 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       debugPrint('Gagal memutar suara scan: $e');
     }
 
-    final item = await ref.read(itemsNotifierProvider.notifier).fetchItemByBarcode(barcode);
-    if (item != null) {
+    final items = await ref.read(itemsNotifierProvider.notifier).fetchItemsByBarcode(barcode);
+    
+    if (items.isEmpty) {
+      _showUnregisteredBarcodeDialog(barcode);
+    } else if (items.length == 1) {
+      final item = items.first;
       ref.read(posNotifierProvider.notifier).addToCart(item);
       _showSuccessToast('Produk ${item.itemName}');
     } else {
-      _showUnregisteredBarcodeDialog(barcode);
+      // Multiple items found for the same barcode
+      _showDuplicateBarcodeSelectionDialog(barcode, items);
     }
+  }
+
+  void _showDuplicateBarcodeSelectionDialog(String barcode, List<ItemModel> items) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Pilih Produk (Barcode: $barcode)'),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 300,
+            child: ListView.builder(
+              itemCount: items.length,
+              itemBuilder: (context, index) {
+                final item = items[index];
+                return ListTile(
+                  title: Text(item.itemName),
+                  subtitle: Text('SKU: ${item.itemNo}'),
+                  trailing: const Icon(Icons.add_shopping_cart),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    ref.read(posNotifierProvider.notifier).addToCart(item);
+                    _showSuccessToast('Produk ${item.itemName}');
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Batal'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _showSuccessToast(String msg) {
@@ -621,6 +665,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
   void _openResumeDialog() {
     final posState = ref.watch(posNotifierProvider);
+    final unitsState = ref.watch(unitsProvider);
     if (posState.heldCarts.isEmpty) {
       _showErrorToast('Tidak ada transaksi yang ditangguhkan.');
       return;
@@ -753,49 +798,89 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     final posNotifier = ref.read(posNotifierProvider.notifier);
     final noteController = TextEditingController(text: cartItem.note);
     final discController = TextEditingController(text: cartItem.discount.toInt().toString());
+    int tempSelectedUnit = cartItem.selectedUnit;
 
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text(cartItem.item.itemName),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: noteController,
-                decoration: const InputDecoration(
-                  labelText: 'Catatan Item',
-                  hintText: 'Level pedas, ukuran, dll.',
-                ),
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return AlertDialog(
+              title: Text(cartItem.item.itemName),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<int>(
+                    value: tempSelectedUnit,
+                    decoration: const InputDecoration(labelText: 'Pilih Satuan'),
+                    items: [
+                      if (cartItem.item.unit1.isNotEmpty)
+                        DropdownMenuItem(
+                          value: 1,
+                          child: Text('${getUnitName(cartItem.item.unit1, ref.read(unitsProvider))} (1) - ${_formatRupiah(cartItem.item.price)}'),
+                        )
+                      else
+                        DropdownMenuItem(
+                          value: 1,
+                          child: Text('PCS (1) - ${_formatRupiah(cartItem.item.price)}'),
+                        ),
+                      if (cartItem.item.unit2.isNotEmpty && cartItem.item.ratio2 > 0)
+                        DropdownMenuItem(
+                          value: 2,
+                          child: Text('${cartItem.item.unit2} (${cartItem.item.ratio2.toInt()}) - ${_formatRupiah(cartItem.item.defUnitPrice2)}'),
+                        ),
+                      if (cartItem.item.unit3.isNotEmpty && cartItem.item.ratio3 > 0)
+                        DropdownMenuItem(
+                          value: 3,
+                          child: Text('${cartItem.item.unit3} (${cartItem.item.ratio3.toInt()}) - ${_formatRupiah(cartItem.item.defUnitPrice3)}'),
+                        ),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setModalState(() {
+                          tempSelectedUnit = val;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: noteController,
+                    decoration: const InputDecoration(
+                      labelText: 'Catatan Item',
+                      hintText: 'Level pedas, ukuran, dll.',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: discController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Diskon Item (Nominal Rp)',
+                      prefixText: 'Rp ',
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: discController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Diskon Item (Nominal Rp)',
-                  prefixText: 'Rp ',
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Batal'),
                 ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Batal'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final note = noteController.text;
-                final discount = double.tryParse(discController.text) ?? 0.0;
-                posNotifier.updateNote(cartItem.item.itemNo, note);
-                posNotifier.applyItemDiscount(cartItem.item.itemNo, discount);
-                Navigator.of(context).pop();
-              },
-              child: const Text('Simpan'),
-            ),
-          ],
+                ElevatedButton(
+                  onPressed: () {
+                    final note = noteController.text;
+                    final discount = double.tryParse(discController.text) ?? 0.0;
+                    posNotifier.updateNote(cartItem.item.itemNo, note);
+                    posNotifier.applyItemDiscount(cartItem.item.itemNo, discount);
+                    posNotifier.updateSelectedUnit(cartItem.item.itemNo, tempSelectedUnit);
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Simpan'),
+                ),
+              ],
+            );
+          }
         );
       },
     );
@@ -805,6 +890,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   Widget build(BuildContext context) {
     final itemsState = ref.watch(itemsNotifierProvider);
     final posState = ref.watch(posNotifierProvider);
+    final unitsState = ref.watch(unitsProvider);
 
     ref.listen<String?>(scannedBarcodeProvider, (previous, next) {
       if (next != null) {
@@ -899,18 +985,20 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 ),
               if (isLargeScreen) ...[
                 const SizedBox(width: 12),
-                Tooltip(
-                  message: 'Scan Barcode Kamera (F2)',
-                  child: IconButton.filledTonal(
-                    style: IconButton.styleFrom(
-                      padding: const EdgeInsets.all(14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) ...[
+                  Tooltip(
+                    message: 'Scan Barcode Kamera (F2)',
+                    child: IconButton.filledTonal(
+                      style: IconButton.styleFrom(
+                        padding: const EdgeInsets.all(14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Icon(Icons.qr_code_scanner, size: 20),
+                      onPressed: _openCameraScanner,
                     ),
-                    icon: const Icon(Icons.qr_code_scanner, size: 20),
-                    onPressed: _openCameraScanner,
                   ),
-                ),
-                const SizedBox(width: 8),
+                  const SizedBox(width: 8),
+                ],
                 Tooltip(
                   message: 'Lanjutkan Transaksi Ditahan',
                   child: IconButton.filledTonal(
@@ -1250,8 +1338,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                                     isOutOfStock
                                                         ? 'Habis'
                                                         : isLowStock
-                                                            ? '${product.obQuantity.toStringAsFixed(0)} (Tipis)'
-                                                            : 'Stok: ${product.obQuantity.toStringAsFixed(0)}',
+                                                            ? '${product.obQuantity.toStringAsFixed(0)} ${product.unit1} (Tipis)'
+                                                            : 'Stok: ${product.obQuantity.toStringAsFixed(0)} ${product.unit1}',
                                                     style: TextStyle(
                                                       fontSize: 9.5,
                                                       fontWeight: isLowStock || isOutOfStock ? FontWeight.bold : FontWeight.normal,
@@ -1372,8 +1460,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                                   isOutOfStock
                                                       ? 'Habis'
                                                       : isLowStock
-                                                          ? 'Stok: ${product.obQuantity.toStringAsFixed(0)} (Tipis)'
-                                                          : 'Stok: ${product.obQuantity.toStringAsFixed(0)}',
+                                                          ? '${product.obQuantity.toStringAsFixed(0)} ${product.unit1} (Tipis)'
+                                                          : 'Stok: ${product.obQuantity.toStringAsFixed(0)} ${product.unit1}',
                                                   style: TextStyle(
                                                     fontSize: 10.5,
                                                     fontWeight: isLowStock || isOutOfStock ? FontWeight.bold : FontWeight.normal,
@@ -2109,12 +2197,14 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 Navigator.of(context).pop();
 
                 try {
-                  final updatedItem = await ref.read(itemsNotifierProvider.notifier).updateItemKeys(
-                    originalItemNo: product.itemNo,
-                    newItemNo: newSKU,
-                    itemUPC: newBarcode,
-                    price: product.price,
-                    itemName: product.itemName,
+                  final updatedItem = await ref.read(itemsNotifierProvider.notifier).updateItem(
+                    product.itemNo,
+                    product.copyWith(
+                      itemNo: newSKU,
+                      itemUPC: newBarcode,
+                      price: product.price,
+                      itemName: product.itemName,
+                    ),
                   );
 
                   ref.read(posNotifierProvider.notifier).addToCart(updatedItem);
@@ -2166,10 +2256,11 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: barcodeController,
+                  autofocus: true,
                   decoration: InputDecoration(
                     labelText: 'Barcode / UPC (Opsional)',
                     prefixIcon: const Icon(Icons.qr_code),
-                    suffixIcon: IconButton(
+                    suffixIcon: (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) ? IconButton(
                       icon: const Icon(Icons.qr_code_scanner),
                       onPressed: () async {
                         var status = await Permission.camera.status;
@@ -2193,7 +2284,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                         }
                       },
                       tooltip: 'Scan Barcode',
-                    ),
+                    ) : null,
                   ),
                   keyboardType: TextInputType.number,
                 ),
@@ -2257,12 +2348,14 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 Navigator.of(context).pop();
 
                 try {
-                  await ref.read(itemsNotifierProvider.notifier).updateItemKeys(
-                    originalItemNo: product.itemNo,
-                    newItemNo: newSKU,
-                    itemUPC: newBarcode,
-                    price: newPrice,
-                    itemName: newName,
+                  await ref.read(itemsNotifierProvider.notifier).updateItem(
+                    product.itemNo,
+                    product.copyWith(
+                      itemNo: newSKU,
+                      itemUPC: newBarcode,
+                      price: newPrice,
+                      itemName: newName,
+                    ),
                   );
                   _showSuccessToast('Produk berhasil diperbarui');
                 } catch (e) {
@@ -2903,11 +2996,12 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
               
               TextFormField(
                 controller: _barcodeController,
+                autofocus: true,
                 decoration: buildInputDecoration(
                   'Barcode / UPC',
                   'Scan atau ketik barcode',
                   Icons.qr_code_scanner_rounded,
-                  suffixIcon: Padding(
+                  suffixIcon: (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) ? Padding(
                     padding: const EdgeInsets.only(right: 8.0),
                     child: IconButton(
                       icon: Icon(Icons.camera_alt_rounded, color: colorScheme.primary),
@@ -2932,7 +3026,7 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
                       },
                       tooltip: 'Scan Barcode',
                     ),
-                  ),
+                  ) : null,
                 ),
               ),
               const SizedBox(height: 32),
@@ -3034,12 +3128,14 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
                       );
 
                       final newItem = await ref.read(itemsNotifierProvider.notifier).createItem(
-                        itemNo: sku,
-                        itemName: name,
-                        itemUPC: barcode,
-                        categoryId: catId,
-                        price: price,
-                        obQuantity: stock,
+                        ItemModel(
+                          itemNo: sku,
+                          itemName: name,
+                          itemUPC: barcode,
+                          categoryId: catId,
+                          price: price,
+                          obQuantity: stock,
+                        ),
                       );
 
                       Navigator.of(context).pop(); // Dismiss loading

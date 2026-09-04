@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -58,15 +59,17 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
     
     // Check if auto backup is enabled and license is PRO
     if (settings.autoBackupEnabled && features != null && features['automatic_backup'] == true) {
-      if (settings.autoBackupLocation.isNotEmpty) {
-        final lastBackup = settings.lastBackupDate;
+      if (kIsWeb) return;
+      
+      final settings = ref.read(settingsNotifierProvider);
+      if (settings.autoBackupEnabled && settings.autoBackupLocation.isNotEmpty) {
         final now = DateTime.now();
-        
         bool shouldBackup = false;
-        if (lastBackup == null) {
+        
+        if (settings.lastBackupDate == null) {
           shouldBackup = true;
         } else {
-          final difference = now.difference(lastBackup).inDays;
+          final difference = now.difference(settings.lastBackupDate!).inDays;
           if (difference >= settings.autoBackupIntervalDays) {
             shouldBackup = true;
           }
@@ -235,13 +238,19 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
     final isDesktop = width >= 900;
     final authState = ref.watch(authNotifierProvider);
     final isAdmin = authState.currentUser?.role == 'admin';
+    
+    final licenseFeatures = ref.watch(licenseProvider).features ?? {};
+    final hasDashboardAnalytics = licenseFeatures['dashboard_analytics'] == true || 
+                                  licenseFeatures['dashboard_analytics'] == 1 || 
+                                  licenseFeatures['dashboard_analytics'] == '1';
 
     final navItems = [
       _NavItem(icon: Icons.point_of_sale, label: 'POS', route: '/pos'),
-      _NavItem(icon: Icons.dashboard, label: 'Dashboard', route: '/dashboard'),
+      if (isAdmin && hasDashboardAnalytics)
+        _NavItem(icon: Icons.dashboard, label: 'Dashboard', route: '/dashboard'),
       _NavItem(icon: Icons.history, label: 'Riwayat', route: '/history'),
       if (isAdmin)
-        _NavItem(icon: Icons.analytics_outlined, label: 'Analisis Kas', route: '/reconciliation-analysis'),
+        _NavItem(icon: Icons.inventory_2, label: 'Inventori', route: '/inventory'),
       _NavItem(icon: Icons.settings, label: 'Pengaturan', route: '/settings'),
     ];
 
@@ -286,10 +295,12 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                             children: [
                               Icon(Icons.storefront_rounded, color: Theme.of(context).colorScheme.primary, size: 28),
                               const SizedBox(width: 8),
-                              const Expanded(
+                              Expanded(
                                 child: Text(
-                                  'TokoPintar',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                                  ref.watch(settingsNotifierProvider).shopName.isNotEmpty
+                                      ? ref.watch(settingsNotifierProvider).shopName
+                                      : 'TokoPintar',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),

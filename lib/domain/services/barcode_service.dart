@@ -61,6 +61,18 @@ class _BarcodeKeyboardListenerState extends State<BarcodeKeyboardListener> {
   bool _handleGlobalKeyEvent(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
 
+    // Jika ada text input yang sedang fokus (misal saat tambah produk), 
+    // biarkan scanner mengetik langsung ke text field tersebut tanpa diintersep.
+    final primaryFocus = FocusManager.instance.primaryFocus;
+    debugPrint('GLOBAL KEY EVENT: focus node: $primaryFocus, context widget: ${primaryFocus?.context?.widget}, debugLabel: ${primaryFocus?.debugLabel}');
+    
+    if (primaryFocus != null && 
+        (primaryFocus.context?.widget is EditableText || 
+         (primaryFocus.debugLabel != null && primaryFocus.debugLabel!.contains('EditableText')))) {
+      if (_buffer.isNotEmpty) _buffer.clear();
+      return false;
+    }
+
     final now = DateTime.now();
     final elapsed = now.difference(_lastKeyEventTime).inMilliseconds;
     _lastKeyEventTime = now;

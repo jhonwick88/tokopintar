@@ -584,7 +584,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                               controller: _searchController,
                               decoration: const InputDecoration(
                                 prefixIcon: Icon(Icons.search),
-                                hintText: 'Cari No. Invoice... (F8 cetak ulang)',
+                                hintText: 'Cari No. Invoice / Nama Produk...',
                               ),
                               onChanged: (val) {
                                 ref.read(salesHistoryNotifierProvider.notifier).setSearchQuery(val.trim());

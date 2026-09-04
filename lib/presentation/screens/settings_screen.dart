@@ -1,7 +1,10 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import 'package:printing/printing.dart';
@@ -1063,6 +1066,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               const SizedBox(height: 24),
 
+                // Section 5: Sistem & Database
+                _buildDatabaseSettings(),
+                const SizedBox(height: 32),
+
                 // Section 4: Aplikasi & Sistem
                 _buildCardSection(
                   title: 'Aplikasi & Sistem',
@@ -1109,6 +1116,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                     const Divider(),
                     ListTile(
+                      leading: const Icon(Icons.rocket_launch, color: Colors.purple),
+                      title: const Text('Hubungi Developer', style: TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: const Text('Tanya fitur, kustomisasi, atau kendala aplikasi'),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () {
+                        context.push('/developer-contact');
+                      },
+                    ),
+                    const Divider(),
+                    ListTile(
                       leading: const Icon(Icons.logout, color: Colors.red),
                       title: const Text('Logout', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
                       subtitle: const Text('Mengakhiri sesi kasir aktif saat ini'),
@@ -1118,7 +1135,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 const SizedBox(height: 32),
 
-                // Submit Buttons Row
+                  // Submit Buttons Row
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
@@ -1155,6 +1172,285 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ),
     );
+  }
+
+
+  Widget _buildDatabaseSettings() {
+    final licenseState = ref.watch(licenseProvider);
+    final features = licenseState.features;
+    final bool hasAutoBackup = features['automatic_backup'] == true;
+    final settings = ref.watch(settingsNotifierProvider);
+
+    return _buildCardSection(
+      title: 'Sistem & Database',
+      icon: Icons.storage_rounded,
+      children: [
+        const Text(
+          'Backup database untuk mengamankan data Anda atau memindahkan ke perangkat lain menggunakan Restore.',
+          style: TextStyle(color: Colors.grey),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _handleBackup,
+                icon: const Icon(Icons.download_rounded),
+                label: const Text('Manual Backup'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  backgroundColor: Colors.blue.shade50,
+                  foregroundColor: Colors.blue.shade700,
+                  elevation: 0,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _handleRestore,
+                icon: const Icon(Icons.upload_file_rounded),
+                label: const Text('Manual Restore'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  foregroundColor: Colors.deepPurple.shade700,
+                  side: BorderSide(color: Colors.deepPurple.shade200),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        const Divider(),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            const Icon(Icons.cloud_sync_rounded, color: Colors.green),
+            const SizedBox(width: 8),
+            const Text(
+              'Automatic Backup',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            if (!hasAutoBackup) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.lock, size: 14, color: Colors.amber),
+                    SizedBox(width: 4),
+                    Text('PRO', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.amber)),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Biarkan sistem melakukan backup otomatis ke komputer Anda sesuai jadwal.',
+          style: TextStyle(color: Colors.grey.shade600),
+        ),
+        const SizedBox(height: 16),
+        if (kIsWeb)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.shade100),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.blue.shade700),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Fitur Auto-Backup tidak didukung saat dijalankan melalui Web Browser karena keterbatasan akses penyimpanan (File System). Silakan gunakan aplikasi versi Desktop (Windows) untuk fitur ini.',
+                    style: TextStyle(color: Colors.blue.shade800),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          Opacity(
+            opacity: hasAutoBackup ? 1.0 : 0.5,
+            child: Column(
+              children: [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Aktifkan Auto-Backup'),
+                  value: settings.autoBackupEnabled,
+                onChanged: hasAutoBackup ? (val) {
+                  ref.read(settingsNotifierProvider.notifier).updateSettings(
+                    settings.copyWith(autoBackupEnabled: val),
+                  );
+                } : null,
+              ),
+              if (settings.autoBackupEnabled) ...[
+                const SizedBox(height: 16),
+                DropdownButtonFormField<int>(
+                  value: settings.autoBackupIntervalDays,
+                  decoration: const InputDecoration(labelText: 'Interval (Hari)'),
+                  items: const [
+                    DropdownMenuItem(value: 1, child: Text('Tiap 1 Hari')),
+                    DropdownMenuItem(value: 3, child: Text('Tiap 3 Hari')),
+                    DropdownMenuItem(value: 7, child: Text('Tiap 7 Hari')),
+                    DropdownMenuItem(value: 30, child: Text('Tiap 30 Hari')),
+                  ],
+                  onChanged: hasAutoBackup ? (val) {
+                    if (val != null) {
+                      ref.read(settingsNotifierProvider.notifier).updateSettings(
+                        settings.copyWith(autoBackupIntervalDays: val),
+                      );
+                    }
+                  } : null,
+                ),
+                const SizedBox(height: 16),
+                InkWell(
+                  onTap: hasAutoBackup ? () async {
+                    final String? selectedDirectory = await FilePicker.getDirectoryPath();
+                    if (selectedDirectory != null) {
+                      ref.read(settingsNotifierProvider.notifier).updateSettings(
+                        settings.copyWith(autoBackupLocation: selectedDirectory),
+                      );
+                    }
+                  } : null,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.grey.shade50,
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.folder_open, color: Colors.blue),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Lokasi Penyimpanan', style: TextStyle(fontWeight: FontWeight.bold)),
+                              Text(
+                                settings.autoBackupLocation.isEmpty 
+                                  ? 'Belum diatur' 
+                                  : settings.autoBackupLocation,
+                                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.edit, size: 20, color: Colors.grey),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _handleBackup() async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+
+      if (kIsWeb) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sedang mengunduh backup...')));
+        await apiClient.downloadBackupWeb();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Backup berhasil diunduh'), backgroundColor: Colors.green));
+        }
+        return;
+      }
+
+      final String? selectedDirectory = await FilePicker.getDirectoryPath();
+      if (selectedDirectory == null) return;
+
+      final savePath = '${selectedDirectory}/tokopintar_manual_${DateTime.now().millisecondsSinceEpoch}.db';
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sedang mengunduh backup...')));
+      
+      await apiClient.downloadBackup(savePath);
+      
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Backup berhasil disimpan di $savePath'), backgroundColor: Colors.green));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal melakukan backup.'), backgroundColor: Colors.red));
+      }
+    }
+  }
+
+  Future<void> _handleRestore() async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Peringatan Restore'),
+        content: const Text('Melakukan restore akan menimpa seluruh data toko saat ini. Aplikasi akan ditutup otomatis setelah restore berhasil. Anda yakin?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Ya, Restore'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['db'],
+        withData: true,
+      );
+
+      if (result == null || result.isEmpty) return;
+      
+      final apiClient = ref.read(apiClientProvider);
+      String message;
+      
+      if (kIsWeb) {
+        final bytes = await result.first.readAsBytes();
+        final name = result.first.name;
+        if (bytes == null) {
+           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal membaca file.'), backgroundColor: Colors.red));
+           return;
+        }
+        message = await apiClient.restoreBackupBytes(bytes, name);
+      } else {
+        final filePath = result.first.path;
+        if (filePath == null) return;
+        message = await apiClient.restoreBackup(filePath);
+      }
+      
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('Restore Berhasil!'),
+          content: Text('$message\n\n1. Buka terminal backend dan jalankan ulang.\n2. Restart aplikasi TokoPintar.'),
+          actions: [
+            FilledButton(
+              onPressed: () => exit(0),
+              child: const Text('Tutup Aplikasi'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
+    }
   }
 
   Widget _buildCardSection({

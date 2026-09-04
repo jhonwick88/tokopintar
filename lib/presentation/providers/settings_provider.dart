@@ -11,6 +11,8 @@ import '../../domain/repositories/auth_repository.dart';
 import '../../domain/repositories/items_repository.dart';
 import '../../domain/repositories/sales_repository.dart';
 import '../../domain/repositories/settings_repository.dart';
+import '../../domain/repositories/supplier_repository.dart';
+import '../../data/repositories/supplier_repository_impl.dart';
 
 // --- DATA SOURCE PROVIDERS ---
 final apiClientProvider = Provider<ApiClient>((ref) {
@@ -33,6 +35,10 @@ final salesRepositoryProvider = Provider<SalesRepository>((ref) {
 
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
   return SettingsRepositoryImpl();
+});
+
+final supplierRepositoryProvider = Provider<SupplierRepository>((ref) {
+  return SupplierRepositoryImpl(ref.watch(apiClientProvider));
 });
 
 final auditRepositoryProvider = Provider<AuditRepository>((ref) {

@@ -10,6 +10,12 @@ import '../../presentation/screens/pos_screen.dart';
 import '../../presentation/screens/sales_history_screen.dart';
 import '../../presentation/screens/settings_screen.dart';
 import '../../presentation/screens/reconciliation_analysis_screen.dart';
+import '../../presentation/screens/products_screen.dart';
+import '../../presentation/screens/unit_screen.dart';
+import '../../presentation/screens/stock_opname_screen.dart';
+import '../../presentation/screens/inventory_dashboard_screen.dart';
+import '../../presentation/screens/suppliers_screen.dart';
+import '../../presentation/screens/developer_contact_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authNotifierProvider);
@@ -45,12 +51,29 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
       }
 
-      if (state.matchedLocation == '/reconciliation-analysis' && authState.currentUser?.role != 'admin') {
+      final adminRoutes = ['/reconciliation-analysis', '/inventory', '/products', '/units', '/stock-opname', '/suppliers'];
+      if (adminRoutes.contains(state.matchedLocation) && authState.currentUser?.role != 'admin') {
         return '/pos';
       }
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/inventory',
+        builder: (context, state) => const InventoryDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/stock-opname',
+        builder: (context, state) => const StockOpnameScreen(),
+      ),
+      GoRoute(
+        path: '/units',
+        builder: (context, state) => const UnitScreen(),
+      ),
+      GoRoute(
+        path: '/suppliers',
+        builder: (context, state) => const SuppliersScreen(),
+      ),
       GoRoute(
         path: '/activation',
         builder: (context, state) => const ActivationScreen(),
@@ -72,12 +95,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SalesHistoryScreen(),
       ),
       GoRoute(
+        path: '/products',
+        builder: (context, state) => const ProductsScreen(),
+      ),
+      GoRoute(
         path: '/settings',
         builder: (context, state) => const SettingsScreen(),
       ),
       GoRoute(
         path: '/reconciliation-analysis',
         builder: (context, state) => const ReconciliationAnalysisScreen(),
+      ),
+      GoRoute(
+        path: '/developer-contact',
+        builder: (context, state) => const DeveloperContactScreen(),
       ),
     ],
   );

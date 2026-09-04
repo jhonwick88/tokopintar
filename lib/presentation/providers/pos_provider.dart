@@ -8,6 +8,7 @@ import '../../domain/services/printer_service.dart';
 import 'auth_provider.dart';
 import 'settings_provider.dart';
 import 'sales_history_provider.dart';
+import '../providers/license_provider.dart';
 
 class CartItem {
   final ItemModel item;
@@ -16,6 +17,7 @@ class CartItem {
   final String note;
   final double discount; // item level discount nominal
   final bool isRoundedTo500;
+  final int selectedUnit; // 1, 2, or 3
 
   CartItem({
     required this.item,
@@ -24,9 +26,28 @@ class CartItem {
     this.note = '',
     this.discount = 0.0,
     this.isRoundedTo500 = false,
+    this.selectedUnit = 1,
   });
 
-  double get price => customPrice ?? item.price;
+  double get price {
+    if (customPrice != null) return customPrice!;
+    if (selectedUnit == 2 && item.defUnitPrice2 > 0) return item.defUnitPrice2;
+    if (selectedUnit == 3 && item.defUnitPrice3 > 0) return item.defUnitPrice3;
+    return item.price;
+  }
+
+  String get unitName {
+    if (selectedUnit == 2 && item.unit2.isNotEmpty) return item.unit2;
+    if (selectedUnit == 3 && item.unit3.isNotEmpty) return item.unit3;
+    return item.unit1.isNotEmpty ? item.unit1 : 'PCS';
+  }
+
+  double get ratio {
+    if (selectedUnit == 2 && item.ratio2 > 0) return item.ratio2;
+    if (selectedUnit == 3 && item.ratio3 > 0) return item.ratio3;
+    return 1.0;
+  }
+
   double get subtotal {
     final rawSubtotal = (price * qty) - discount;
     if (isRoundedTo500) {
@@ -42,6 +63,7 @@ class CartItem {
     String? note,
     double? discount,
     bool? isRoundedTo500,
+    int? selectedUnit,
   }) {
     return CartItem(
       item: item ?? this.item,
@@ -50,6 +72,7 @@ class CartItem {
       note: note ?? this.note,
       discount: discount ?? this.discount,
       isRoundedTo500: isRoundedTo500 ?? this.isRoundedTo500,
+      selectedUnit: selectedUnit ?? this.selectedUnit,
     );
   }
 }
@@ -77,7 +100,7 @@ class PosState {
   final String discountType; // 'none', 'nominal', 'percent'
   final double discountValue;
   final List<HeldCart> heldCarts;
-  
+
   // Professional settings addition
   final bool enableTax;
   final double taxPercentage;
@@ -128,7 +151,9 @@ class PosState {
     if (!enableTax) return 0.0;
     final netSub = subtotal - transactionDiscount;
     final totalWithService = netSub + serviceCharge;
-    return totalWithService > 0 ? totalWithService * (taxPercentage / 100) : 0.0;
+    return totalWithService > 0
+        ? totalWithService * (taxPercentage / 100)
+        : 0.0;
   }
 
   double get grandTotal {
@@ -155,7 +180,8 @@ class PosState {
       enableTax: enableTax ?? this.enableTax,
       taxPercentage: taxPercentage ?? this.taxPercentage,
       enableServiceCharge: enableServiceCharge ?? this.enableServiceCharge,
-      serviceChargePercentage: serviceChargePercentage ?? this.serviceChargePercentage,
+      serviceChargePercentage:
+          serviceChargePercentage ?? this.serviceChargePercentage,
     );
   }
 }
@@ -166,13 +192,21 @@ class PosNotifier extends StateNotifier<PosState> {
   PosNotifier(this._ref) : super(PosState());
 
   void addToCart(ItemModel item, {int qty = 1}) {
-    final existingIndex = state.cartItems.indexWhere((i) => i.item.itemNo == item.itemNo);
+    final existingIndex = state.cartItems.indexWhere(
+      (i) => i.item.itemNo == item.itemNo,
+    );
     if (existingIndex >= 0) {
       final existing = state.cartItems[existingIndex];
-      _updateItemInList(existingIndex, existing.copyWith(qty: existing.qty + qty));
+      _updateItemInList(
+        existingIndex,
+        existing.copyWith(qty: existing.qty + qty),
+      );
     } else {
       state = state.copyWith(
-        cartItems: [...state.cartItems, CartItem(item: item, qty: qty)],
+        cartItems: [
+          ...state.cartItems,
+          CartItem(item: item, qty: qty),
+        ],
       );
     }
   }
@@ -198,6 +232,16 @@ class PosNotifier extends StateNotifier<PosState> {
     }
   }
 
+  void updateSelectedUnit(String itemNo, int unitLevel) {
+    final idx = state.cartItems.indexWhere((i) => i.item.itemNo == itemNo);
+    if (idx >= 0) {
+      _updateItemInList(
+        idx,
+        state.cartItems[idx].copyWith(selectedUnit: unitLevel),
+      );
+    }
+  }
+
   void updatePrice(String itemNo, double price) {
     final idx = state.cartItems.indexWhere((i) => i.item.itemNo == itemNo);
     if (idx >= 0) {
@@ -220,10 +264,7 @@ class PosNotifier extends StateNotifier<PosState> {
   }
 
   void applyTransactionDiscount(String type, double value) {
-    state = state.copyWith(
-      discountType: type,
-      discountValue: value,
-    );
+    state = state.copyWith(discountType: type, discountValue: value);
   }
 
   void clearCart() {
@@ -246,7 +287,9 @@ class PosNotifier extends StateNotifier<PosState> {
 
     final held = HeldCart(
       id: const Uuid().v4(),
-      title: title.isEmpty ? 'Held ${DateTime.now().hour}:${DateTime.now().minute}' : title,
+      title: title.isEmpty
+          ? 'Held ${DateTime.now().hour}:${DateTime.now().minute}'
+          : title,
       date: DateTime.now(),
       cartItems: state.cartItems,
       discountType: state.discountType,
@@ -263,12 +306,14 @@ class PosNotifier extends StateNotifier<PosState> {
     // Audit Log
     final user = _ref.read(authNotifierProvider).currentUser;
     if (user != null) {
-      _ref.read(auditRepositoryProvider).logActivity(
-        user.uid,
-        user.username,
-        'hold_transaction',
-        'Held active cart: "${held.title}"',
-      );
+      _ref
+          .read(auditRepositoryProvider)
+          .logActivity(
+            user.uid,
+            user.username,
+            'hold_transaction',
+            'Held active cart: "${held.title}"',
+          );
     }
   }
 
@@ -286,12 +331,14 @@ class PosNotifier extends StateNotifier<PosState> {
       // Audit Log
       final user = _ref.read(authNotifierProvider).currentUser;
       if (user != null) {
-        _ref.read(auditRepositoryProvider).logActivity(
-          user.uid,
-          user.username,
-          'resume_transaction',
-          'Resumed held transaction: "${target.title}"',
-        );
+        _ref
+            .read(auditRepositoryProvider)
+            .logActivity(
+              user.uid,
+              user.username,
+              'resume_transaction',
+              'Resumed held transaction: "${target.title}"',
+            );
       }
     }
   }
@@ -305,12 +352,14 @@ class PosNotifier extends StateNotifier<PosState> {
     // Audit Log
     final user = _ref.read(authNotifierProvider).currentUser;
     if (user != null) {
-      _ref.read(auditRepositoryProvider).logActivity(
-        user.uid,
-        user.username,
-        'void_held',
-        'Voided held transaction: "${target.title}"',
-      );
+      _ref
+          .read(auditRepositoryProvider)
+          .logActivity(
+            user.uid,
+            user.username,
+            'void_held',
+            'Voided held transaction: "${target.title}"',
+          );
     }
   }
 
@@ -318,6 +367,7 @@ class PosNotifier extends StateNotifier<PosState> {
   Future<SaleModel?> checkout({
     required String paymentMethod,
     required double paidAmount,
+    List<SalesPaymentModel>? paymentSplits,
   }) async {
     if (state.cartItems.isEmpty) return null;
 
@@ -328,8 +378,10 @@ class PosNotifier extends StateNotifier<PosState> {
 
     // Format Invoice No: INVyyyyMMddHHmmss
     final now = DateTime.now();
-    final dateStr = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-    final timeStr = '${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+    final dateStr =
+        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+    final timeStr =
+        '${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
     final invoiceNo = 'INV$dateStr$timeStr';
 
     final double change = paidAmount - state.grandTotal;
@@ -345,6 +397,8 @@ class PosNotifier extends StateNotifier<PosState> {
         subtotal: c.subtotal,
         note: c.note,
         discount: c.discount,
+        unitName: c.unitName,
+        ratio: c.ratio,
       );
     }).toList();
 
@@ -362,6 +416,7 @@ class PosNotifier extends StateNotifier<PosState> {
       changeAmount: change > 0 ? change : 0.0,
       status: 'completed',
       items: saleItems,
+      payments: paymentSplits ?? [],
     );
 
     try {
@@ -372,22 +427,40 @@ class PosNotifier extends StateNotifier<PosState> {
       _ref.read(salesHistoryNotifierProvider.notifier).fetchSales();
 
       // 2. Log Activity
-      await _ref.read(auditRepositoryProvider).logActivity(
-        cashierId,
-        user?.username ?? 'kasir',
-        'checkout',
-        'Completed sale $invoiceNo with total ${_formatCurrency(sale.grandTotal)} via $paymentMethod',
-      );
+      await _ref
+          .read(auditRepositoryProvider)
+          .logActivity(
+            cashierId,
+            user?.username ?? 'kasir',
+            'checkout',
+            'Completed sale $invoiceNo with total ${_formatCurrency(sale.grandTotal)} via $paymentMethod',
+          );
 
       // 3. Print Receipt
       if (settings.autoPrintOnCheckout) {
-        final printBytes = PrinterService.instance.generateReceiptBytes(sale, settings);
+        final printBytes = PrinterService.instance.generateReceiptBytes(
+          sale,
+          settings,
+        );
         if (settings.printerType == 'LAN') {
-          PrinterService.instance.printToLan(settings.printerIp, settings.printerPort, printBytes, copies: settings.printReceiptCopies);
+          PrinterService.instance.printToLan(
+            settings.printerIp,
+            settings.printerPort,
+            printBytes,
+            copies: settings.printReceiptCopies,
+          );
         } else if (settings.printerType == 'Bluetooth') {
-          PrinterService.instance.printToBluetooth(settings.printerMacAddress, printBytes, copies: settings.printReceiptCopies);
+          PrinterService.instance.printToBluetooth(
+            settings.printerMacAddress,
+            printBytes,
+            copies: settings.printReceiptCopies,
+          );
         } else if (settings.printerType == 'USB') {
-          PrinterService.instance.printToWindows(settings.printerMacAddress, sale, settings);
+          PrinterService.instance.printToWindows(
+            settings.printerMacAddress,
+            sale,
+            settings,
+          );
         } else {
           dev.log('Print Job generated. Receipt printed to output pipeline.');
         }
@@ -402,11 +475,13 @@ class PosNotifier extends StateNotifier<PosState> {
     }
   }
 
-  void _syncSettings(SettingsModel settings) {
+  void _syncSettings(SettingsModel settings, {bool hasAdvancedPos = false}) {
     state = state.copyWith(
-      enableTax: settings.enableTax,
+      enableTax: hasAdvancedPos ? settings.enableTax : false,
       taxPercentage: settings.taxPercentage,
-      enableServiceCharge: settings.enableServiceCharge,
+      enableServiceCharge: hasAdvancedPos
+          ? settings.enableServiceCharge
+          : false,
       serviceChargePercentage: settings.serviceChargePercentage,
     );
   }
@@ -421,10 +496,23 @@ class PosNotifier extends StateNotifier<PosState> {
 
 final posNotifierProvider = StateNotifierProvider<PosNotifier, PosState>((ref) {
   final notifier = PosNotifier(ref);
+
+  void updateSettings() {
+    final settings = ref.read(settingsNotifierProvider);
+    final license = ref.read(licenseProvider);
+    final hasAdvancedPos = license.features['advanced_pos'] == true;
+    notifier._syncSettings(settings, hasAdvancedPos: hasAdvancedPos);
+  }
+
   ref.listen<SettingsModel>(settingsNotifierProvider, (prev, next) {
-    notifier._syncSettings(next);
+    updateSettings();
   });
-  notifier._syncSettings(ref.read(settingsNotifierProvider));
+
+  ref.listen<LicenseState>(licenseProvider, (prev, next) {
+    updateSettings();
+  });
+
+  updateSettings();
   return notifier;
 });
 
