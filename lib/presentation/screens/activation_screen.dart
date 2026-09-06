@@ -65,6 +65,44 @@ class _ActivationScreenState extends ConsumerState<ActivationScreen> {
     }
   }
 
+  Future<void> _requestTrial() async {
+    final success = await ref.read(licenseProvider.notifier).requestTrial();
+    if (!mounted) return;
+
+    if (success) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.check_circle, color: Colors.green, size: 64),
+              SizedBox(height: 16),
+              Text('Trial Diaktifkan!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              SizedBox(height: 8),
+              Text('Mengalihkan ke halaman Login...', style: TextStyle(color: Colors.grey)),
+            ],
+          ),
+        ),
+      );
+
+      // REDIRECT TO LOGIN AFTER 2 SECONDS
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          Navigator.of(context).pop(); // Dismiss dialog
+          context.go('/login');
+        }
+      });
+    } else {
+      final error = ref.read(licenseProvider).errorMessage;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error ?? 'Gagal mengambil trial'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(licenseProvider);
@@ -123,6 +161,15 @@ class _ActivationScreenState extends ConsumerState<ActivationScreen> {
                           child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                         )
                       : const Text('Activate', style: TextStyle(fontSize: 16)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: OutlinedButton(
+                  onPressed: state.isLoading ? null : _requestTrial,
+                  child: const Text('Coba Gratis 14 Hari', style: TextStyle(fontSize: 16)),
                 ),
               ),
               if (state.machineFingerprint != null) ...[

@@ -11,11 +11,14 @@ import '../../presentation/screens/sales_history_screen.dart';
 import '../../presentation/screens/settings_screen.dart';
 import '../../presentation/screens/reconciliation_analysis_screen.dart';
 import '../../presentation/screens/products_screen.dart';
+import '../../presentation/screens/categories_screen.dart';
+import '../../presentation/screens/category_form_screen.dart';
 import '../../presentation/screens/unit_screen.dart';
 import '../../presentation/screens/stock_opname_screen.dart';
 import '../../presentation/screens/inventory_dashboard_screen.dart';
 import '../../presentation/screens/suppliers_screen.dart';
 import '../../presentation/screens/developer_contact_screen.dart';
+import '../../data/models/category_model.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authNotifierProvider);
@@ -51,7 +54,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
       }
 
-      final adminRoutes = ['/reconciliation-analysis', '/inventory', '/products', '/units', '/stock-opname', '/suppliers'];
+      final adminRoutes = ['/reconciliation-analysis', '/inventory', '/products', '/categories', '/categories/new', '/categories/edit', '/units', '/stock-opname', '/suppliers'];
       if (adminRoutes.contains(state.matchedLocation) && authState.currentUser?.role != 'admin') {
         return '/pos';
       }
@@ -61,6 +64,21 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/inventory',
         builder: (context, state) => const InventoryDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/categories',
+        builder: (context, state) => const CategoriesScreen(),
+      ),
+      GoRoute(
+        path: '/categories/new',
+        builder: (context, state) => const CategoryFormScreen(),
+      ),
+      GoRoute(
+        path: '/categories/edit',
+        builder: (context, state) {
+          final category = state.extra as CategoryModel?;
+          return CategoryFormScreen(category: category);
+        },
       ),
       GoRoute(
         path: '/stock-opname',

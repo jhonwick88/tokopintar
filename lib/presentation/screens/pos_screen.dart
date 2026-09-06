@@ -2225,7 +2225,27 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   }
 
   void _showEditProductDialog(ItemModel product) {
+    BarcodeService.instance.pause();
     final nameController = TextEditingController(text: product.itemName);
+    
+    // Auto-generate short name if empty, otherwise use existing
+    final initialShortName = product.itemNameShort.isEmpty 
+        ? generateItemNameShort(product.itemName) 
+        : product.itemNameShort;
+    final shortNameController = TextEditingController(text: initialShortName);
+    
+    bool isShortNameManuallyEdited = product.itemNameShort.isNotEmpty && 
+                                     product.itemNameShort != generateItemNameShort(product.itemName);
+
+    nameController.addListener(() {
+      if (!isShortNameManuallyEdited) {
+        final newShortName = generateItemNameShort(nameController.text);
+        if (shortNameController.text != newShortName) {
+          shortNameController.text = newShortName;
+        }
+      }
+    });
+
     final barcodeController = TextEditingController(text: product.itemUPC);
     final skuController = TextEditingController(text: product.itemNo);
     final priceController = TextEditingController(text: product.price.toStringAsFixed(0));
@@ -2251,6 +2271,17 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Nama Produk (itemName)',
                     prefixIcon: Icon(Icons.shopping_bag),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: shortNameController,
+                  onChanged: (val) {
+                    isShortNameManuallyEdited = true;
+                  },
+                  decoration: const InputDecoration(
+                    labelText: 'Nama Singkat / Struk (itemNameShort)',
+                    prefixIcon: Icon(Icons.short_text),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -2333,6 +2364,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             ElevatedButton(
               onPressed: () async {
                 final newName = nameController.text.trim();
+                final newShortName = shortNameController.text.trim();
                 final newBarcode = barcodeController.text.trim();
                 final newSKU = skuController.text.trim();
                 final priceText = priceController.text.trim();
@@ -2355,6 +2387,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                       itemUPC: newBarcode,
                       price: newPrice,
                       itemName: newName,
+                      itemNameShort: newShortName,
                     ),
                   );
                   _showSuccessToast('Produk berhasil diperbarui');
@@ -2368,7 +2401,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           ],
         );
       },
-    );
+    ).then((_) {
+      BarcodeService.instance.resume();
+    });
   }
 
   void _openAddProductPage({String? barcode, String? itemName}) {
@@ -2834,6 +2869,8 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
   late TextEditingController _barcodeController;
   late TextEditingController _skuController;
   late TextEditingController _nameController;
+  late TextEditingController _shortNameController;
+  bool _isShortNameManuallyEdited = false;
   late TextEditingController _priceController;
   late TextEditingController _stockController;
   int? _selectedCategoryId;
@@ -2841,11 +2878,22 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
   @override
   void initState() {
     super.initState();
+    BarcodeService.instance.pause();
     _barcodeController = TextEditingController(text: widget.initialBarcode ?? '');
     _skuController = TextEditingController(text: '');
     _nameController = TextEditingController(text: widget.initialItemName ?? '');
+    _shortNameController = TextEditingController(text: generateItemNameShort(widget.initialItemName ?? ''));
     _priceController = TextEditingController(text: '');
     _stockController = TextEditingController(text: '10');
+
+    _nameController.addListener(() {
+      if (!_isShortNameManuallyEdited) {
+        final newShortName = generateItemNameShort(_nameController.text);
+        if (_shortNameController.text != newShortName) {
+          _shortNameController.text = newShortName;
+        }
+      }
+    });
 
     // Attempt to set a default generated SKU
     _skuController.text = 'SKU-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
@@ -2853,9 +2901,11 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
 
   @override
   void dispose() {
+    BarcodeService.instance.resume();
     _barcodeController.dispose();
     _skuController.dispose();
     _nameController.dispose();
+    _shortNameController.dispose();
     _priceController.dispose();
     _stockController.dispose();
     super.dispose();
@@ -2959,6 +3009,19 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
                   if (val == null || val.trim().isEmpty) return 'Nama produk tidak boleh kosong';
                   return null;
                 },
+              ),
+              const SizedBox(height: 20),
+              
+              TextFormField(
+                controller: _shortNameController,
+                onChanged: (val) {
+                  _isShortNameManuallyEdited = true;
+                },
+                decoration: buildInputDecoration(
+                  'Nama Singkat / Struk',
+                  'Nama pendek untuk cetak struk',
+                  Icons.short_text,
+                ),
               ),
               const SizedBox(height: 20),
               
@@ -3131,6 +3194,7 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
                         ItemModel(
                           itemNo: sku,
                           itemName: name,
+                          itemNameShort: _shortNameController.text.trim(),
                           itemUPC: barcode,
                           categoryId: catId,
                           price: price,
@@ -3197,6 +3261,32 @@ String _cleanErrorMessage(dynamic error, String defaultMsg) {
     message = message.substring(11);
   }
   return '$defaultMsg: $message';
+}
+
+String generateItemNameShort(String name) {
+  if (name.trim().isEmpty) return '';
+  List<String> words = name.trim().split(RegExp(r'\s+'));
+  if (words.length <= 3) {
+    return name.trim();
+  }
+  
+  List<String> result = [];
+  for (int i = 0; i < words.length; i++) {
+    if (i < 3) {
+      result.add(words[i]);
+    } else {
+      String w = words[i];
+      if (w.length <= 3) {
+        result.add(w);
+      } else {
+        String firstChar = w[0];
+        String rest = w.substring(1).replaceAll(RegExp(r'[aeiouAEIOU]'), '');
+        result.add('$firstChar$rest');
+      }
+    }
+  }
+  String finalString = result.join(' ');
+  return finalString.length > 35 ? finalString.substring(0, 35) : finalString;
 }
 
 String generateSKUFromName(String name) {

@@ -192,95 +192,131 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                               }
 
                               final item = itemsState.sortedItems[index];
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 8.0),
-                                child: ListTile(
-                                  title: Text(item.itemName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  subtitle: Text(
-                                    'SKU: ${item.itemNo} | Barcode: ${item.itemUPC}\nStok: ${item.obQuantity} | Harga: ${currencyFormatter.format(item.price)}',
+                              final isDesktop = MediaQuery.of(context).size.width > 600;
+
+                              final actionButtons = <Widget>[
+                                if (hasStockMovement)
+                                  ElevatedButton.icon(
+                                    onPressed: () {
+                                      Navigator.push(context, MaterialPageRoute(
+                                        builder: (_) => StockLedgerScreen(itemNo: item.itemNo, itemName: item.itemName),
+                                      ));
+                                    },
+                                    icon: const Icon(Icons.list_alt, size: 16),
+                                    label: const Text('Kartu Stok'),
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      backgroundColor: Colors.blue[50],
+                                    ),
                                   ),
-                                  isThreeLine: true,
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (hasStockMovement)
-                                        ElevatedButton.icon(
-                                          onPressed: () {
-                                            Navigator.push(context, MaterialPageRoute(
-                                              builder: (_) => StockLedgerScreen(itemNo: item.itemNo, itemName: item.itemName),
-                                            ));
-                                          },
-                                          icon: const Icon(Icons.list_alt, size: 16),
-                                          label: const Text('Kartu Stok'),
-                                          style: ElevatedButton.styleFrom(
-                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                            backgroundColor: Colors.blue[50],
-                                          ),
-                                        ),
-                                      if (hasStockMovement) const SizedBox(width: 8),
-                                      ElevatedButton.icon(
-                                        onPressed: hasStockOpname ? () => _showStockOpnameDialog(item) : () {
-                                          showDialog(
-                                            context: context,
-                                            builder: (_) => AlertDialog(
-                                              title: Row(
-                                                children: [
-                                                  const Icon(Icons.star, color: Colors.amber),
-                                                  const SizedBox(width: 8),
-                                                  const Text('Fitur PRO'),
-                                                ],
-                                              ),
-                                              content: const Text('Fitur Stok Opname hanya tersedia di versi PRO. Harap kontak penjual untuk upgrade lisensi Anda.'),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () => Navigator.pop(context),
-                                                  child: const Text('Tutup'),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        },
-                                        icon: const Icon(Icons.inventory, size: 16),
-                                        label: Row(
-                                          mainAxisSize: MainAxisSize.min,
+                                ElevatedButton.icon(
+                                  onPressed: hasStockOpname ? () => _showStockOpnameDialog(item) : () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (_) => AlertDialog(
+                                        title: Row(
                                           children: [
-                                            const Text('Stok Opname'),
-                                            if (!hasStockOpname) ...[
-                                              const SizedBox(width: 4),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.orange,
-                                                  borderRadius: BorderRadius.circular(4),
-                                                ),
-                                                child: const Text('PRO', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
-                                              ),
-                                            ]
+                                            const Icon(Icons.star, color: Colors.amber),
+                                            const SizedBox(width: 8),
+                                            const Text('Fitur PRO'),
                                           ],
                                         ),
-                                        style: ElevatedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        content: const Text('Fitur Stok Opname hanya tersedia di versi PRO. Harap kontak penjual untuk upgrade lisensi Anda.'),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context),
+                                            child: const Text('Tutup'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.inventory, size: 16),
+                                  label: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text('Stok Opname'),
+                                      if (!hasStockOpname) ...[
+                                        const SizedBox(width: 4),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.orange,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: const Text('PRO', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
                                         ),
+                                      ]
+                                    ],
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.edit, color: Colors.blue),
+                                  onPressed: () {
+                                    Navigator.push(context, MaterialPageRoute(
+                                      builder: (_) => ProductFormScreen(existingItem: item)
+                                    ));
+                                  },
+                                  tooltip: 'Edit Produk',
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () => _showDeleteDialog(item),
+                                  tooltip: 'Hapus Produk',
+                                ),
+                              ];
+
+                              if (isDesktop) {
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 8.0),
+                                  child: ListTile(
+                                    title: Text(item.itemName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    subtitle: Text(
+                                      'SKU: ${item.itemNo} | Barcode: ${item.itemUPC}\nStok: ${item.obQuantity} | Harga: ${currencyFormatter.format(item.price)}',
+                                    ),
+                                    isThreeLine: true,
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: actionButtons.map((btn) => Padding(padding: const EdgeInsets.only(left: 8.0), child: btn)).toList(),
+                                    ),
+                                  ),
+                                );
+                              } else {
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 8.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      ListTile(
+                                        title: Text(
+                                          item.itemName, 
+                                          style: const TextStyle(fontWeight: FontWeight.bold),
+                                        ),
+                                        subtitle: Text(
+                                          'SKU: ${item.itemNo} | Barcode: ${item.itemUPC}\nStok: ${item.obQuantity} | Harga: ${currencyFormatter.format(item.price)}',
+                                        ),
+                                        isThreeLine: true,
                                       ),
-                                      const SizedBox(width: 8),
-                                      IconButton(
-                                        icon: const Icon(Icons.edit, color: Colors.blue),
-                                        onPressed: () {
-                                          Navigator.push(context, MaterialPageRoute(
-                                            builder: (_) => ProductFormScreen(existingItem: item)
-                                          ));
-                                        },
-                                        tooltip: 'Edit Produk',
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.delete, color: Colors.red),
-                                        onPressed: () => _showDeleteDialog(item),
-                                        tooltip: 'Hapus Produk',
+                                      const Divider(height: 1),
+                                      Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: SizedBox(
+                                          width: double.infinity,
+                                          child: Wrap(
+                                            alignment: WrapAlignment.end,
+                                            spacing: 8.0,
+                                            runSpacing: 8.0,
+                                            children: actionButtons,
+                                          ),
+                                        ),
                                       ),
                                     ],
                                   ),
-                                ),
-                              );
+                                );
+                              }
                             },
                           ),
               ),

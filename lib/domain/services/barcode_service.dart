@@ -7,6 +7,7 @@ class BarcodeService {
   BarcodeService._internal();
 
   final List<void Function(String)> _listeners = [];
+  bool isPaused = false;
 
   void addBarcodeListener(void Function(String) onBarcodeScanned) {
     _listeners.add(onBarcodeScanned);
@@ -15,8 +16,17 @@ class BarcodeService {
   void removeBarcodeListener(void Function(String) onBarcodeScanned) {
     _listeners.remove(onBarcodeScanned);
   }
+  
+  void pause() {
+    isPaused = true;
+  }
+  
+  void resume() {
+    isPaused = false;
+  }
 
   void notifyBarcodeScanned(String barcode) {
+    if (isPaused) return;
     for (var listener in _listeners) {
       listener(barcode);
     }
@@ -60,6 +70,11 @@ class _BarcodeKeyboardListenerState extends State<BarcodeKeyboardListener> {
 
   bool _handleGlobalKeyEvent(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
+    
+    if (BarcodeService.instance.isPaused) {
+      if (_buffer.isNotEmpty) _buffer.clear();
+      return false;
+    }
 
     // Jika ada text input yang sedang fokus (misal saat tambah produk), 
     // biarkan scanner mengetik langsung ke text field tersebut tanpa diintersep.

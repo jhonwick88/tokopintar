@@ -47,6 +47,7 @@ class ApiClient {
   }
 
   String get baseUrl => _baseUrl;
+  Dio get dio => _dio;
 
   Future<List<CategoryModel>> getCategories() async {
     try {

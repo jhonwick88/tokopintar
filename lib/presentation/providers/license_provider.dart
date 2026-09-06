@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:convert';
 
 class LicenseState {
@@ -79,10 +80,16 @@ class LicenseNotifier extends StateNotifier<LicenseState> {
     _fetchStatus();
   }
 
+  Future<String> _getBaseUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('local_rest_api_url') ?? dotenv.env['API_BASE_URL'] ?? 'http://localhost:8181';
+  }
+
   Future<void> _fetchStatus() async {
     try {
+      final baseUrl = await _getBaseUrl();
       final dio = Dio(BaseOptions(
-        baseUrl: 'http://localhost:8181',
+        baseUrl: baseUrl,
         connectTimeout: const Duration(seconds: 5),
         receiveTimeout: const Duration(seconds: 3),
       ));
@@ -112,8 +119,9 @@ class LicenseNotifier extends StateNotifier<LicenseState> {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
+      final baseUrl = await _getBaseUrl();
       final dio = Dio(BaseOptions(
-        baseUrl: 'http://localhost:8181',
+        baseUrl: baseUrl,
         connectTimeout: const Duration(seconds: 5),
         receiveTimeout: const Duration(seconds: 3),
       ));
@@ -164,6 +172,53 @@ class LicenseNotifier extends StateNotifier<LicenseState> {
         isLoading: false,
         errorMessage: errMsg,
       );
+      return false;
+    }
+  }
+
+  Future<bool> requestTrial() async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+
+    try {
+      final baseUrl = await _getBaseUrl();
+      final dio = Dio(BaseOptions(
+        baseUrl: baseUrl,
+        connectTimeout: const Duration(seconds: 5),
+        receiveTimeout: const Duration(seconds: 3),
+      ));
+
+      final response = await dio.post('/api/license/trial');
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('license_token', 'activated');
+      
+      Map<String, dynamic> features = {};
+      if (response.data['features'] != null) {
+        features = response.data['features'];
+        await prefs.setString('license_features', jsonEncode(features));
+      }
+
+      state = state.copyWith(isLoading: false);
+      
+      Future.delayed(const Duration(seconds: 2), () {
+        state = state.copyWith(
+          token: 'activated',
+          isActivated: true,
+          features: features,
+        );
+      });
+
+      return true;
+    } catch (e) {
+      String errMsg = 'Gagal mengambil trial 14 hari.';
+      if (e is DioException) {
+        if (e.response != null && e.response?.data != null) {
+          errMsg = e.response?.data['message'] ?? errMsg;
+        } else {
+          errMsg = 'Network error. Pastikan server (rest_go_toko) menyala.';
+        }
+      }
+      state = state.copyWith(isLoading: false, errorMessage: errMsg);
       return false;
     }
   }

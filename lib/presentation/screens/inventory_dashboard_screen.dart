@@ -46,6 +46,15 @@ class InventoryDashboardScreen extends ConsumerWidget {
                     ),
                     _buildInventoryCard(
                       context: context,
+                      title: 'Manajemen Kategori',
+                      description: 'Tambah, edit, atau hapus data kategori produk',
+                      icon: Icons.category,
+                      color: Colors.orange,
+                      route: '/categories',
+                      isDesktop: isDesktop,
+                    ),
+                    _buildInventoryCard(
+                      context: context,
                       title: 'Master Satuan',
                       description: 'Kelola data satuan produk (pcs, box, lusin, dll)',
                       icon: Icons.straighten,
