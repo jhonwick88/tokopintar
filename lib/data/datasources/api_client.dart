@@ -301,6 +301,12 @@ class ApiClient {
         }
       }
       throw Exception(response.data?['message'] ?? 'Gagal menambahkan produk baru');
+    } on DioException catch (e) {
+      dev.log('Error in createItem (Dio): ${e.response?.data}');
+      if (e.response != null && e.response?.data != null && e.response?.data is Map) {
+        throw Exception(e.response?.data['message'] ?? 'Gagal menambahkan produk baru');
+      }
+      throw Exception('Gagal menambahkan produk baru: ${e.message}');
     } catch (e) {
       dev.log('Error in createItem: $e');
       rethrow;

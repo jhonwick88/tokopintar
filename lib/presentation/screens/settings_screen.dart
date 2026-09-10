@@ -301,9 +301,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           );
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Pengaturan berhasil disimpan'), backgroundColor: Colors.green),
-    );
+    if (currentUser?.role != 'admin') {
+      if (mounted) {
+        setState(() {
+          _isEditingUnlocked = false;
+        });
+      }
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pengaturan berhasil disimpan'), backgroundColor: Colors.green),
+      );
+    }
   }
 
   Future<void> _testApiConnection() async {
@@ -347,7 +357,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       case 'connected':
         color = Colors.green;
         icon = Icons.check_circle;
-        text = 'Koneksi Berhasil! Terhubung ke server REST API Golang.';
+        text = 'Koneksi Berhasil! Terhubung ke Server.';
         break;
       case 'error':
         color = Colors.orange;
@@ -498,6 +508,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final themeMode = ref.watch(themeModeProvider);
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width >= 900;
+    final currentUser = ref.watch(authNotifierProvider).currentUser;
+    final isAdmin = currentUser?.role == 'admin';
     return MainLayout(
       currentRoute: '/settings',
       child: Scaffold(
@@ -635,7 +647,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         Expanded(
                           child: _buildTextField(
                             controller: _apiUrlController,
-                            label: 'Base URL API Golang',
+                            label: 'Base URL Server',
                             hint: 'http://localhost:8181',
                             validator: (val) => val!.isEmpty ? 'URL REST API wajib diisi' : null,
                           ),
@@ -1066,9 +1078,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               const SizedBox(height: 24),
 
-                // Section 5: Sistem & Database
-                _buildDatabaseSettings(),
-                const SizedBox(height: 32),
+                // Section 5: Sistem & Database (Hanya untuk Level Admin)
+                if (isAdmin) ...[
+                  _buildDatabaseSettings(),
+                  const SizedBox(height: 32),
+                ],
 
                 // Section 4: Aplikasi & Sistem
                 _buildCardSection(
@@ -1360,6 +1374,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _handleBackup() async {
+    final currentUser = ref.read(authNotifierProvider).currentUser;
+    if (currentUser?.role != 'admin') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Akses ditolak. Fitur ini hanya untuk level Admin.'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
     try {
       final apiClient = ref.read(apiClientProvider);
 
@@ -1389,6 +1411,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _handleRestore() async {
+    final currentUser = ref.read(authNotifierProvider).currentUser;
+    if (currentUser?.role != 'admin') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Akses ditolak. Fitur ini hanya untuk level Admin.'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(

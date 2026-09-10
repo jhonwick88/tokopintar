@@ -7,6 +7,8 @@ import 'package:intl/intl.dart';
 import 'product_form_screen.dart';
 import 'stock_ledger_screen.dart';
 import '../providers/license_provider.dart';
+import '../providers/auth_provider.dart';
+import '../../core/utils/excel_service.dart';
 
 class ProductsScreen extends ConsumerStatefulWidget {
   const ProductsScreen({super.key});
@@ -127,6 +129,66 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     );
   }
 
+  Future<void> _importExcel() async {
+    try {
+      final itemsToImport = await ExcelService.importProductsFromExcel();
+      if (itemsToImport.isEmpty) return; // cancelled or empty
+
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Mengimpor produk...'),
+            ],
+          ),
+        ),
+      );
+
+      int successCount = 0;
+      String? errorMessage;
+
+      for (var item in itemsToImport) {
+        try {
+          await ref.read(itemsNotifierProvider.notifier).createItem(item);
+          successCount++;
+        } catch (e) {
+          errorMessage = e.toString().replaceAll('Exception: ', '');
+          break; // stop on error (e.g., duplicate or license limit)
+        }
+      }
+
+      if (mounted) Navigator.pop(context); // close dialog
+
+      if (errorMessage != null && mounted) {
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Import Terhenti'),
+            content: Text('Berhasil mengimpor $successCount produk.\n\nBerhenti karena:\n$errorMessage'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Tutup')),
+            ],
+          ),
+        );
+      } else if (successCount > 0 && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Berhasil mengimpor $successCount produk'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final itemsState = ref.watch(itemsNotifierProvider);
@@ -139,6 +201,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       symbol: 'Rp ',
       decimalDigits: 0,
     );
+    
+    final isAdmin = ref.watch(authNotifierProvider).currentUser?.role == 'admin';
     
     return MainLayout(
       currentRoute: '/products',
@@ -154,6 +218,31 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
               },
               tooltip: 'Refresh Data',
             ),
+            if (isAdmin)
+              PopupMenuButton<String>(
+                onSelected: (value) async {
+                  if (value == 'download_template') {
+                    final success = await ExcelService.generateProductTemplate();
+                    if (success && mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Template berhasil diunduh'), backgroundColor: Colors.green),
+                      );
+                    }
+                  } else if (value == 'import_excel') {
+                    _importExcel();
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'download_template',
+                    child: Text('Download Template Excel'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'import_excel',
+                    child: Text('Import Produk dari Excel'),
+                  ),
+                ],
+              ),
           ],
         ),
         body: Padding(

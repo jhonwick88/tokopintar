@@ -288,13 +288,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     // Quick guide hints for testing
                     Divider(color: Colors.grey.withOpacity(0.15)),
                     const SizedBox(height: 12),
-                    Text(
-                      'Demo Admin PIN: 1234  |  Kasir PIN: 0000',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
-                      ),
-                    ),
+                    // Text(
+                    //   'Demo Admin PIN: 1234  |  Kasir PIN: 0000',
+                    //   style: TextStyle(
+                    //     fontSize: 11,
+                    //     color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+                    //   ),
+                    // ),
                   ],
                 ),
               ),
