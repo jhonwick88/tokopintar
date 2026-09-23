@@ -7,8 +7,9 @@ import '../../data/models/sale_model.dart';
 import '../providers/sales_history_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/auth_provider.dart';
-import '../providers/reconciliation_provider.dart';
+import '../providers/reconciliation_provider.dart' hide DateTimeRange;
 import '../widgets/main_layout.dart';
+import '../widgets/cash_out_dialog.dart';
 
 class SalesHistoryScreen extends ConsumerStatefulWidget {
   const SalesHistoryScreen({super.key});
@@ -163,6 +164,22 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
   SaleModel? _selectedSale;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _keyboardFocusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshToday();
+    });
+  }
+
+  void _refreshToday() {
+    final now = DateTime.now();
+    ref.read(salesHistoryNotifierProvider.notifier).updateDateFilter(
+      DateTime(now.year, now.month, now.day),
+      DateTime(now.year, now.month, now.day, 23, 59, 59),
+    );
+  }
 
   @override
   void dispose() {
@@ -417,9 +434,13 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
         .fold(0.0, (sum, s) => sum + s.discount);
     
     final today = DateTime.now();
-    final todayRevenue = historyState.sales
+    final todaySales = historyState.sales
         .where((s) => s.date.year == today.year && s.date.month == today.month && s.date.day == today.day)
         .where((s) => s.status != 'voided' && s.status != 'refunded')
+        .toList();
+    final todayRevenue = todaySales.fold(0.0, (sum, s) => sum + s.grandTotal);
+    final todayCashRevenue = todaySales
+        .where((s) => s.paymentMethod.toLowerCase() == 'cash')
         .fold(0.0, (sum, s) => sum + s.grandTotal);
 
     return KeyboardListener(
@@ -433,6 +454,11 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
           title: const Text('Riwayat', style: TextStyle(fontWeight: FontWeight.bold)),
           centerTitle: false,
           actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Muat Ulang / Hari Ini',
+              onPressed: _refreshToday,
+            ),
             IconButton(
               icon: const Icon(Icons.download),
               tooltip: 'Ekspor ke CSV',
@@ -473,8 +499,13 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
               flex: 4,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: CustomScrollView(
-                  slivers: [
+                child: RefreshIndicator(
+                  onRefresh: () async {
+                    await ref.read(salesHistoryNotifierProvider.notifier).fetchSales();
+                  },
+                  child: CustomScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
                     // Summary Cards Grid
                     SliverToBoxAdapter(
                       child: Padding(
@@ -496,9 +527,9 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                       title: 'Omzet',
                                       value: currencyFormatter.format(activeRevenue),
                                       icon: Icons.monetization_on,
-                                      color: Colors.green,
-                                      onTap: () => _showCashReconciliationDialog(todayRevenue),
-                                    ),
+                                       color: Colors.green,
+                                       onTap: () => _showCashReconciliationDialog(todayRevenue, todayCashRevenue),
+                                     ),
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
@@ -538,9 +569,9 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                           title: 'Omzet',
                                           value: currencyFormatter.format(activeRevenue),
                                           icon: Icons.monetization_on,
-                                          color: Colors.green,
-                                          onTap: () => _showCashReconciliationDialog(todayRevenue),
-                                        ),
+                                           color: Colors.green,
+                                           onTap: () => _showCashReconciliationDialog(todayRevenue, todayCashRevenue),
+                                         ),
                                       ),
                                     ],
                                   ),
@@ -767,6 +798,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                       ),
                   ],
                 ),
+                ),
               ),
             ),
             
@@ -891,8 +923,11 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
     return cardContent;
   }
 
-  void _showCashReconciliationDialog(double todayRevenue) {
-    final defaultOperator = '';
+  void _showCashReconciliationDialog(double todayRevenue, double todayCashRevenue) {
+    final authState = ref.read(authNotifierProvider);
+    final defaultOperator = authState.currentUser?.fullname.isNotEmpty == true
+        ? authState.currentUser!.fullname
+        : (authState.currentUser?.username ?? '');
     final operatorController = TextEditingController(text: defaultOperator);
     final cashController = TextEditingController();
     final notesController = TextEditingController();
@@ -901,19 +936,22 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setState) {
-            final difference = actualCash - todayRevenue;
+            final recState = ref.watch(reconciliationProvider);
+            final todayCashOut = recState.todayCashOut;
+            final expectedSystemCash = (todayCashRevenue - todayCashOut).clamp(0.0, double.infinity);
+            final difference = actualCash - expectedSystemCash;
             
             double accuracyRate;
-            if (todayRevenue == 0) {
+            if (expectedSystemCash == 0) {
               accuracyRate = actualCash == 0 ? 100.0 : 0.0;
             } else {
-              if (actualCash >= todayRevenue) {
-                accuracyRate = (todayRevenue / actualCash) * 100;
+              if (actualCash >= expectedSystemCash) {
+                accuracyRate = (expectedSystemCash / actualCash) * 100;
               } else {
-                accuracyRate = (actualCash / todayRevenue) * 100;
+                accuracyRate = (actualCash / expectedSystemCash) * 100;
               }
             }
             
@@ -940,10 +978,11 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Bandingkan uang fisik di laci dengan omzet tercatat di aplikasi hari ini.',
+                      'Bandingkan uang fisik di laci dengan kas bersih sistem hari ini.',
                       style: TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                     const SizedBox(height: 16),
+                    // Summary Breakdown Box
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -951,13 +990,53 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.teal.withOpacity(0.2)),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      child: Column(
                         children: [
-                          const Text('Omzet Hari Ini (Sistem):', style: TextStyle(fontWeight: FontWeight.bold)),
-                          Text(
-                            currencyFormatter.format(todayRevenue),
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal, fontSize: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Penjualan Tunai:', style: TextStyle(fontSize: 13)),
+                              Text(
+                                currencyFormatter.format(todayCashRevenue),
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Text('Kas Keluar (Laci):', style: TextStyle(fontSize: 13, color: Colors.orange)),
+                                  const SizedBox(width: 6),
+                                  InkWell(
+                                    onTap: () async {
+                                      final res = await CashOutDialog.show(context);
+                                      if (res == true) {
+                                        setState(() {});
+                                      }
+                                    },
+                                    child: const Icon(Icons.add_circle_outline, size: 16, color: Colors.orange),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                '- ${currencyFormatter.format(todayCashOut)}',
+                                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 14),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Kas Bersih Seharusnya:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                              Text(
+                                currencyFormatter.format(expectedSystemCash),
+                                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal, fontSize: 16),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -985,7 +1064,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                       decoration: const InputDecoration(
                         labelText: 'Uang Fisik di Laci (Rp)',
                         prefixIcon: Icon(Icons.payments),
-                        hintText: 'Masukkan jumlah uang fisik',
+                        hintText: 'Masukkan jumlah uang fisik di laci',
                       ),
                       keyboardType: TextInputType.number,
                       onChanged: (val) {
@@ -1041,7 +1120,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                       maxLines: 2,
                       decoration: const InputDecoration(
                         labelText: 'Catatan (Opsional)',
-                        hintText: 'Contoh: Selisih Rp 2.000 karena kembalian...',
+                        hintText: 'Contoh: Selisih Rp 2.000 karena pembulatan...',
                         prefixIcon: Icon(Icons.note_alt),
                       ),
                     ),
@@ -1068,7 +1147,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                     final success = await ref
                         .read(salesHistoryNotifierProvider.notifier)
                         .saveReconciliation(
-                          systemRevenue: todayRevenue,
+                          systemRevenue: expectedSystemCash,
                           actualDrawerCash: actualCash,
                           notes: notesController.text.trim(),
                           operatorName: opName,
@@ -1078,7 +1157,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                       ref.read(reconciliationProvider.notifier).fetchReconciliations();
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Rekonsiliasi kas berhasil disimpan ke Firestore'),
+                          content: Text('Rekonsiliasi kas berhasil disimpan'),
                           backgroundColor: Colors.green,
                         ),
                       );

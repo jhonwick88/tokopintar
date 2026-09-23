@@ -1,11 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/cash_reconciliation_model.dart';
+import '../../data/models/cash_movement_model.dart';
 import '../../domain/repositories/sales_repository.dart';
 import 'dart:developer' as dev;
 import 'settings_provider.dart';
 
 class ReconciliationState {
   final List<CashReconciliationModel> reconciliations;
+  final List<CashMovementModel> cashMovements;
   final String filterType; // 'today', 'weekly', 'monthly', 'custom'
   final DateTime? customStartDate;
   final DateTime? customEndDate;
@@ -14,6 +16,7 @@ class ReconciliationState {
 
   ReconciliationState({
     this.reconciliations = const [],
+    this.cashMovements = const [],
     this.filterType = 'weekly',
     this.customStartDate,
     this.customEndDate,
@@ -21,7 +24,7 @@ class ReconciliationState {
     this.errorMessage,
   });
 
-  List<CashReconciliationModel> get filteredReconciliations {
+  DateTimeRange get _activeRange {
     final now = DateTime.now();
     DateTime start;
     DateTime end = DateTime(now.year, now.month, now.day, 23, 59, 59);
@@ -34,14 +37,29 @@ class ReconciliationState {
       start = DateTime(now.year, now.month, 1);
     } else {
       // custom
-      if (customStartDate == null || customEndDate == null) return reconciliations;
-      start = DateTime(customStartDate!.year, customStartDate!.month, customStartDate!.day);
-      end = DateTime(customEndDate!.year, customEndDate!.month, customEndDate!.day, 23, 59, 59);
+      if (customStartDate == null || customEndDate == null) {
+        start = DateTime(2000);
+      } else {
+        start = DateTime(customStartDate!.year, customStartDate!.month, customStartDate!.day);
+        end = DateTime(customEndDate!.year, customEndDate!.month, customEndDate!.day, 23, 59, 59);
+      }
     }
+    return DateTimeRange(start: start, end: end);
+  }
 
+  List<CashReconciliationModel> get filteredReconciliations {
+    final range = _activeRange;
     return reconciliations.where((rec) {
-      return (rec.date.isAfter(start) || rec.date.isAtSameMomentAs(start)) &&
-             (rec.date.isBefore(end) || rec.date.isAtSameMomentAs(end));
+      return (rec.date.isAfter(range.start) || rec.date.isAtSameMomentAs(range.start)) &&
+             (rec.date.isBefore(range.end) || rec.date.isAtSameMomentAs(range.end));
+    }).toList();
+  }
+
+  List<CashMovementModel> get filteredCashMovements {
+    final range = _activeRange;
+    return cashMovements.where((mov) {
+      return (mov.date.isAfter(range.start) || mov.date.isAtSameMomentAs(range.start)) &&
+             (mov.date.isBefore(range.end) || mov.date.isAtSameMomentAs(range.end));
     }).toList();
   }
 
@@ -61,8 +79,26 @@ class ReconciliationState {
     return filteredReconciliations.fold(0.0, (sum, rec) => sum + rec.difference);
   }
 
+  double get totalCashOut {
+    return filteredCashMovements
+        .where((m) => m.type == 'OUT')
+        .fold(0.0, (sum, m) => sum + m.amount);
+  }
+
+  double get todayCashOut {
+    final now = DateTime.now();
+    return cashMovements
+        .where((m) =>
+            m.type == 'OUT' &&
+            m.date.year == now.year &&
+            m.date.month == now.month &&
+            m.date.day == now.day)
+        .fold(0.0, (sum, m) => sum + m.amount);
+  }
+
   ReconciliationState copyWith({
     List<CashReconciliationModel>? reconciliations,
+    List<CashMovementModel>? cashMovements,
     String? filterType,
     DateTime? customStartDate,
     DateTime? customEndDate,
@@ -72,6 +108,7 @@ class ReconciliationState {
   }) {
     return ReconciliationState(
       reconciliations: reconciliations ?? this.reconciliations,
+      cashMovements: cashMovements ?? this.cashMovements,
       filterType: filterType ?? this.filterType,
       customStartDate: clearCustomDates ? null : (customStartDate ?? this.customStartDate),
       customEndDate: clearCustomDates ? null : (customEndDate ?? this.customEndDate),
@@ -81,23 +118,63 @@ class ReconciliationState {
   }
 }
 
+class DateTimeRange {
+  final DateTime start;
+  final DateTime end;
+  DateTimeRange({required this.start, required this.end});
+}
+
 class ReconciliationNotifier extends StateNotifier<ReconciliationState> {
   final SalesRepository _salesRepository;
 
   ReconciliationNotifier(this._salesRepository) : super(ReconciliationState()) {
-    fetchReconciliations();
+    fetchData();
   }
 
-  Future<void> fetchReconciliations() async {
+  Future<void> fetchData() async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final list = await _salesRepository.getCashReconciliations();
-      state = state.copyWith(reconciliations: list, isLoading: false);
+      final reconciliations = await _salesRepository.getCashReconciliations();
+      final movements = await _salesRepository.getCashMovements();
+      state = state.copyWith(
+        reconciliations: reconciliations,
+        cashMovements: movements,
+        isLoading: false,
+      );
     } catch (e) {
+      dev.log('Failed to fetch cash data: $e');
       state = state.copyWith(
         isLoading: false,
         errorMessage: 'Gagal memuat analisis kas: $e',
       );
+    }
+  }
+
+  Future<void> fetchReconciliations() async {
+    await fetchData();
+  }
+
+  Future<void> addCashMovement(CashMovementModel movement) async {
+    try {
+      final created = await _salesRepository.saveCashMovement(movement);
+      state = state.copyWith(
+        cashMovements: [created, ...state.cashMovements],
+      );
+    } catch (e) {
+      dev.log('Failed to add cash movement: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteCashMovement(String id) async {
+    try {
+      await _salesRepository.deleteCashMovement(id);
+      state = state.copyWith(
+        cashMovements: state.cashMovements.where((m) => m.id != id).toList(),
+      );
+    } catch (e) {
+      dev.log('Failed to delete cash movement: $e');
+      rethrow;
     }
   }
 

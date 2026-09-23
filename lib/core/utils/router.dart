@@ -18,6 +18,8 @@ import '../../presentation/screens/stock_opname_screen.dart';
 import '../../presentation/screens/inventory_dashboard_screen.dart';
 import '../../presentation/screens/suppliers_screen.dart';
 import '../../presentation/screens/developer_contact_screen.dart';
+import '../../presentation/screens/sales_report_screen.dart';
+import '../../presentation/screens/users_screen.dart';
 import '../../data/models/category_model.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -54,7 +56,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
       }
 
-      final adminRoutes = ['/reconciliation-analysis', '/inventory', '/products', '/categories', '/categories/new', '/categories/edit', '/units', '/stock-opname', '/suppliers'];
+      final adminRoutes = [
+        '/reconciliation-analysis',
+        '/inventory',
+        '/products',
+        '/categories',
+        '/categories/new',
+        '/categories/edit',
+        '/units',
+        '/stock-opname',
+        '/suppliers',
+        '/sales-report',
+        '/users',
+      ];
       if (adminRoutes.contains(state.matchedLocation) && authState.currentUser?.role != 'admin') {
         return '/pos';
       }
@@ -64,6 +78,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/inventory',
         builder: (context, state) => const InventoryDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/sales-report',
+        builder: (context, state) => const SalesReportScreen(),
+      ),
+      GoRoute(
+        path: '/users',
+        builder: (context, state) => const UsersScreen(),
       ),
       GoRoute(
         path: '/categories',

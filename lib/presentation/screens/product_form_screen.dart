@@ -1,8 +1,16 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../data/models/item_model.dart';
+import '../../data/models/category_model.dart';
 import '../providers/items_provider.dart';
+import '../providers/categories_provider.dart';
 import '../providers/unit_provider.dart';
+import '../widgets/camera_scanner_dialog.dart';
+import '../widgets/app_permissions_dialog.dart';
+import 'pos_screen.dart';
 
 class ProductFormScreen extends ConsumerStatefulWidget {
   final ItemModel? existingItem;
@@ -36,6 +44,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   late TextEditingController _defUnitPrice2Controller;
   late TextEditingController _defUnitPrice3Controller;
 
+  bool _isShortNameManuallyEdited = false;
   bool _isLoading = false;
 
   @override
@@ -45,10 +54,29 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
 
     _skuController = TextEditingController(text: item?.itemNo ?? '');
     _nameController = TextEditingController(text: item?.itemName ?? '');
-    _nameShortController = TextEditingController(text: item?.itemNameShort ?? '');
+    
+    final initialShortName = item?.itemNameShort ?? '';
+    _nameShortController = TextEditingController(text: initialShortName);
+    
+    _isShortNameManuallyEdited = initialShortName.isNotEmpty &&
+        initialShortName != generateItemNameShort(item?.itemName ?? '');
+
+    _nameController.addListener(() {
+      if (!_isShortNameManuallyEdited) {
+        final newShort = generateItemNameShort(_nameController.text);
+        if (_nameShortController.text != newShort) {
+          _nameShortController.text = newShort;
+        }
+      }
+    });
+
     _upcController = TextEditingController(text: item?.itemUPC ?? '');
-    _priceController = TextEditingController(text: item?.price.toString() ?? '0.0');
-    _obQuantityController = TextEditingController(text: item?.obQuantity.toString() ?? '10.0');
+    _priceController = TextEditingController(
+      text: item != null ? item.price.toStringAsFixed(0) : '0',
+    );
+    _obQuantityController = TextEditingController(
+      text: item != null ? item.obQuantity.toStringAsFixed(0) : '0',
+    );
     _notesController = TextEditingController(text: item?.notes ?? '');
     _attributeController = TextEditingController(text: item?.attribute ?? '');
 
@@ -80,11 +108,35 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     super.dispose();
   }
 
+  Future<void> _scanBarcode() async {
+    var status = await Permission.camera.status;
+    if (status != PermissionStatus.granted) {
+      if (mounted) {
+        await AppPermissionsDialog.show(context);
+      }
+      status = await Permission.camera.status;
+      if (status != PermissionStatus.granted) {
+        return;
+      }
+    }
+
+    if (!mounted) return;
+    final scanned = await showDialog<String>(
+      context: context,
+      builder: (context) => const CameraScannerDialog(),
+    );
+    if (scanned != null && scanned.isNotEmpty) {
+      setState(() {
+        _upcController.text = scanned;
+      });
+    }
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
-    
+
     final price = double.tryParse(_priceController.text) ?? 0.0;
     final obQuantity = double.tryParse(_obQuantityController.text) ?? 0.0;
     final ratio2 = double.tryParse(_ratio2Controller.text) ?? 0.0;
@@ -115,23 +167,120 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
       if (widget.existingItem == null) {
         await ref.read(itemsNotifierProvider.notifier).createItem(newItem);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Produk berhasil ditambahkan!')));
-          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Produk berhasil ditambahkan!'), backgroundColor: Colors.green),
+          );
+          Navigator.pop(context, newItem);
         }
       } else {
         await ref.read(itemsNotifierProvider.notifier).updateItem(widget.existingItem!.itemNo, newItem);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Produk berhasil diperbarui!')));
-          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Produk berhasil diperbarui!'), backgroundColor: Colors.green),
+          );
+          Navigator.pop(context, newItem);
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _showQuickAddCategoryDialog() async {
+    final nameController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        bool isSaving = false;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.add_circle, color: Colors.blueAccent),
+                  SizedBox(width: 8),
+                  Text('Tambah Kategori Cepat'),
+                ],
+              ),
+              content: Form(
+                key: formKey,
+                child: TextFormField(
+                  controller: nameController,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Nama Kategori',
+                    hintText: 'Contoh: Minuman Dingin, Snack, dll',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Nama kategori wajib diisi' : null,
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSaving ? null : () => Navigator.of(ctx).pop(),
+                  child: const Text('Batal'),
+                ),
+                ElevatedButton(
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          if (!formKey.currentState!.validate()) return;
+                          setDialogState(() => isSaving = true);
+                          try {
+                            final newCategory = CategoryModel(
+                              id: 0,
+                              name: nameController.text.trim(),
+                            );
+                            await ref.read(categoriesProvider.notifier).createCategory(newCategory);
+                            await ref.read(itemsNotifierProvider.notifier).loadItems();
+
+                            final updatedCategories = ref.read(categoriesProvider).categories;
+                            final matched = updatedCategories.firstWhere(
+                              (c) => c.name.toLowerCase() == nameController.text.trim().toLowerCase(),
+                              orElse: () => updatedCategories.isNotEmpty ? updatedCategories.last : CategoryModel(id: 0, name: ''),
+                            );
+                            if (matched.id != 0) {
+                              setState(() {
+                                _categoryId = matched.id;
+                              });
+                            }
+
+                            if (ctx.mounted) {
+                              Navigator.of(ctx).pop();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Kategori "${nameController.text.trim()}" berhasil ditambahkan!'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            setDialogState(() => isSaving = false);
+                            if (ctx.mounted) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                SnackBar(content: Text('Gagal menambah kategori: $e'), backgroundColor: Colors.red),
+                              );
+                            }
+                          }
+                        },
+                  child: isSaving
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Simpan'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -143,7 +292,6 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     if (unitsState.hasValue) {
       unitNames.addAll(unitsState.value!.map((e) => e.name).toList());
     }
-    // Ensure currently selected units are in the list if not found
     for (final u in [_unit1, _unit2, _unit3]) {
       if (u != null && u.isNotEmpty && !unitNames.contains(u)) {
         unitNames.add(u);
@@ -153,89 +301,150 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.existingItem == null ? 'Tambah Produk' : 'Edit Produk'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.check),
+            tooltip: 'Simpan',
+            onPressed: _isLoading ? null : _save,
+          ),
+        ],
       ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  _buildBasicInfoCard(categories),
-                  const SizedBox(height: 16),
-                  _buildPriceStockCard(),
-                  const SizedBox(height: 16),
-                  _buildUnitsCard(unitNames),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _save,
-                      child: Text(widget.existingItem == null ? 'Simpan Produk Baru' : 'Simpan Perubahan'),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 800),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildBasicInfoCard(categories),
+                        const SizedBox(height: 16),
+                        _buildPriceStockCard(),
+                        const SizedBox(height: 16),
+                        _buildUnitsCard(unitNames),
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          height: 50,
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.save),
+                            onPressed: _save,
+                            label: Text(
+                              widget.existingItem == null ? 'Simpan Produk Baru' : 'Simpan Perubahan',
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 40),
-                ],
+                ),
               ),
             ),
-          ),
     );
   }
 
   Widget _buildBasicInfoCard(List<dynamic> categories) {
+    final isMobile = !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+
     return Card(
       elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Informasi Dasar', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const Divider(),
+            const Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.blueAccent),
+                SizedBox(width: 8),
+                Text('Informasi Dasar', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const Divider(height: 24),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                if (constraints.maxWidth > 500) {
+                  return Row(
+                    children: [
+                      Expanded(child: _buildSkuField()),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildUpcField(isMobile)),
+                    ],
+                  );
+                } else {
+                  return Column(
+                    children: [
+                      _buildSkuField(),
+                      const SizedBox(height: 14),
+                      _buildUpcField(isMobile),
+                    ],
+                  );
+                }
+              },
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: 'Nama Produk *',
+                prefixIcon: Icon(Icons.shopping_bag_outlined),
+                border: OutlineInputBorder(),
+              ),
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'Nama produk wajib diisi' : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _nameShortController,
+              onChanged: (_) {
+                _isShortNameManuallyEdited = true;
+              },
+              decoration: const InputDecoration(
+                labelText: 'Nama Singkat / Struk (Opsional)',
+                prefixIcon: Icon(Icons.short_text),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 14),
             Row(
               children: [
                 Expanded(
-                  child: TextFormField(
-                    controller: _skuController,
-                    decoration: const InputDecoration(labelText: 'SKU / Kode Item'),
+                  child: DropdownButtonFormField<int>(
+                    value: categories.any((c) => c.id == _categoryId) ? _categoryId : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Kategori',
+                      prefixIcon: Icon(Icons.category_outlined),
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      const DropdownMenuItem<int>(
+                        value: 0,
+                        child: Text('Tanpa Kategori'),
+                      ),
+                      ...categories.map((c) {
+                        return DropdownMenuItem<int>(
+                          value: c.id,
+                          child: Text(c.name),
+                        );
+                      }),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) setState(() => _categoryId = val);
+                    },
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextFormField(
-                    controller: _upcController,
-                    autofocus: true,
-                    decoration: const InputDecoration(labelText: 'Barcode (UPC)'),
-                  ),
+                const SizedBox(width: 8),
+                IconButton.filledTonal(
+                  icon: const Icon(Icons.add),
+                  tooltip: 'Tambah Kategori Cepat',
+                  onPressed: _showQuickAddCategoryDialog,
                 ),
               ],
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _nameController,
-              decoration: const InputDecoration(labelText: 'Nama Produk *'),
-              validator: (v) => (v == null || v.isEmpty) ? 'Nama produk wajib diisi' : null,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _nameShortController,
-              decoration: const InputDecoration(labelText: 'Nama Pendek (Opsional)'),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<int>(
-              value: categories.any((c) => c.id == _categoryId) ? _categoryId : null,
-              decoration: const InputDecoration(labelText: 'Kategori'),
-              items: categories.map((c) {
-                return DropdownMenuItem<int>(
-                  value: c.id,
-                  child: Text(c.name),
-                );
-              }).toList(),
-              onChanged: (val) {
-                if (val != null) setState(() => _categoryId = val);
-              },
             ),
           ],
         ),
@@ -243,39 +452,142 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     );
   }
 
+  Widget _buildSkuField() {
+    return TextFormField(
+      controller: _skuController,
+      decoration: InputDecoration(
+        labelText: 'SKU / Kode Item *',
+        prefixIcon: const Icon(Icons.inventory_2_outlined),
+        border: const OutlineInputBorder(),
+        suffixIcon: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.auto_awesome, color: Colors.blue),
+              onPressed: () {
+                final generated = generateSKUFromName(_nameController.text);
+                if (generated.isNotEmpty) {
+                  setState(() {
+                    _skuController.text = generated;
+                  });
+                }
+              },
+              tooltip: 'Generate SKU Otomatis',
+            ),
+            IconButton(
+              icon: const Icon(Icons.help_outline, color: Colors.grey),
+              onPressed: () => showSKUGuideDialog(context),
+              tooltip: 'Panduan SKU',
+            ),
+          ],
+        ),
+      ),
+      validator: (v) => (v == null || v.trim().isEmpty) ? 'SKU wajib diisi' : null,
+    );
+  }
+
+  Widget _buildUpcField(bool isMobile) {
+    return TextFormField(
+      controller: _upcController,
+      decoration: InputDecoration(
+        labelText: 'Barcode (UPC)',
+        prefixIcon: const Icon(Icons.qr_code),
+        border: const OutlineInputBorder(),
+        suffixIcon: isMobile
+            ? IconButton(
+                icon: const Icon(Icons.qr_code_scanner),
+                onPressed: _scanBarcode,
+                tooltip: 'Scan Barcode Kamera',
+              )
+            : null,
+      ),
+    );
+  }
+
   Widget _buildPriceStockCard() {
     return Card(
       elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Harga & Stok Dasar', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const Divider(),
-            Row(
+            const Row(
               children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _priceController,
-                    decoration: const InputDecoration(labelText: 'Harga Jual Dasar (Rp)'),
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextFormField(
-                    controller: _obQuantityController,
-                    decoration: const InputDecoration(labelText: 'Stok Awal'),
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
+                Icon(Icons.monetization_on_outlined, color: Colors.green),
+                SizedBox(width: 8),
+                Text('Harga & Stok Dasar', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ],
             ),
-            const SizedBox(height: 12),
+            const Divider(height: 24),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                if (constraints.maxWidth > 500) {
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _priceController,
+                          decoration: const InputDecoration(
+                            labelText: 'Harga Jual Dasar (Rp) *',
+                            prefixIcon: Icon(Icons.attach_money),
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          validator: (v) => (v == null || v.trim().isEmpty) ? 'Harga wajib diisi' : null,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _obQuantityController,
+                          decoration: const InputDecoration(
+                            labelText: 'Stok Awal',
+                            prefixIcon: Icon(Icons.warehouse_outlined),
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        ),
+                      ),
+                    ],
+                  );
+                } else {
+                  return Column(
+                    children: [
+                      TextFormField(
+                        controller: _priceController,
+                        decoration: const InputDecoration(
+                          labelText: 'Harga Jual Dasar (Rp) *',
+                          prefixIcon: Icon(Icons.attach_money),
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Harga wajib diisi' : null,
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: _obQuantityController,
+                        decoration: const InputDecoration(
+                          labelText: 'Stok Awal',
+                          prefixIcon: Icon(Icons.warehouse_outlined),
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      ),
+                    ],
+                  );
+                }
+              },
+            ),
+            const SizedBox(height: 14),
             TextFormField(
               controller: _notesController,
-              decoration: const InputDecoration(labelText: 'Catatan'),
+              decoration: const InputDecoration(
+                labelText: 'Catatan Produk',
+                prefixIcon: Icon(Icons.notes),
+                border: OutlineInputBorder(),
+              ),
             ),
           ],
         ),
@@ -286,83 +598,116 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   Widget _buildUnitsCard(List<String> unitNames) {
     return Card(
       elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Pengaturan Multi Satuan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const Divider(),
+            const Row(
+              children: [
+                Icon(Icons.layers_outlined, color: Colors.orange),
+                SizedBox(width: 8),
+                Text('Pengaturan Multi Satuan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const Divider(height: 24),
             
             // Unit 1
-            const Text('Satuan Dasar (Unit 1)', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('Satuan Dasar (Unit 1)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               value: _unit1,
-              decoration: const InputDecoration(labelText: 'Nama Satuan 1'),
+              decoration: const InputDecoration(
+                labelText: 'Nama Satuan 1 (e.g. PCS, BTL)',
+                border: OutlineInputBorder(),
+              ),
               items: _buildUnitItems(unitNames),
               onChanged: (val) => setState(() => _unit1 = val),
             ),
             const SizedBox(height: 24),
             
             // Unit 2
-            const Text('Satuan Menengah (Unit 2)', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('Satuan Menengah (Unit 2)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
                   flex: 2,
                   child: DropdownButtonFormField<String>(
                     value: _unit2,
-                    decoration: const InputDecoration(labelText: 'Nama Satuan 2'),
+                    decoration: const InputDecoration(
+                      labelText: 'Nama Satuan 2 (e.g. PACK)',
+                      border: OutlineInputBorder(),
+                    ),
                     items: _buildUnitItems(unitNames),
                     onChanged: (val) => setState(() => _unit2 = val),
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Expanded(
+                  flex: 1,
                   child: TextFormField(
                     controller: _ratio2Controller,
-                    decoration: const InputDecoration(labelText: 'Isi (Ratio)'),
-                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Isi (Rasio)',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             TextFormField(
               controller: _defUnitPrice2Controller,
-              decoration: const InputDecoration(labelText: 'Harga Jual Satuan 2 (Rp)'),
-              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Harga Jual Satuan 2 (Rp)',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
             ),
             const SizedBox(height: 24),
 
             // Unit 3
-            const Text('Satuan Besar (Unit 3)', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('Satuan Besar (Unit 3)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
                   flex: 2,
                   child: DropdownButtonFormField<String>(
                     value: _unit3,
-                    decoration: const InputDecoration(labelText: 'Nama Satuan 3'),
+                    decoration: const InputDecoration(
+                      labelText: 'Nama Satuan 3 (e.g. DUS)',
+                      border: OutlineInputBorder(),
+                    ),
                     items: _buildUnitItems(unitNames),
                     onChanged: (val) => setState(() => _unit3 = val),
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Expanded(
+                  flex: 1,
                   child: TextFormField(
                     controller: _ratio3Controller,
-                    decoration: const InputDecoration(labelText: 'Isi (Ratio)'),
-                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Isi (Rasio)',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             TextFormField(
               controller: _defUnitPrice3Controller,
-              decoration: const InputDecoration(labelText: 'Harga Jual Satuan 3 (Rp)'),
-              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Harga Jual Satuan 3 (Rp)',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
             ),
           ],
         ),

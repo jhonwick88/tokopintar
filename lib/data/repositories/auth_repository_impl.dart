@@ -26,4 +26,14 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> saveUser(UserModel user) {
     return _apiClient.saveUser(user);
   }
+
+  @override
+  Future<void> updateUser(UserModel user) {
+    return _apiClient.updateUser(user);
+  }
+
+  @override
+  Future<void> deleteUser(String uid) {
+    return _apiClient.deleteUser(uid);
+  }
 }

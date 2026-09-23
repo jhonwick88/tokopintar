@@ -1,0 +1,2088 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tokopintar POS - Solusi Kasir Cerdas: Cepat, Bebas Internet & Anti Bocor Kas</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        /* CSS Variables */
+        :root {
+            --bg-color: #0f172a;
+            --bg-card: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --accent: #ec4899;
+            --success: #10b981;
+            --danger: #ef4444;
+        }
+
+        /* Reset & Base */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        /* Layout */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header */
+        header {
+            padding: 20px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .logo {
+            font-size: 26px;
+            font-weight: 800;
+            background: linear-gradient(to right, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-block;
+            border: none;
+            font-size: 16px;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--text-muted);
+            color: var(--text-main);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .btn-wa {
+            background-color: #25D366;
+            color: white;
+            width: 100%;
+            text-align: center;
+            font-size: 16px;
+            margin-top: 20px;
+            box-shadow: 0 4px 15px rgba(37, 211, 102, 0.3);
+            border-radius: 12px;
+        }
+
+        .btn-wa:hover {
+            background-color: #1ebc5a;
+            transform: translateY(-2px);
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 80px 0 60px;
+            text-align: center;
+            position: relative;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 800px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, rgba(15, 23, 42, 0) 70%);
+            z-index: -1;
+        }
+
+        .hero h1 {
+            font-size: 52px;
+            font-weight: 800;
+            margin-bottom: 24px;
+            line-height: 1.15;
+        }
+
+        .hero p {
+            font-size: 18px;
+            color: var(--text-muted);
+            max-width: 650px;
+            margin: 0 auto 40px;
+        }
+
+        /* Intro Grid with Model */
+        .intro-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 50px;
+            align-items: stretch;
+            margin-top: 0;
+            text-align: left;
+        }
+
+        @media(max-width: 768px) {
+            .intro-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .intro-slider-wrapper {
+                aspect-ratio: 4/3;
+                min-height: 360px;
+            }
+        }
+
+        .intro-img {
+            width: 100%;
+            border-radius: 16px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .intro-text h2 {
+            font-size: 32px;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+
+        .intro-text p {
+            color: var(--text-muted);
+            font-size: 17px;
+            margin-bottom: 20px;
+        }
+
+        /* Timer - Ultra Vibrant & Urgent */
+        .timer-container {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.16) 0%, rgba(249, 115, 22, 0.16) 50%, rgba(236, 72, 153, 0.16) 100%);
+            border: 2px solid #f97316;
+            padding: 16px 32px;
+            border-radius: 60px;
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 30px;
+            position: relative;
+            animation: urgentPulseGlow 2.5s infinite alternate ease-in-out;
+            backdrop-filter: blur(10px);
+        }
+
+        @media(min-width: 680px) {
+            .timer-container {
+                flex-direction: row;
+                gap: 25px;
+            }
+        }
+
+        @keyframes urgentPulseGlow {
+            0% {
+                box-shadow: 0 0 20px rgba(239, 68, 68, 0.4), 0 0 40px rgba(249, 115, 22, 0.25), inset 0 0 15px rgba(239, 68, 68, 0.2);
+                border-color: #ef4444;
+            }
+
+            100% {
+                box-shadow: 0 0 35px rgba(249, 115, 22, 0.8), 0 0 70px rgba(239, 68, 68, 0.5), inset 0 0 25px rgba(249, 115, 22, 0.35);
+                border-color: #fbbf24;
+                transform: scale(1.02);
+            }
+        }
+
+        .timer-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #fef08a;
+            font-weight: 800;
+            font-size: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            text-shadow: 0 0 12px rgba(245, 158, 11, 0.8);
+        }
+
+        .timer-badge {
+            background: linear-gradient(90deg, #ef4444, #dc2626);
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 4px 10px;
+            border-radius: 20px;
+            letter-spacing: 1px;
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.6);
+            animation: blinkAlert 1.2s infinite ease-in-out;
+        }
+
+        @keyframes blinkAlert {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.8;
+                transform: scale(0.95);
+            }
+        }
+
+        .timer {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .time-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.88);
+            border: 1px solid rgba(249, 115, 22, 0.6);
+            padding: 8px 14px;
+            border-radius: 12px;
+            min-width: 60px;
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.7), 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .time-box span.num {
+            font-size: 30px;
+            font-weight: 900;
+            line-height: 1;
+            color: #ffedd5;
+            text-shadow: 0 0 15px rgba(249, 115, 22, 0.9), 0 0 30px rgba(239, 68, 68, 0.6);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .time-box span.label {
+            font-size: 10px;
+            color: #fdba74;
+            text-transform: uppercase;
+            margin-top: 4px;
+            letter-spacing: 1.2px;
+            font-weight: 700;
+        }
+
+        .time-colon {
+            font-size: 26px;
+            font-weight: 900;
+            color: #fbbf24;
+            text-shadow: 0 0 10px rgba(251, 191, 36, 0.8);
+            animation: colonBlink 1s infinite;
+        }
+
+        @keyframes colonBlink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        /* Intro Showcase Slider */
+        .intro-slider-wrapper {
+            position: relative;
+            border-radius: 20px;
+            overflow: hidden;
+            background: #0b0f19;
+            border: 2px solid rgba(99, 102, 241, 0.4);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(99, 102, 241, 0.25);
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+        }
+
+        .slider-screen {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .slide-item {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
+            background: radial-gradient(circle at center, #1e293b 0%, #0b0f19 100%);
+            overflow: hidden;
+        }
+
+        .slide-item.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Slide 0: Multi Device Composition (PC from left, Tablet from bottom, HP from right) */
+        .slide-multidevice {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        .slide-multidevice .img-pc {
+            position: absolute;
+            width: 66%;
+            left: 6%;
+            top: 12%;
+            filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.7));
+            opacity: 0;
+            transform: translateX(-140px) scale(0.85);
+            transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 1;
+        }
+
+        .slide-multidevice .img-phone {
+            position: absolute;
+            width: 28%;
+            right: 6%;
+            bottom: 16%;
+            filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.7));
+            opacity: 0;
+            transform: translateX(140px) scale(0.85);
+            transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.1s;
+            z-index: 3;
+        }
+
+        .slide-multidevice .img-tablet {
+            position: absolute;
+            width: 52%;
+            left: 22%;
+            bottom: 12%;
+            filter: drop-shadow(0 25px 35px rgba(0, 0, 0, 0.85));
+            opacity: 0;
+            transform: translateY(140px) scale(0.85);
+            transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.2s;
+            z-index: 2;
+        }
+
+        .slide-item.active .slide-multidevice .img-pc {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+            animation: gentleFloat1 4s ease-in-out infinite 0.7s alternate;
+        }
+
+        .slide-item.active .slide-multidevice .img-phone {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+            animation: gentleFloat2 4.5s ease-in-out infinite 0.8s alternate;
+        }
+
+        .slide-item.active .slide-multidevice .img-tablet {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            animation: gentleFloat3 5s ease-in-out infinite 0.9s alternate;
+        }
+
+        @keyframes gentleFloat1 {
+            0% {
+                transform: translateY(0);
+            }
+
+            100% {
+                transform: translateY(-7px);
+            }
+        }
+
+        @keyframes gentleFloat2 {
+            0% {
+                transform: translateY(0);
+            }
+
+            100% {
+                transform: translateY(-9px);
+            }
+        }
+
+        @keyframes gentleFloat3 {
+            0% {
+                transform: translateY(0);
+            }
+
+            100% {
+                transform: translateY(-6px);
+            }
+        }
+
+        /* Slide 1: Server Lokal Super Cepat */
+        .slide-server {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        .slide-server .img-server {
+            position: absolute;
+            width: 54%;
+            left: 8%;
+            top: 22%;
+            filter: drop-shadow(0 0 35px rgba(99, 102, 241, 0.4));
+            opacity: 0;
+            transform: translateX(-120px);
+            transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .slide-server .img-speed {
+            position: absolute;
+            width: 50%;
+            right: 6%;
+            top: 26%;
+            filter: drop-shadow(0 0 35px rgba(251, 191, 36, 0.5));
+            opacity: 0;
+            transform: scale(0.6) rotate(-15deg);
+            transition: all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s;
+        }
+
+        .slide-item.active .slide-server .img-server {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .slide-item.active .slide-server .img-speed {
+            opacity: 1;
+            transform: scale(1) rotate(0deg);
+            animation: boltPulse 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes boltPulse {
+            0% {
+                transform: scale(1);
+                filter: drop-shadow(0 0 25px rgba(251, 191, 36, 0.5));
+            }
+
+            100% {
+                transform: scale(1.06);
+                filter: drop-shadow(0 0 45px rgba(251, 191, 36, 0.9));
+            }
+        }
+
+        /* Slide 2: Paket Komplit */
+        .slide-package {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        .slide-package .img-box {
+            position: absolute;
+            width: 54%;
+            left: 6%;
+            top: 14%;
+            filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.7));
+            opacity: 0;
+            transform: translateY(-100px);
+            transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .slide-package .img-hardware {
+            position: absolute;
+            width: 52%;
+            right: 6%;
+            bottom: 14%;
+            filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.7));
+            opacity: 0;
+            transform: translateY(100px);
+            transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.15s;
+        }
+
+        .slide-item.active .slide-package .img-box {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .slide-item.active .slide-package .img-hardware {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Slide 3: Backup Otomatis */
+        .slide-backup {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        .slide-backup .img-vault {
+            position: absolute;
+            width: 68%;
+            left: 16%;
+            top: 20%;
+            filter: drop-shadow(0 0 40px rgba(16, 185, 129, 0.4));
+            opacity: 0;
+            transform: scale(0.7) translateY(60px);
+            transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .slide-item.active .slide-backup .img-vault {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+            animation: vaultShield 3s ease-in-out infinite alternate;
+        }
+
+        @keyframes vaultShield {
+            0% {
+                transform: translateY(0);
+                filter: drop-shadow(0 0 30px rgba(16, 185, 129, 0.4));
+            }
+
+            100% {
+                transform: translateY(-8px);
+                filter: drop-shadow(0 0 50px rgba(16, 185, 129, 0.8));
+            }
+        }
+
+        /* Slide 4: Analisa Kas & Kontrol Kasir */
+        .slide-cash {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        .slide-cash .img-drawer {
+            position: absolute;
+            width: 56%;
+            left: 6%;
+            bottom: 15%;
+            filter: drop-shadow(0 20px 35px rgba(0, 0, 0, 0.8));
+            opacity: 0;
+            transform: translateX(-120px) translateY(40px);
+            transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .slide-cash .img-accuracy {
+            position: absolute;
+            width: 50%;
+            right: 6%;
+            top: 15%;
+            filter: drop-shadow(0 0 35px rgba(16, 185, 129, 0.5));
+            opacity: 0;
+            transform: scale(1.4) rotate(20deg);
+            transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s;
+        }
+
+        .slide-item.active .slide-cash .img-drawer {
+            opacity: 1;
+            transform: translateX(0) translateY(0);
+        }
+
+        .slide-item.active .slide-cash .img-accuracy {
+            opacity: 1;
+            transform: scale(1) rotate(0deg);
+            animation: stampGlow 2.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes stampGlow {
+            0% {
+                filter: drop-shadow(0 0 25px rgba(16, 185, 129, 0.5));
+            }
+
+            100% {
+                filter: drop-shadow(0 0 45px rgba(251, 191, 36, 0.8));
+            }
+        }
+
+        .slide-caption {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 16px 20px 12px;
+            background: linear-gradient(to top, rgba(15, 23, 42, 0.95) 0%, rgba(15, 23, 42, 0.7) 70%, transparent 100%);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 13px;
+            color: #e2e8f0;
+            backdrop-filter: blur(4px);
+            z-index: 5;
+        }
+
+        .slide-tag {
+            font-weight: 700;
+            background: var(--primary);
+            color: #fff;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+
+        .slider-indicators {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            display: flex;
+            gap: 6px;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 6px 10px;
+            border-radius: 20px;
+            backdrop-filter: blur(6px);
+        }
+
+        .slider-indicators .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.35);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .slider-indicators .dot.active {
+            background: #f97316;
+            width: 22px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px #f97316;
+        }
+
+        .interactive-benefit {
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .interactive-benefit:hover,
+        .interactive-benefit.active {
+            border-color: var(--primary) !important;
+            background: rgba(99, 102, 241, 0.16) !important;
+            transform: translateX(8px);
+            box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);
+        }
+
+        /* .interactive-benefit.active::after {
+            content: '';
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            ''
+            font-size: 11px;
+            color: var(--accent);
+            font-weight: 700;
+            background: rgba(236, 72, 153, 0.15);
+            padding: 3px 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(236, 72, 153, 0.3);
+        } */
+
+        /* Benefits Row */
+        .benefits-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-top: 60px;
+            margin-bottom: 20px;
+        }
+
+        .benefit-item {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9));
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 25px;
+            border-radius: 16px;
+            text-align: left;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .benefit-item:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+            box-shadow: 0 15px 30px rgba(99, 102, 241, 0.2);
+        }
+
+        .b-icon {
+            font-size: 36px;
+            margin-bottom: 15px;
+            background: -webkit-linear-gradient(var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: inline-block;
+        }
+
+        .benefit-item h4 {
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: var(--text-main);
+            font-weight: 700;
+        }
+
+        .benefit-item p {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* Features Section */
+        .features {
+            padding: 100px 0;
+            background: rgba(255, 255, 255, 0.02);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 36px;
+            margin-bottom: 15px;
+            font-weight: 800;
+        }
+
+        .section-subtitle {
+            text-align: center;
+            color: var(--text-muted);
+            margin-bottom: 60px;
+            font-size: 16px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 30px;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 20px;
+            transition: all 0.4s ease;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            position: relative;
+            cursor: pointer;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            border-color: rgba(99, 102, 241, 0.4);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .feature-card img {
+            width: 100%;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            object-fit: cover;
+            aspect-ratio: 16/9;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: transform 0.3s;
+        }
+
+        .feature-card:hover img {
+            transform: scale(1.02);
+        }
+
+        .zoom-icon {
+            position: absolute;
+            top: 35%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 15px;
+            border-radius: 50%;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            font-size: 20px;
+        }
+
+        .feature-card:hover .zoom-icon {
+            opacity: 1;
+        }
+
+        .feature-card h3 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        .feature-card p {
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        /* Lightbox */
+        .lightbox {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.95);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .lightbox.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .lightbox img {
+            max-width: 90%;
+            max-height: 90vh;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+
+        .lightbox.active img {
+            transform: scale(1);
+        }
+
+        .lightbox-close {
+            position: absolute;
+            top: 30px;
+            right: 40px;
+            color: white;
+            font-size: 40px;
+            cursor: pointer;
+            font-weight: 300;
+        }
+
+        /* Video Section */
+        .video-section {
+            padding: 100px 0;
+            text-align: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .video-container {
+            max-width: 900px;
+            margin: 0 auto;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        video {
+            width: 100%;
+            display: block;
+        }
+
+        /* Pricing Section */
+        .pricing {
+            padding: 100px 0;
+            background: linear-gradient(to bottom, var(--bg-color), #09090b);
+        }
+
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        @media(max-width: 768px) {
+            .pricing-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .pricing-card {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 40px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease;
+        }
+
+        .pricing-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .pricing-card.pro {
+            border-color: var(--primary);
+            box-shadow: 0 0 40px rgba(99, 102, 241, 0.15);
+            background: linear-gradient(180deg, rgba(30, 41, 59, 1) 0%, rgba(15, 23, 42, 1) 100%);
+        }
+
+        .badge {
+            position: absolute;
+            top: -14px;
+            right: 30px;
+            background: linear-gradient(to right, var(--primary), var(--accent));
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 10px rgba(236, 72, 153, 0.3);
+        }
+
+        .price-title {
+            font-size: 26px;
+            margin-bottom: 10px;
+            font-weight: 800;
+        }
+
+        .price-normal {
+            text-decoration: line-through;
+            color: var(--text-muted);
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .price-promo {
+            font-size: 42px;
+            font-weight: 800;
+            background: linear-gradient(to right, #fff, var(--text-muted));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 25px;
+            line-height: 1.1;
+        }
+
+        .pricing-card.pro .price-promo {
+            background: linear-gradient(to right, #fff, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .features-list {
+            list-style: none;
+            margin-bottom: 40px;
+            flex-grow: 1;
+        }
+
+        .features-list li {
+            margin-bottom: 14px;
+            font-size: 15px;
+            color: #cbd5e1;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 500;
+        }
+
+        .features-list li.value-feature {
+            justify-content: space-between;
+        }
+
+        .value-badge {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 700;
+            color: white;
+        }
+
+        .pro .value-badge {
+            background: rgba(99, 102, 241, 0.2);
+            color: #a5b4fc;
+        }
+
+        .icon-check {
+            color: var(--success);
+            font-weight: bold;
+            font-size: 16px;
+            background: rgba(16, 185, 129, 0.1);
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .icon-cross {
+            color: var(--danger);
+            font-size: 14px;
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            flex-shrink: 0;
+            opacity: 0.5;
+        }
+
+        .feature-disabled {
+            color: #475569 !important;
+            text-decoration: line-through;
+        }
+
+        /* Footer */
+        footer {
+            padding: 50px 0;
+            text-align: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            color: var(--text-muted);
+            font-size: 15px;
+            background: #09090b;
+        }
+
+        /* Lifetime Highlight Card */
+        .lifetime-highlight-card {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(236, 72, 153, 0.1) 100%);
+            border: 1px solid rgba(99, 102, 241, 0.4);
+            border-radius: 16px;
+            padding: 20px 28px;
+            margin: 0 auto 35px auto;
+            max-width: 780px;
+            box-shadow: 0 10px 35px rgba(99, 102, 241, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(12px);
+            position: relative;
+            animation: pulseGlow 4s ease-in-out infinite alternate;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .lifetime-highlight-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 45px rgba(99, 102, 241, 0.35);
+        }
+
+        @keyframes pulseGlow {
+            0% {
+                border-color: rgba(99, 102, 241, 0.35);
+                box-shadow: 0 10px 30px rgba(99, 102, 241, 0.15);
+            }
+
+            100% {
+                border-color: rgba(236, 72, 153, 0.55);
+                box-shadow: 0 12px 38px rgba(236, 72, 153, 0.25);
+            }
+        }
+
+        .highlight-gradient-text {
+            background: linear-gradient(90deg, #60a5fa, #c084fc, #f472b6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
+        }
+
+        /* Problem vs Solution Comparison */
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+            gap: 20px;
+            margin: 35px 0 20px;
+            text-align: left;
+        }
+
+        .comparison-card {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 22px;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .comparison-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(99, 102, 241, 0.4);
+            box-shadow: 0 15px 35px rgba(99, 102, 241, 0.2);
+        }
+
+        .pain-box {
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            border-radius: 12px;
+            padding: 12px 14px;
+            margin-bottom: 14px;
+        }
+
+        .pain-badge {
+            display: inline-block;
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+
+        .pain-title {
+            color: #fecaca;
+            font-size: 13.5px;
+            font-weight: 600;
+            line-height: 1.4;
+        }
+
+        .solution-box {
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            border-radius: 12px;
+            padding: 12px 14px;
+        }
+
+        .solution-badge {
+            display: inline-block;
+            background: rgba(16, 185, 129, 0.2);
+            color: #6ee7b7;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+
+        .solution-title {
+            color: #a7f3d0;
+            font-size: 14.5px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .solution-desc {
+            color: #cbd5e1;
+            font-size: 12.5px;
+            line-height: 1.5;
+        }
+
+        /* 6 Core Pillars */
+        .pillars-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 25px;
+            margin-top: 35px;
+            text-align: left;
+        }
+
+        .pillar-card {
+            background: linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95));
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 28px;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .pillar-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .pillar-card:hover {
+            transform: translateY(-6px);
+            border-color: rgba(99, 102, 241, 0.4);
+            box-shadow: 0 20px 40px rgba(99, 102, 241, 0.2);
+        }
+
+        .pillar-card:hover::before {
+            opacity: 1;
+        }
+
+        .pillar-icon {
+            font-size: 38px;
+            margin-bottom: 14px;
+            display: inline-block;
+        }
+
+        .pillar-card h3 {
+            font-size: 19px;
+            font-weight: 800;
+            margin-bottom: 14px;
+            color: #fff;
+        }
+
+        .pillar-card ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .pillar-card ul li {
+            font-size: 13.5px;
+            color: #94a3b8;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            line-height: 1.5;
+        }
+
+        .pillar-card ul li span.bullet {
+            color: var(--success);
+            font-weight: bold;
+            font-size: 14px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        /* Industry Use Case Cards */
+        .industry-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+            text-align: left;
+        }
+
+        .industry-card {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 22px;
+            transition: all 0.3s ease;
+        }
+
+        .industry-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+            box-shadow: 0 12px 30px rgba(99, 102, 241, 0.25);
+        }
+
+        .industry-card .ind-icon {
+            font-size: 36px;
+            margin-bottom: 12px;
+            display: inline-block;
+        }
+
+        .industry-card h4 {
+            font-size: 16px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .industry-card p {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* ROI Card */
+        .roi-card {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95));
+            border: 2px solid rgba(16, 185, 129, 0.3);
+            border-radius: 20px;
+            padding: 35px;
+            max-width: 900px;
+            margin: 40px auto 10px auto;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4), 0 0 30px rgba(16, 185, 129, 0.15);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <header>
+            <div class="logo">Tokopintar POS</div>
+            <a href="#pricing" class="btn btn-primary">Beli Sekarang</a>
+        </header>
+
+        <section class="hero">
+            <div class="timer-container">
+                <div class="timer-title">
+                    <span>🔥 FLASH SALE 50% BERAKHIR:</span>
+                    <span class="timer-badge">SEGERA HABIS</span>
+                </div>
+                <div class="timer">
+                    <div class="time-box">
+                        <span class="num timer-hours" id="hours">00</span>
+                        <span class="label">Jam</span>
+                    </div>
+                    <div class="time-colon">:</div>
+                    <div class="time-box">
+                        <span class="num timer-minutes" id="minutes">00</span>
+                        <span class="label">Menit</span>
+                    </div>
+                    <div class="time-colon">:</div>
+                    <div class="time-box">
+                        <span class="num timer-seconds" id="seconds">00</span>
+                        <span class="label">Detik</span>
+                    </div>
+                </div>
+            </div>
+
+            <h1>Revolusi Cara Anda<br>Mengelola Toko & Bisnis</h1>
+
+            <p
+                style="font-size: 18px; margin-bottom: 25px; color: var(--text-muted); max-width: 680px; margin-left: auto; margin-right: auto;">
+                Sistem Kasir Pintar (POS) modern dengan <b>kontrol keuangan anti bocor kas</b>, manajemen stok cerdas, dan
+                transaksi kilat <b>100% bebas internet</b>. Diskon 50% eksklusif untuk Anda hari ini!
+            </p>
+
+            <!-- Keunggulan Mutlak: 1 Lisensi Seumur Hidup -->
+            <div class="lifetime-highlight-card">
+                <div
+                    style="display: inline-flex; align-items: center; gap: 8px; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.35); padding: 5px 15px; border-radius: 999px; margin-bottom: 12px;">
+                    <span style="font-size: 15px;">💎</span>
+                    <span class="highlight-gradient-text"
+                        style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.8px;">
+                        Keunggulan Mutlak Dibanding POS Lainnya
+                    </span>
+                </div>
+                <h3 style="font-size: 24px; font-weight: 800; color: #ffffff; margin-bottom: 8px; line-height: 1.35;">
+                    1x Beli Lisensi Untuk <span
+                        style="background: linear-gradient(90deg, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 0 20px rgba(56, 189, 248, 0.3);">SELAMANYA
+                        (Lifetime)</span>
+                </h3>
+                <div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 15px; margin: 12px 0;">
+                    <span
+                        style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); padding: 4px 12px; border-radius: 8px; font-size: 13px; font-weight: 600;">
+                        ❌ Tanpa Biaya Bulanan
+                    </span>
+                    <span
+                        style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); padding: 4px 12px; border-radius: 8px; font-size: 13px; font-weight: 600;">
+                        ❌ Tanpa Tagihan Tahunan
+                    </span>
+                    <span
+                        style="background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); padding: 4px 12px; border-radius: 8px; font-size: 13px; font-weight: 600;">
+                        ✨ Gratis Update Berkala
+                    </span>
+                </div>
+                <p style="font-size: 15px; color: #cbd5e1; margin: 0 auto; line-height: 1.6; max-width: 680px;">
+                    Jangan biarkan omzet usaha Anda terus tergerus biaya sewa aplikasi tiap bulan! Bersama <b>Tokopintar
+                        POS</b>, cukup satu kali investasi untuk <b>selamanya</b>, bebas beban langganan rutin, dan Anda
+                    tetap mendapatkan <b>update fitur berkala</b> selama lisensi aktif.
+                </p>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <a href="#pricing" class="btn btn-primary" style="margin-right: 15px;">Klaim Promo 50%</a>
+                <a href="#video" class="btn btn-outline">Lihat Video Demo</a>
+            </div>
+
+            <!-- Masalah Klasik vs Solusi TokoPintar -->
+            <div style="margin-top: 50px; margin-bottom: 10px; text-align: center;">
+                <div style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                    <span style="font-size: 20px;">💡</span>
+                    <h3 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0;">
+                        Toko Anda Sering Mengalami Hal Ini?
+                    </h3>
+                </div>
+                <p style="font-size: 14.5px; color: #94a3b8; max-width: 650px; margin: 0 auto;">
+                    Banyak pemilik usaha rugi jutaan rupiah setiap bulan karena sistem kasir yang tidak tepat. Lihat bagaimana TokoPintar menyelesaikannya:
+                </p>
+
+                <div class="comparison-grid">
+                    <div class="comparison-card">
+                        <div class="pain-box">
+                            <span class="pain-badge">Masalah</span>
+                            <div class="pain-title">❌ Uang Kasir Sering Selisih & Tekor</div>
+                        </div>
+                        <div class="solution-box">
+                            <span class="solution-badge">Solusi TokoPintar</span>
+                            <div class="solution-title">Rekonsiliasi Kas & Kas Keluar</div>
+                            <div class="solution-desc">Hitung otomatis uang fisik laci vs sistem tiap tutup shift. Catat biaya operasional kasir transparan!</div>
+                        </div>
+                    </div>
+
+                    <div class="comparison-card">
+                        <div class="pain-box">
+                            <span class="pain-badge">Masalah</span>
+                            <div class="pain-title">❌ Internet Mati, Antrean Macet Total</div>
+                        </div>
+                        <div class="solution-box">
+                            <span class="solution-badge">Solusi TokoPintar</span>
+                            <div class="solution-title">100% Bebas Kuota & Internet</div>
+                            <div class="solution-desc">Bekerja penuh di jaringan lokal (Wi-Fi toko). Toko tetap jualan lancar meski internet padam total!</div>
+                        </div>
+                    </div>
+
+                    <div class="comparison-card">
+                        <div class="pain-box">
+                            <span class="pain-badge">Masalah</span>
+                            <div class="pain-title">❌ Stok Bocor & Hilang Tanpa Jejak</div>
+                        </div>
+                        <div class="solution-box">
+                            <span class="solution-badge">Solusi TokoPintar</span>
+                            <div class="solution-title">Kartu Stok & Jejak Audit</div>
+                            <div class="solution-desc">Lacak buku besar alur masuk-keluar per item barang serta catat siapa staf yang melakukan perubahan.</div>
+                        </div>
+                    </div>
+
+                    <div class="comparison-card">
+                        <div class="pain-box">
+                            <span class="pain-badge">Masalah</span>
+                            <div class="pain-title">❌ Biaya Langganan Bulanan Mengikat</div>
+                        </div>
+                        <div class="solution-box">
+                            <span class="solution-badge">Solusi TokoPintar</span>
+                            <div class="solution-title">1x Beli Seumur Hidup (Lifetime)</div>
+                            <div class="solution-desc">Tanpa biaya sewa bulanan atau tagihan tahunan. Data 100% tersimpan aman di toko Anda sendiri!</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Intro Section with Interactive Showcase & Benefits -->
+            <div style="margin-top: 50px; margin-bottom: 20px; text-align: center;">
+                <div style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                    <span style="font-size: 22px;">🚀</span>
+                    <h2 style="font-size: 22px; font-weight: 700; color: #f8fafc; margin: 0;">
+                        Dirancang Untuk Percepat Laju Bisnis Anda
+                    </h2>
+                </div>
+                <p style="font-size: 15px; color: #94a3b8; margin: 0 auto; max-width: 680px; line-height: 1.6;">
+                    <b>Tokopintar POS</b> bukanlah aplikasi kasir biasa. Sistem kami mengintegrasikan manajemen
+                    produk berskala besar, perhitungan akurat, dan laporan canggih dalam satu aplikasi cerdas.
+                </p>
+            </div>
+            <!-- Intro Section with Interactive Showcase & Benefits -->
+            <div class="intro-grid">
+                <div class="intro-slider-wrapper">
+                    <div class="slider-screen">
+                        <!-- Slide 0: Multi Device (PC dari kiri, HP dari kanan, Tablet dari bawah) -->
+                        <div class="slide-item active" data-slide="0">
+                            <div class="slide-multidevice">
+                                <img src="./multi_pc.png" class="img-pc" alt="Komputer PC Windows">
+                                <img src="./multi_phone.png" class="img-phone" alt="Smartphone Android POS">
+                                <img src="./multi_tablet.png" class="img-tablet" alt="Tablet POS Touchscreen">
+                            </div>
+                            <div class="slide-caption">
+                                <span class="slide-tag">💻 Multi Device</span>
+                                <span>PC dari Kiri, HP dari Kanan, Tablet dari Bawah</span>
+                            </div>
+                        </div>
+
+                        <!-- Slide 1: Server Lokal Super Cepat -->
+                        <div class="slide-item" data-slide="1">
+                            <div class="slide-server">
+                                <img src="./server_unit.png" class="img-server" alt="Server Lokal Offline">
+                                <img src="./server_speed.png" class="img-speed" alt="Ultra Speed Latency">
+                            </div>
+                            <div class="slide-caption">
+                                <span class="slide-tag">⚡ Server Lokal Cepat</span>
+                                <span>Transaksi Secepat Kilat Tanpa Loading Internet</span>
+                            </div>
+                        </div>
+
+                        <!-- Slide 2: Paket Komplit (Server+Klien) -->
+                        <div class="slide-item" data-slide="2">
+                            <div class="slide-package">
+                                <img src="./package_box.png" class="img-box" alt="Paket Box Komplit">
+                                <img src="./package_hardware.png" class="img-hardware" alt="Printer & Scanner">
+                            </div>
+                            <div class="slide-caption">
+                                <span class="slide-tag">📦 Paket Komplit</span>
+                                <span>1 Paket Lengkap Server + Klien Siap Pakai</span>
+                            </div>
+                        </div>
+
+                        <!-- Slide 3: Backup Otomatis Terjadwal -->
+                        <div class="slide-item" data-slide="3">
+                            <div class="slide-backup">
+                                <img src="./backup_vault.png" class="img-vault" alt="Backup Database Aman">
+                            </div>
+                            <div class="slide-caption">
+                                <span class="slide-tag">💾 Backup Otomatis</span>
+                                <span>Cegah Risiko Kehilangan Data dengan Auto-Sync</span>
+                            </div>
+                        </div>
+
+                        <!-- Slide 4: Analisa Kas & Kontrol Kasir -->
+                        <div class="slide-item" data-slide="4">
+                            <div class="slide-cash">
+                                <img src="./cash_drawer.png" class="img-drawer" alt="Laci Kasir Nyata">
+                                <img src="./cash_accuracy.png" class="img-accuracy" alt="Akurasi Input 100%">
+                            </div>
+                            <div class="slide-caption">
+                                <span class="slide-tag">💵 Analisa Kas & Laci</span>
+                                <span>Pantau Laci Kasir & Akurasi Input 100% Produk</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Slide Indicators -->
+                    <div class="slider-indicators">
+                        <span class="dot active" onclick="setSlide(0)"></span>
+                        <span class="dot" onclick="setSlide(1)"></span>
+                        <span class="dot" onclick="setSlide(2)"></span>
+                        <span class="dot" onclick="setSlide(3)"></span>
+                        <span class="dot" onclick="setSlide(4)"></span>
+                    </div>
+                </div>
+                <div class="intro-text">
+
+
+                    <div class="benefits-row" style="margin-top: 0; margin-bottom: 0; grid-template-columns: 1fr;">
+
+                        <div class="benefit-item interactive-benefit active" style="padding: 15px 20px;"
+                            onmouseenter="setSlide(0)" onclick="setSlide(0)">
+                            <div style="display:flex; align-items:center; gap: 15px;">
+                                <div class="b-icon" style="margin-bottom:0; font-size: 28px;">💻</div>
+                                <div>
+                                    <h4 style="margin-bottom:2px; font-size:16px;">Satu Akun, Multi Device</h4>
+                                    <p style="font-size:13px;">Berjalan mulus di Windows PC, Tablet, maupun HP Android.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="benefit-item interactive-benefit" style="padding: 15px 20px;"
+                            onmouseenter="setSlide(1)" onclick="setSlide(1)">
+                            <div style="display:flex; align-items:center; gap: 15px;">
+                                <div class="b-icon" style="margin-bottom:0; font-size: 28px;">⚡</div>
+                                <div>
+                                    <h4 style="margin-bottom:2px; font-size:16px;">Server Lokal Super Cepat</h4>
+                                    <p style="font-size:13px;">Transaksi secepat kilat tanpa gangguan *loading*
+                                        internet.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="benefit-item interactive-benefit" style="padding: 15px 20px;"
+                            onmouseenter="setSlide(2)" onclick="setSlide(2)">
+                            <div style="display:flex; align-items:center; gap: 15px;">
+                                <div class="b-icon" style="margin-bottom:0; font-size: 28px;">📦</div>
+                                <div>
+                                    <h4 style="margin-bottom:2px; font-size:16px;">Paket Komplit (Server+Klien)</h4>
+                                    <p style="font-size:13px;">Sekali beli dapat 1 paket lengkap server lokal & klien.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="benefit-item interactive-benefit" style="padding: 15px 20px;"
+                            onmouseenter="setSlide(3)" onclick="setSlide(3)">
+                            <div style="display:flex; align-items:center; gap: 15px;">
+                                <div class="b-icon" style="margin-bottom:0; font-size: 28px;">💾</div>
+                                <div>
+                                    <h4 style="margin-bottom:2px; font-size:16px;">Backup Otomatis Terjadwal</h4>
+                                    <p style="font-size:13px;">Cegah risiko kehilangan data pokok bisnis Anda dengan
+                                        pencadangan otomatis secara berkala dan aman.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="benefit-item interactive-benefit" style="padding: 15px 20px;"
+                            onmouseenter="setSlide(4)" onclick="setSlide(4)">
+                            <div style="display:flex; align-items:center; gap: 15px;">
+                                <div class="b-icon" style="margin-bottom:0; font-size: 28px;">💵</div>
+                                <div>
+                                    <h4 style="margin-bottom:2px; font-size:16px;">Analisa Kas & Kontrol Kasir</h4>
+                                    <p style="font-size:13px;">Pantau laci kasir dan ukur tingkat akurasi input produk
+                                        karyawan. Akurasi 100% memastikan semua barang customer tercatat penuh di sistem
+                                        POS.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- More Benefits -->
+            <div class="benefits-row">
+                <div class="benefit-item">
+                    <div class="b-icon">🖨️</div>
+                    <h4>Support Semua Printer</h4>
+                    <p>Printer thermal ukuran 58mm maupun 80mm bisa terhubung mudah lewat USB, LAN, atau Bluetooth.</p>
+                </div>
+                <div class="benefit-item">
+                    <div class="b-icon">📊</div>
+                    <h4>Import Excel Instan</h4>
+                    <p>Punya ribuan barang? Tidak perlu input manual satu per satu. Cukup gunakan fitur Import Excel.
+                    </p>
+                </div>
+                <div class="benefit-item">
+                    <div class="b-icon">🛠️</div>
+                    <h4>Instalasi Mudah & Remote</h4>
+                    <p>Instalasi aplikasi sangat mudah dan tim kami siap memandu pemasangannya secara Remote (Jarak
+                        Jauh).</p>
+                </div>
+            </div>
+
+        </section>
+
+        <section id="video" class="video-section">
+            <h2 class="section-title">Lihat Tokopintar Beraksi</h2>
+            <div class="video-container">
+                <video controls poster="./halaman login aplikasi.png">
+                    <!-- Embedded promo video -->
+                    <source src="./tokopintar-pos.mp4" type="video/mp4">
+                    Browser Anda tidak mendukung pemutar video HTML5.
+                </video>
+            </div>
+        </section>
+
+        <!-- 6 Pilar Keunggulan Utama TokoPintar -->
+        <section style="padding: 70px 0 30px; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.05);">
+            <div style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                <span style="font-size: 24px;">🌟</span>
+                <h2 class="section-title" style="margin-bottom: 0;">6 Pilar Keunggulan Utama TokoPintar</h2>
+            </div>
+            <p class="section-subtitle" style="margin-bottom: 10px;">Dirancang khusus untuk menghadirkan kontrol penuh, efisiensi waktu, dan keuntungan maksimal bagi usaha Anda.</p>
+
+            <div class="pillars-grid">
+                <div class="pillar-card">
+                    <div class="pillar-icon">⚡</div>
+                    <h3>Transaksi Kasir Kilat & Anti Antre</h3>
+                    <ul>
+                        <li><span class="bullet">✓</span> <b>Pencarian Cepat & Barcode</b>: Cari produk via teks atau scanner barcode dalam milidetik.</li>
+                        <li><span class="bullet">✓</span> <b>Tombol Quick Add</b>: Shortcut 1-klik untuk produk paling laris di jam sibuk.</li>
+                        <li><span class="bullet">✓</span> <b>Hold Bill (Tahan Transaksi)</b>: Tahan nota sementara jika pembeli ingin ambil barang lagi, kasir layani antrean berikutnya tanpa antri.</li>
+                    </ul>
+                </div>
+
+                <div class="pillar-card">
+                    <div class="pillar-icon">🛡️</div>
+                    <h3>Anti Kebocoran Kas & Rekonsiliasi</h3>
+                    <ul>
+                        <li><span class="bullet">✓</span> <b>Tutup Shift & Rekonsiliasi Kas</b>: Sistem otomatis membandingkan uang fisik di laci kasir vs hitungan sistem. Selisih langsung terdeteksi!</li>
+                        <li><span class="bullet">✓</span> <b>Pencatatan Kas Keluar (Petty Cash)</b>: Catat pengeluaran operasional toko (beli galon, sampah, parkir) transparan.</li>
+                        <li><span class="bullet">✓</span> <b>Otorisasi Void & Refund Ketat</b>: Pembatalan nota wajib alasan jelas dan terekam di sistem.</li>
+                    </ul>
+                </div>
+
+                <div class="pillar-card">
+                    <div class="pillar-icon">📦</div>
+                    <h3>Manajemen Stok & Multi-Satuan</h3>
+                    <ul>
+                        <li><span class="bullet">✓</span> <b>Multi-Satuan Penjualan</b>: Jual eceran maupun grosir (Pcs, Pack, Lusin, Dus, Renteng) sangat rapi.</li>
+                        <li><span class="bullet">✓</span> <b>Stock Opname Cepat</b>: Koreksi stok fisik dengan mudah tanpa perlu menutup operasional toko.</li>
+                        <li><span class="bullet">✓</span> <b>Kartu Pergerakan Stok (Stock Ledger)</b>: Lacak riwayat masuk-keluar setiap barang secara mendalam.</li>
+                    </ul>
+                </div>
+
+                <div class="pillar-card">
+                    <div class="pillar-icon">🌐</div>
+                    <h3>Multi-Device 100% Bebas Internet</h3>
+                    <ul>
+                        <li><span class="bullet">✓</span> <b>Hubungkan Banyak Kasir Sekaligus</b>: Gunakan PC, Tablet, dan HP Android bersamaan dalam 1 toko.</li>
+                        <li><span class="bullet">✓</span> <b>Sinkronisasi Otomatis</b>: Penjualan di kasir 1 langsung mengupdate stok di kasir 2 secara seketika.</li>
+                        <li><span class="bullet">✓</span> <b>Tanpa Kuota / Local-First</b>: Bekerja sempurna di jaringan Wi-Fi lokal, toko tetap buka saat internet padam.</li>
+                    </ul>
+                </div>
+
+                <div class="pillar-card">
+                    <div class="pillar-icon">📊</div>
+                    <h3>Dashboard Analitik & Ekspor Excel</h3>
+                    <ul>
+                        <li><span class="bullet">✓</span> <b>Pantau Omzet Harian</b>: Total pendapatan, laba kotor, dan rerata belanja pelanggan dalam 1 layar.</li>
+                        <li><span class="bullet">✓</span> <b>Produk Terlaris (Best Seller)</b>: Ketahui produk mana yang paling diminati untuk maksimalkan keuntungan.</li>
+                        <li><span class="bullet">✓</span> <b>Ekspor 1-Klik ke Excel & CSV</b>: Download laporan lengkap untuk kebutuhan pembukuan & akuntansi.</li>
+                    </ul>
+                </div>
+
+                <div class="pillar-card">
+                    <div class="pillar-icon">🔒</div>
+                    <h3>Keamanan & Jejak Audit Lengkap</h3>
+                    <ul>
+                        <li><span class="bullet">✓</span> <b>Hak Akses Bertingkat</b>: Pisahkan hak akses untuk Admin Toko dan Kasir dengan aman.</li>
+                        <li><span class="bullet">✓</span> <b>Audit Trail Lengkap</b>: Setiap aktivitas login, perubahan harga, dan void tercatat dengan waktu & nama staf.</li>
+                        <li><span class="bullet">✓</span> <b>Cadangkan & Pulihkan Data 1-Klik</b>: Data toko Anda terlindungi dari risiko kerusakan perangkat.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section class="features">
+            <h2 class="section-title">Galeri Fitur & Antarmuka Aplikasi</h2>
+            <p class="section-subtitle">Klik gambar untuk melihat tampilan fitur TokoPintar dengan lebih jelas.</p>
+
+            <div class="feature-grid">
+                <div class="feature-card" onclick="openLightbox('./tampilan POS utama untuk transaksi di buat mudah bisa langsung scan , cari item dan keranjang belanja.png')">
+                    <div class="zoom-icon">🔍</div>
+                    <img src="./tampilan POS utama untuk transaksi di buat mudah bisa langsung scan , cari item dan keranjang belanja.png" alt="Tampilan POS Utama">
+                    <h3>Transaksi Kasir Cepat & Barcode</h3>
+                    <p>Antarmuka kasir intuitif dengan pencarian instan, scan barcode, dan keranjang belanja responsif.</p>
+                </div>
+                <div class="feature-card" onclick="openLightbox('./rekonsiliasi kas dengan drawe tertutup dan layat kecil.png')">
+                    <div class="zoom-icon">🔍</div>
+                    <img src="./rekonsiliasi kas dengan drawe tertutup dan layat kecil.png" alt="Rekonsiliasi Kasir">
+                    <h3>Rekonsiliasi Kas Laci (Anti Bocor)</h3>
+                    <p>Hitung uang fisik kasir vs sistem tiap tutup shift untuk mendeteksi selisih lebih/kurang secara akurat.</p>
+                </div>
+                <div class="feature-card" onclick="openLightbox('./dashboard analitik menampilkan total pendapatan, grafik pembelian dan barang terlaris berdasarkan filter waktu tertentu.png')">
+                    <div class="zoom-icon">🔍</div>
+                    <img src="./dashboard analitik menampilkan total pendapatan, grafik pembelian dan barang terlaris berdasarkan filter waktu tertentu.png" alt="Dashboard Analitik">
+                    <h3>Dashboard Omzet & Grafik Penjualan</h3>
+                    <p>Pantau omzet, grafik tren penjualan, dan daftar produk terlaris berdasarkan filter tanggal tertentu.</p>
+                </div>
+                <div class="feature-card" onclick="openLightbox('./proses pembayaran customer.png')">
+                    <div class="zoom-icon">🔍</div>
+                    <img src="./proses pembayaran customer.png" alt="Proses Pembayaran">
+                    <h3>Multi Metode Pembayaran</h3>
+                    <p>Mendukung Tunai, QRIS, Transfer Bank, dan E-Wallet dengan kalkulasi kembalian otomatis.</p>
+                </div>
+                <div class="feature-card" onclick="openLightbox('./Inventori menampilkan data master untuk manajemen produk POS.png')">
+                    <div class="zoom-icon">🔍</div>
+                    <img src="./Inventori menampilkan data master untuk manajemen produk POS.png" alt="Manajemen Inventori">
+                    <h3>Kontrol Inventori & Multi-Satuan</h3>
+                    <p>Kelola master produk, barcode, stok fisik, kategori, dan konversi satuan barang (pcs/dus/pack).</p>
+                </div>
+                <div class="feature-card" onclick="openLightbox('./Riwayat menampilkan struk belanja, pembatalan dan history dari penjualan.png')">
+                    <div class="zoom-icon">🔍</div>
+                    <img src="./Riwayat menampilkan struk belanja, pembatalan dan history dari penjualan.png" alt="Riwayat Penjualan">
+                    <h3>Riwayat Nota, Void & Cetak Ulang</h3>
+                    <p>Lihat detail transaksi lampau, cetak ulang struk belanja, dan kelola otorisasi pembatalan nota (Void/Refund).</p>
+                </div>
+                <div class="feature-card" onclick="openLightbox('./darshboard versi lebih kecil sesuai layar aplikasi.png')">
+                    <div class="zoom-icon">🔍</div>
+                    <img src="./darshboard versi lebih kecil sesuai layar aplikasi.png" alt="Tampilan Responsif">
+                    <h3>Multi-Device (PC, Tablet & HP)</h3>
+                    <p>Tampilan fleksibel otomatis menyesuaikan saat dibuka di komputer Windows, tablet, maupun HP Android.</p>
+                </div>
+                <div class="feature-card" onclick="openLightbox('./pengaturan printer bisa BT maupun USB, kamu bisa pilih jumlah gandaan print maupun lebar kertas.png')">
+                    <div class="zoom-icon">🔍</div>
+                    <img src="./pengaturan printer bisa BT maupun USB, kamu bisa pilih jumlah gandaan print maupun lebar kertas.png" alt="Pengaturan Printer">
+                    <h3>Koneksi Printer USB & Bluetooth</h3>
+                    <p>Kompatibel dengan printer thermal 58mm & 80mm serta pengaturan jumlah rangkap cetak nota belanja.</p>
+                </div>
+                <div class="feature-card" onclick="openLightbox('./pengaturan system pos, bisa mode terang, quick item biar mudah akses  produk yg sering terjual, kalkulator untuk hitung harga dan juga backup automatis untuk versi pro.png')">
+                    <div class="zoom-icon">🔍</div>
+                    <img src="./pengaturan system pos, bisa mode terang, quick item biar mudah akses  produk yg sering terjual, kalkulator untuk hitung harga dan juga backup automatis untuk versi pro.png" alt="Pengaturan Sistem">
+                    <h3>Pengaturan Sistem & Quick Items</h3>
+                    <p>Kustomisasi tema, kalkulator floating, shortcut item favorit, dan pencadangan database otomatis.</p>
+                </div>
+                <div class="feature-card" onclick="openLightbox('./panduan shortcut keyboard untuk POS windows app.png')">
+                    <div class="zoom-icon">🔍</div>
+                    <img src="./panduan shortcut keyboard untuk POS windows app.png" alt="Shortcut Keyboard">
+                    <h3>Navigasi Shortcut Keyboard Kilat</h3>
+                    <p>Operasikan kasir tanpa mouse dengan tombol shortcut keyboard Windows untuk kecepatan transaksi maksimal.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Cocok Untuk Segala Jenis Usaha -->
+        <section style="padding: 70px 0 30px; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.05);">
+            <div style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                <span style="font-size: 24px;">🏢</span>
+                <h2 class="section-title" style="margin-bottom: 0;">Cocok Untuk Segala Jenis Usaha</h2>
+            </div>
+            <p class="section-subtitle" style="margin-bottom: 10px;">Dirancang fleksibel untuk mendongkrak performa operasional toko Anda.</p>
+
+            <div class="industry-grid">
+                <div class="industry-card">
+                    <div class="ind-icon">🛒</div>
+                    <h4>Minimarket & Kelontong</h4>
+                    <p>Scan barcode cepat ribuan SKU, multi-satuan renceng/dus, dan pencegahan selisih kas kasir.</p>
+                </div>
+                <div class="industry-card">
+                    <div class="ind-icon">☕</div>
+                    <h4>Kafe & Resto Cepat Saji</h4>
+                    <p>Tombol menu favorit, cetak struk pesanan cepat, dan rekonsiliasi kas harian per pergantian shift.</p>
+                </div>
+                <div class="industry-card">
+                    <div class="ind-icon">💊</div>
+                    <h4>Apotek & Toko Obat</h4>
+                    <p>Lacak riwayat pergerakan stok secara mendalam dengan kartu stok serta jejak audit transaksi.</p>
+                </div>
+                <div class="industry-card">
+                    <div class="ind-icon">👗</div>
+                    <h4>Toko Pakaian & Fashion</h4>
+                    <p>Manajemen varian ukuran/warna, barcode label, dan laporan produk paling laris.</p>
+                </div>
+                <div class="industry-card">
+                    <div class="ind-icon">🔨</div>
+                    <h4>Toko Bangunan & Perkakas</h4>
+                    <p>Satuan penjualan fleksibel dan pencatatan kas keluar operasional toko yang rapi dan transparan.</p>
+                </div>
+            </div>
+
+            <!-- Nilai Tambah Investasi -->
+            <div class="roi-card">
+                <h3 style="font-size: 22px; font-weight: 800; color: #6ee7b7; margin-bottom: 14px;">🏆 Mengapa TokoPintar Pilihan Investasi Bisnis Terbaik?</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; text-align: left; margin-top: 20px;">
+                    <div>
+                        <h5 style="color: #fff; font-size: 15px; margin-bottom: 6px;">💰 Hemat Biaya Selamanya</h5>
+                        <p style="font-size: 13px; color: #94a3b8; line-height: 1.5;">Tanpa sewa bulanan. Sekali bayar, sistem menjadi aset permanen bisnis Anda.</p>
+                    </div>
+                    <div>
+                        <h5 style="color: #fff; font-size: 15px; margin-bottom: 6px;">🔐 Data Milik Anda Penuh</h5>
+                        <p style="font-size: 13px; color: #94a3b8; line-height: 1.5;">Data penjualan tersimpan aman di toko Anda, bukan di tangan pihak ketiga.</p>
+                    </div>
+                    <div>
+                        <h5 style="color: #fff; font-size: 15px; margin-bottom: 6px;">⚡ Jualan Bebas Kuota</h5>
+                        <p style="font-size: 13px; color: #94a3b8; line-height: 1.5;">Toko tetap buka dan melayani ribuan transaksi tanpa cemas server down.</p>
+                    </div>
+                    <div>
+                        <h5 style="color: #fff; font-size: 15px; margin-bottom: 6px;">⭐ Citra Toko Profesional</h5>
+                        <p style="font-size: 13px; color: #94a3b8; line-height: 1.5;">Kasir gesit dan struk rapi meningkatkan kepuasan serta loyalitas pelanggan.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Urgency Reminder Countdown Before Pricing (POIN 3) -->
+        <div style="text-align: center; margin: 60px 0 20px;">
+            <div class="timer-container">
+                <div class="timer-title">
+                    <span>⚡ PROMO SPESIAL 50% SEGERA BERAKHIR:</span>
+                    <span class="timer-badge">JANGAN LEWATKAN</span>
+                </div>
+                <div class="timer">
+                    <div class="time-box">
+                        <span class="num timer-hours">00</span>
+                        <span class="label">Jam</span>
+                    </div>
+                    <div class="time-colon">:</div>
+                    <div class="time-box">
+                        <span class="num timer-minutes">00</span>
+                        <span class="label">Menit</span>
+                    </div>
+                    <div class="time-colon">:</div>
+                    <div class="time-box">
+                        <span class="num timer-seconds">00</span>
+                        <span class="label">Detik</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <section id="pricing" class="pricing">
+            <h2 class="section-title">Pilih Plan Terbaik Sesuai Skala Bisnis Anda<br><span
+                    style="color:var(--accent); font-size:20px; display:inline-block; margin-top:10px;">Potongan 50%
+                    Khusus Hari Ini!</span></h2>
+
+            <div class="pricing-grid">
+                <!-- Paket STD (Basic) -->
+                <div class="pricing-card">
+                    <h3 class="price-title">Paket Basic (STD)</h3>
+                    <div class="price-normal">Rp 200.000</div>
+                    <div class="price-promo">Rp 100.000</div>
+
+                    <ul class="features-list">
+                        <li class="value-feature">Maksimal Produk <span class="value-badge">1000</span></li>
+                        <li class="value-feature">Maksimal Kasir <span class="value-badge">limited</span></li>
+                        <li class="value-feature">Maksimal Pengguna <span class="value-badge">limited</span></li>
+                        <li class="value-feature">Maksimal Perangkat <span class="value-badge">limited</span></li>
+
+                        <li><span class="icon-check">✓</span> <b>100% Bebas Kuota / Offline-Ready</b></li>
+                        <li><span class="icon-check">✓</span> Barcode Scanning Cepat</li>
+                        <li><span class="icon-check">✓</span> Bluetooth/USB Printing (58/80mm)</li>
+                        <li><span class="icon-check">✓</span> Tahan Transaksi (Hold Bill)</li>
+                        <li><span class="icon-check">✓</span> Rekonsiliasi Kas Laci (Tutup Shift)</li>
+                        <li><span class="icon-check">✓</span> Pencatatan Kas Keluar (Petty Cash)</li>
+                        <!-- Fitur yang Tidak Tersedia (Dicoret) -->
+                        <li class="feature-disabled"><span class="icon-cross">✕</span> Multi-Device LAN Sync</li>
+                        <li class="feature-disabled"><span class="icon-cross">✕</span> Backup Otomatis Database</li>
+                        <li class="feature-disabled"><span class="icon-cross">✕</span> Dashboard Analitik Omzet</li>
+                        <li class="feature-disabled"><span class="icon-cross">✕</span> Stok Opname & Kartu Stok</li>
+                        <li class="feature-disabled"><span class="icon-cross">✕</span> Laporan Ekspor Excel</li>
+                        <li class="feature-disabled"><span class="icon-cross">✕</span> Manajemen Supplier</li>
+                        <li class="feature-disabled"><span class="icon-cross">✕</span> Multi-User Kasir Bebas</li>
+                    </ul>
+
+                    <a href="https://wa.me/6282132935168?text=Halo,%20saya%20tertarik%20membeli%20Tokopintar%20POS%20Paket%20Basic%20(STD)%20dengan%20promo%20diskon%2050%25."
+                        target="_blank" class="btn btn-wa">Beli Paket Basic</a>
+                </div>
+
+                <!-- Paket PRO -->
+                <div class="pricing-card pro">
+                    <div class="badge">Fitur Terlengkap</div>
+                    <h3 class="price-title">Paket Profesional (PRO)</h3>
+                    <div class="price-normal">Rp 600.000</div>
+                    <div class="price-promo">Rp 300.000</div>
+
+                    <ul class="features-list">
+                        <li class="value-feature">Maksimal Produk <span class="value-badge">10.000+</span></li>
+                        <li class="value-feature">Maksimal Kasir <span class="value-badge">Banyak Device</span></li>
+                        <li class="value-feature">Maksimal Pengguna <span class="value-badge">Up to 5</span></li>
+                        <li class="value-feature">Jaringan Multi-Device <span class="value-badge">Wi-Fi Lokal</span></li>
+
+                        <li><span class="icon-check">✓</span> <b>100% Bebas Kuota / Offline-Ready</b></li>
+                        <li><span class="icon-check">✓</span> <b>Multi-Device LAN Sync (PC, Tablet, HP)</b></li>
+                        <li><span class="icon-check">✓</span> <b>Rekonsiliasi Kas Laci & Kas Keluar</b></li>
+                        <li><span class="icon-check">✓</span> <b>Kartu Stok (Stock Ledger) & Opname</b></li>
+                        <li><span class="icon-check">✓</span> <b>Dashboard Analitik & Ekspor Excel</b></li>
+                        <li><span class="icon-check">✓</span> <b>Backup Otomatis Database 1-Klik</b></li>
+                        <li><span class="icon-check">✓</span> Barcode Scanning & Quick Add</li>
+                        <li><span class="icon-check">✓</span> Bluetooth/USB Printing (58/80mm)</li>
+                        <li><span class="icon-check">✓</span> Manajemen Supplier & Multi-Satuan</li>
+                        <li><span class="icon-check">✓</span> Audit Trail & Otorisasi Void/Refund</li>
+                        <li><span class="icon-check">✓</span> Multi-User Kasir & Hak Akses</li>
+                    </ul>
+
+                    <a href="https://wa.me/6282132935168?text=Halo,%20saya%20tertarik%20membeli%20Tokopintar%20POS%20Paket%20Profesional%20(PRO)%20dengan%20promo%20diskon%2050%25."
+                        target="_blank" class="btn btn-wa">Beli Paket PRO</a>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <footer>
+        <p>&copy; 2026 Tokopintar POS. Solusi Kasir Pintar Masa Kini.</p>
+    </footer>
+
+    <!-- Lightbox Modal -->
+    <div id="lightbox" class="lightbox" onclick="closeLightbox()">
+        <span class="lightbox-close">&times;</span>
+        <img id="lightbox-img" src="" alt="Feature Image Zoom">
+    </div>
+
+    <script>
+        // Lightbox Logic
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImg = document.getElementById('lightbox-img');
+
+        function openLightbox(src) {
+            lightboxImg.src = src;
+            lightbox.classList.add('active');
+            document.body.style.overflow = 'hidden'; // prevent scrolling
+        }
+
+        function closeLightbox() {
+            lightbox.classList.remove('active');
+            document.body.style.overflow = 'auto'; // enable scrolling
+            setTimeout(() => lightboxImg.src = '', 300); // clear after transition
+        }
+
+        // Close on Escape key
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape' && lightbox.classList.contains('active')) {
+                closeLightbox();
+            }
+        });
+
+        // Countdown Timer Logic (Synchronized for both Hero and Pricing timers)
+        let endTime = localStorage.getItem('promoEndTime');
+        const duration = 2 * 60 * 60 * 1000 + 45 * 60 * 1000 + 30 * 1000; // 2 Jam 45 Menit 30 Detik
+
+        if (!endTime || Date.now() > endTime) {
+            endTime = Date.now() + duration;
+            localStorage.setItem('promoEndTime', endTime);
+        }
+
+        function updateTimer() {
+            let timeRemaining = endTime - Date.now();
+
+            if (timeRemaining <= 0) {
+                endTime = Date.now() + duration;
+                localStorage.setItem('promoEndTime', endTime);
+                timeRemaining = duration;
+            }
+
+            let h = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            let m = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+            let s = Math.floor((timeRemaining % (1000 * 60)) / 1000);
+
+            const hoursStr = h.toString().padStart(2, '0');
+            const minutesStr = m.toString().padStart(2, '0');
+            const secondsStr = s.toString().padStart(2, '0');
+
+            document.querySelectorAll('.timer-hours').forEach(el => el.innerText = hoursStr);
+            document.querySelectorAll('.timer-minutes').forEach(el => el.innerText = minutesStr);
+            document.querySelectorAll('.timer-seconds').forEach(el => el.innerText = secondsStr);
+
+            const hEl = document.getElementById('hours');
+            if (hEl) hEl.innerText = hoursStr;
+            const mEl = document.getElementById('minutes');
+            if (mEl) mEl.innerText = minutesStr;
+            const sEl = document.getElementById('seconds');
+            if (sEl) sEl.innerText = secondsStr;
+        }
+
+        setInterval(updateTimer, 1000);
+        updateTimer();
+
+        // Intro Slider & Benefit Sync Logic (POIN 1)
+        let currentSlide = 0;
+        const totalSlides = 5;
+        let slideInterval = null;
+
+        function setSlide(index) {
+            currentSlide = index;
+            const slides = document.querySelectorAll('.slide-item');
+            const dots = document.querySelectorAll('.slider-indicators .dot');
+            const benefits = document.querySelectorAll('.interactive-benefit');
+
+            slides.forEach((slide, i) => {
+                slide.classList.toggle('active', i === index);
+            });
+
+            dots.forEach((dot, i) => {
+                dot.classList.toggle('active', i === index);
+            });
+
+            benefits.forEach((b, i) => {
+                b.classList.toggle('active', i === index);
+            });
+        }
+
+        function startSlideAutoPlay() {
+            if (slideInterval) clearInterval(slideInterval);
+            slideInterval = setInterval(() => {
+                let next = (currentSlide + 1) % totalSlides;
+                setSlide(next);
+            }, 4500);
+        }
+
+        function stopSlideAutoPlay() {
+            if (slideInterval) clearInterval(slideInterval);
+        }
+
+        const introGrid = document.querySelector('.intro-grid');
+        if (introGrid) {
+            introGrid.addEventListener('mouseenter', stopSlideAutoPlay);
+            introGrid.addEventListener('mouseleave', startSlideAutoPlay);
+        }
+
+        startSlideAutoPlay();
+    </script>
+</body>
+
+</html>

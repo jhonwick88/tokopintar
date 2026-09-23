@@ -76,62 +76,78 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
             ),
           ],
         ),
-        body: state.isLoading && state.suppliers.isEmpty
-            ? const Center(child: CircularProgressIndicator())
-            : state.errorMessage != null && state.suppliers.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+        body: RefreshIndicator(
+          onRefresh: () => ref.read(supplierNotifierProvider.notifier).loadSuppliers(),
+          child: state.isLoading && state.suppliers.isEmpty
+              ? const Center(child: CircularProgressIndicator())
+              : state.errorMessage != null && state.suppliers.isEmpty
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       children: [
-                        Text(state.errorMessage!, style: const TextStyle(color: Colors.red)),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: () => ref.read(supplierNotifierProvider.notifier).loadSuppliers(),
-                          child: const Text('Coba Lagi'),
+                        const SizedBox(height: 100),
+                        Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(state.errorMessage!, style: const TextStyle(color: Colors.red)),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: () => ref.read(supplierNotifierProvider.notifier).loadSuppliers(),
+                                child: const Text('Coba Lagi'),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
-                    ),
-                  )
-                : state.suppliers.isEmpty
-                    ? const Center(child: Text('Belum ada data supplier'))
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: state.suppliers.length,
-                        itemBuilder: (context, index) {
-                          final supplier = state.suppliers[index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            elevation: 2,
-                            child: ListTile(
-                              leading: const CircleAvatar(
-                                child: Icon(Icons.local_shipping),
+                    )
+                  : state.suppliers.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: const [
+                            SizedBox(height: 100),
+                            Center(child: Text('Belum ada data supplier')),
+                          ],
+                        )
+                      : ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          itemCount: state.suppliers.length,
+                          itemBuilder: (context, index) {
+                            final supplier = state.suppliers[index];
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              elevation: 2,
+                              child: ListTile(
+                                leading: const CircleAvatar(
+                                  child: Icon(Icons.local_shipping),
+                                ),
+                                title: Text(supplier.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (supplier.contactInfo.isNotEmpty) Text('Kontak: ${supplier.contactInfo}'),
+                                    if (supplier.address.isNotEmpty) Text('Alamat: ${supplier.address}'),
+                                  ],
+                                ),
+                                isThreeLine: supplier.contactInfo.isNotEmpty || supplier.address.isNotEmpty,
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.edit, color: Colors.blue),
+                                      onPressed: () => _showSupplierForm(supplier),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete, color: Colors.red),
+                                      onPressed: () => _confirmDelete(supplier),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              title: Text(supplier.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (supplier.contactInfo.isNotEmpty) Text('Kontak: ${supplier.contactInfo}'),
-                                  if (supplier.address.isNotEmpty) Text('Alamat: ${supplier.address}'),
-                                ],
-                              ),
-                              isThreeLine: supplier.contactInfo.isNotEmpty || supplier.address.isNotEmpty,
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.edit, color: Colors.blue),
-                                    onPressed: () => _showSupplierForm(supplier),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.red),
-                                    onPressed: () => _confirmDelete(supplier),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                            );
+                          },
+                        ),
+        ),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () => _showSupplierForm(),
           icon: const Icon(Icons.add),

@@ -121,103 +121,119 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
               ),
             ),
             Expanded(
-              child: categoriesState.isLoading && categoriesState.categories.isEmpty
-                  ? const Center(child: CircularProgressIndicator())
-                  : categoriesState.error != null && categoriesState.categories.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+              child: RefreshIndicator(
+                onRefresh: () async => ref.read(categoriesProvider.notifier).loadCategories(),
+                child: categoriesState.isLoading && categoriesState.categories.isEmpty
+                    ? const Center(child: CircularProgressIndicator())
+                    : categoriesState.error != null && categoriesState.categories.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
                             children: [
-                              const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                              const SizedBox(height: 16),
-                              Text('Error: ${categoriesState.error}'),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: () => ref.read(categoriesProvider.notifier).loadCategories(),
-                                child: const Text('Coba Lagi'),
+                              const SizedBox(height: 100),
+                              Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                                    const SizedBox(height: 16),
+                                    Text('Error: ${categoriesState.error}'),
+                                    const SizedBox(height: 16),
+                                    ElevatedButton(
+                                      onPressed: () => ref.read(categoriesProvider.notifier).loadCategories(),
+                                      child: const Text('Coba Lagi'),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
-                          ),
-                        )
-                      : filteredCategories.isEmpty
-                          ? Center(
-                              child: Text(
-                                _searchQuery.isEmpty 
-                                  ? 'Tidak ada data kategori.' 
-                                  : 'Kategori tidak ditemukan.',
-                                style: const TextStyle(fontSize: 16, color: Colors.grey),
-                              ),
-                            )
-                          : ListView.separated(
-                              itemCount: filteredCategories.length,
-                              separatorBuilder: (context, index) => const Divider(height: 1),
-                              itemBuilder: (context, index) {
-                                final category = filteredCategories[index];
-                                return LayoutBuilder(
-                                  builder: (context, constraints) {
-                                    final isMobile = constraints.maxWidth < 600;
+                          )
+                        : filteredCategories.isEmpty
+                            ? ListView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                children: [
+                                  const SizedBox(height: 100),
+                                  Center(
+                                    child: Text(
+                                      _searchQuery.isEmpty 
+                                        ? 'Tidak ada data kategori.' 
+                                        : 'Kategori tidak ditemukan.',
+                                      style: const TextStyle(fontSize: 16, color: Colors.grey),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : ListView.separated(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                itemCount: filteredCategories.length,
+                                separatorBuilder: (context, index) => const Divider(height: 1),
+                                itemBuilder: (context, index) {
+                                  final category = filteredCategories[index];
+                                  return LayoutBuilder(
+                                    builder: (context, constraints) {
+                                      final isMobile = constraints.maxWidth < 600;
 
-                                    if (isMobile) {
-                                      return Column(
-                                        children: [
-                                          ListTile(
-                                            leading: CircleAvatar(
-                                              child: Text(category.name.isNotEmpty ? category.name[0].toUpperCase() : '?'),
+                                      if (isMobile) {
+                                        return Column(
+                                          children: [
+                                            ListTile(
+                                              leading: CircleAvatar(
+                                                child: Text(category.name.isNotEmpty ? category.name[0].toUpperCase() : '?'),
+                                              ),
+                                              title: Text(category.name),
+                                              subtitle: Text('ID: ${category.id}'),
                                             ),
-                                            title: Text(category.name),
-                                            subtitle: Text('ID: ${category.id}'),
-                                          ),
-                                          const Divider(height: 1),
-                                          Padding(
-                                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                                            child: Wrap(
-                                              spacing: 8.0,
-                                              alignment: WrapAlignment.end,
-                                              children: [
-                                                OutlinedButton.icon(
-                                                  onPressed: () => context.push('/categories/edit', extra: category),
-                                                  icon: const Icon(Icons.edit, size: 16),
-                                                  label: const Text('Edit'),
-                                                ),
-                                                OutlinedButton.icon(
-                                                  onPressed: () => _deleteCategory(category),
-                                                  icon: const Icon(Icons.delete, size: 16, color: Colors.red),
-                                                  label: const Text('Hapus', style: TextStyle(color: Colors.red)),
-                                                ),
-                                              ],
+                                            const Divider(height: 1),
+                                            Padding(
+                                              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                                              child: Wrap(
+                                                spacing: 8.0,
+                                                alignment: WrapAlignment.end,
+                                                children: [
+                                                  OutlinedButton.icon(
+                                                    onPressed: () => context.push('/categories/edit', extra: category),
+                                                    icon: const Icon(Icons.edit, size: 16),
+                                                    label: const Text('Edit'),
+                                                  ),
+                                                  OutlinedButton.icon(
+                                                    onPressed: () => _deleteCategory(category),
+                                                    icon: const Icon(Icons.delete, size: 16, color: Colors.red),
+                                                    label: const Text('Hapus', style: TextStyle(color: Colors.red)),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
-                                          ),
-                                          const Divider(height: 4, thickness: 4),
-                                        ],
+                                            const Divider(height: 4, thickness: 4),
+                                          ],
+                                        );
+                                      }
+
+                                      return ListTile(
+                                        leading: CircleAvatar(
+                                          child: Text(category.name.isNotEmpty ? category.name[0].toUpperCase() : '?'),
+                                        ),
+                                        title: Text(category.name),
+                                        subtitle: Text('ID: ${category.id}'),
+                                        trailing: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            IconButton(
+                                              icon: const Icon(Icons.edit, color: Colors.blue),
+                                              onPressed: () => context.push('/categories/edit', extra: category),
+                                              tooltip: 'Edit',
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(Icons.delete, color: Colors.red),
+                                              onPressed: () => _deleteCategory(category),
+                                              tooltip: 'Hapus',
+                                            ),
+                                          ],
+                                        ),
                                       );
-                                    }
-
-                                    return ListTile(
-                                      leading: CircleAvatar(
-                                        child: Text(category.name.isNotEmpty ? category.name[0].toUpperCase() : '?'),
-                                      ),
-                                      title: Text(category.name),
-                                      subtitle: Text('ID: ${category.id}'),
-                                      trailing: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          IconButton(
-                                            icon: const Icon(Icons.edit, color: Colors.blue),
-                                            onPressed: () => context.push('/categories/edit', extra: category),
-                                            tooltip: 'Edit',
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(Icons.delete, color: Colors.red),
-                                            onPressed: () => _deleteCategory(category),
-                                            tooltip: 'Hapus',
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                );
-                              },
-                            ),
+                                    },
+                                  );
+                                },
+                              ),
+              ),
             ),
           ],
         ),

@@ -23,8 +23,20 @@ class _TransactionSuccessDialogState extends ConsumerState<TransactionSuccessDia
   Future<void> _printReceiptDirect(SaleModel sale) async {
     final settings = ref.read(settingsNotifierProvider);
 
-    // Context-aware Bluetooth permissions check
+    // Pre-flight check printer configuration
     if (settings.printerType == 'Bluetooth') {
+      if (settings.printerMacAddress.trim().isEmpty || settings.printerMacAddress == 'none') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Printer Bluetooth belum dipilih. Silakan atur printer di menu Pengaturan.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
       if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
         final locGranted = await Permission.locationWhenInUse.isGranted;
         final btConnectGranted = await Permission.bluetoothConnect.isGranted;
@@ -49,6 +61,32 @@ class _TransactionSuccessDialogState extends ConsumerState<TransactionSuccessDia
             return;
           }
         }
+      }
+    } else if (settings.printerType == 'LAN') {
+      if (settings.printerIp.trim().isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('IP Printer LAN belum diatur. Silakan atur printer di menu Pengaturan.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+    } else if (settings.printerType == 'USB') {
+      if (!kIsWeb && Platform.isWindows && settings.printerMacAddress.trim().isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Printer USB/Windows belum dipilih. Silakan atur di menu Pengaturan.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
       }
     }
 

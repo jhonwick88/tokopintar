@@ -13,6 +13,7 @@ import '../models/user_model.dart';
 import '../models/settings_model.dart';
 import '../models/supplier_model.dart';
 import '../models/stock_ledger_model.dart';
+import '../models/cash_movement_model.dart';
 
 class ApiClient {
   final Dio _dio;
@@ -451,6 +452,63 @@ class ApiClient {
     }
   }
 
+  // --- Cash Movements (Petty Cash / Kas Keluar) ---
+
+  Future<List<CashMovementModel>> getCashMovements({DateTime? startDate, DateTime? endDate}) async {
+    try {
+      final queryParams = <String, dynamic>{'limit': '999999'};
+      if (startDate != null) {
+        queryParams['start_date'] = startDate.toIso8601String().substring(0, 10);
+      }
+      if (endDate != null) {
+        queryParams['end_date'] = '${endDate.toIso8601String().substring(0, 10)} 23:59:59';
+      }
+
+      final response = await _dio.get('/api/cash-movements', queryParameters: queryParams);
+      if (response.statusCode == 200 && response.data != null) {
+        final success = response.data['success'] as bool? ?? false;
+        if (success) {
+          final list = response.data['data'] as List?;
+          if (list != null) {
+            return list.map((e) => CashMovementModel.fromJson(e as Map<String, dynamic>)).toList();
+          }
+        }
+      }
+      return [];
+    } catch (e) {
+      dev.log('Error in getCashMovements: $e');
+      rethrow;
+    }
+  }
+
+  Future<CashMovementModel> saveCashMovement(CashMovementModel movement) async {
+    try {
+      final response = await _dio.post('/api/cash-movements', data: movement.toJson());
+      if (response.statusCode == 200 && response.data != null) {
+        final success = response.data['success'] as bool? ?? false;
+        if (success && response.data['data'] != null) {
+          return CashMovementModel.fromJson(response.data['data'] as Map<String, dynamic>);
+        }
+      }
+      throw Exception(response.data?['message'] ?? 'Gagal mencatat pengeluaran kas');
+    } catch (e) {
+      dev.log('Error in saveCashMovement: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteCashMovement(String id) async {
+    try {
+      final response = await _dio.delete('/api/cash-movements/$id');
+      if (response.statusCode != 200) {
+        throw Exception(response.data?['message'] ?? 'Gagal menghapus pengeluaran kas');
+      }
+    } catch (e) {
+      dev.log('Error in deleteCashMovement: $e');
+      rethrow;
+    }
+  }
+
   // --- Audit Logs ---
 
   Future<List<AuditLogModel>> getAuditLogs() async {
@@ -546,6 +604,30 @@ class ApiClient {
       }
     } catch (e) {
       dev.log('Error in saveUser: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateUser(UserModel user) async {
+    try {
+      final response = await _dio.put('/api/users/${user.uid}', data: user.toJson());
+      if (response.statusCode != 200) {
+        throw Exception(response.data?['message'] ?? 'Gagal memperbarui user');
+      }
+    } catch (e) {
+      dev.log('Error in updateUser: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteUser(String uid) async {
+    try {
+      final response = await _dio.delete('/api/users/$uid');
+      if (response.statusCode != 200) {
+        throw Exception(response.data?['message'] ?? 'Gagal menghapus user');
+      }
+    } catch (e) {
+      dev.log('Error in deleteUser: $e');
       rethrow;
     }
   }

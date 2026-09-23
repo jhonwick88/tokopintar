@@ -15,6 +15,7 @@ import '../widgets/app_permissions_dialog.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../widgets/voice_search_button.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'cash_out_dialog.dart';
 
 class MainLayout extends ConsumerStatefulWidget {
   final Widget child;
@@ -382,6 +383,34 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                     ),
                   ),
                   
+                  // Kas Keluar Quick Action Button
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: _isSidebarCollapsed ? 8 : 12, vertical: 4),
+                    child: _isSidebarCollapsed
+                        ? Tooltip(
+                            message: 'Catat Kas Keluar',
+                            child: IconButton(
+                              icon: const Icon(Icons.output_rounded, color: Colors.orange),
+                              onPressed: () => CashOutDialog.show(context),
+                            ),
+                          )
+                        : SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.orange.shade800,
+                                side: BorderSide(color: Colors.orange.shade300),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                              ),
+                              icon: const Icon(Icons.output_rounded, size: 18),
+                              label: const Text('Kas Keluar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              onPressed: () => CashOutDialog.show(context),
+                            ),
+                          ),
+                  ),
+                  const SizedBox(height: 4),
+
                   // Cashier Info Footer
                   const Divider(height: 1),
                   if (authState.currentUser != null)
@@ -477,6 +506,11 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
             ? AppBar(
                 title: const Text('TokoPintar POS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                 actions: [
+                  IconButton(
+                    icon: const Icon(Icons.output_rounded, color: Colors.orange),
+                    tooltip: 'Catat Kas Keluar',
+                    onPressed: () => CashOutDialog.show(context),
+                  ),
                   IconButton(
                     icon: const Icon(Icons.hourglass_empty_rounded, color: Colors.orange),
                     onPressed: () => _openResumeDialog(context, ref),

@@ -24,6 +24,7 @@ import '../widgets/voice_search_button.dart';
 import '../widgets/floating_calculator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/settings_provider.dart';
+import 'product_form_screen.dart';
 import '../../core/utils/unit_helper.dart';
 import '../providers/unit_provider.dart';
 
@@ -51,6 +52,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     HardwareKeyboard.instance.addHandler(_handleGlobalKeyEvent);
     _loadViewPreference();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(itemsNotifierProvider.notifier).initCatalog();
       _checkAndPromptPermissions();
       if (mounted) {
         final settings = ref.read(settingsNotifierProvider);
@@ -665,7 +667,6 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
   void _openResumeDialog() {
     final posState = ref.watch(posNotifierProvider);
-    final unitsState = ref.watch(unitsProvider);
     if (posState.heldCarts.isEmpty) {
       _showErrorToast('Tidak ada transaksi yang ditangguhkan.');
       return;
@@ -890,7 +891,6 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   Widget build(BuildContext context) {
     final itemsState = ref.watch(itemsNotifierProvider);
     final posState = ref.watch(posNotifierProvider);
-    final unitsState = ref.watch(unitsProvider);
 
     ref.listen<String?>(scannedBarcodeProvider, (previous, next) {
       if (next != null) {
@@ -1101,6 +1101,17 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                         onPressed: _toggleViewPreference,
                         tooltip: _isGridView ? 'Tampilan List' : 'Tampilan Grid',
                       ),
+                      if (!isLargeScreen) ...[
+                        const SizedBox(width: 8),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.refresh, size: 20),
+                          tooltip: 'Refresh Katalog',
+                          onPressed: () {
+                            ref.read(itemsNotifierProvider.notifier).initCatalog();
+                          },
+                        ),
+                      ],
                       const SizedBox(width: 8),
                       ActionChip(
                         avatar: const Icon(Icons.bolt, color: Colors.teal, size: 18),
@@ -2226,196 +2237,35 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
   void _showEditProductDialog(ItemModel product) {
     BarcodeService.instance.pause();
-    final nameController = TextEditingController(text: product.itemName);
-    
-    // Auto-generate short name if empty, otherwise use existing
-    final initialShortName = product.itemNameShort.isEmpty 
-        ? generateItemNameShort(product.itemName) 
-        : product.itemNameShort;
-    final shortNameController = TextEditingController(text: initialShortName);
-    
-    bool isShortNameManuallyEdited = product.itemNameShort.isNotEmpty && 
-                                     product.itemNameShort != generateItemNameShort(product.itemName);
-
-    nameController.addListener(() {
-      if (!isShortNameManuallyEdited) {
-        final newShortName = generateItemNameShort(nameController.text);
-        if (shortNameController.text != newShortName) {
-          shortNameController.text = newShortName;
-        }
-      }
-    });
-
-    final barcodeController = TextEditingController(text: product.itemUPC);
-    final skuController = TextEditingController(text: product.itemNo);
-    final priceController = TextEditingController(text: product.price.toStringAsFixed(0));
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.edit, color: Theme.of(context).colorScheme.primary),
-              const SizedBox(width: 8),
-              const Text('Edit Produk'),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nama Produk (itemName)',
-                    prefixIcon: Icon(Icons.shopping_bag),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: shortNameController,
-                  onChanged: (val) {
-                    isShortNameManuallyEdited = true;
-                  },
-                  decoration: const InputDecoration(
-                    labelText: 'Nama Singkat / Struk (itemNameShort)',
-                    prefixIcon: Icon(Icons.short_text),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: barcodeController,
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    labelText: 'Barcode / UPC (Opsional)',
-                    prefixIcon: const Icon(Icons.qr_code),
-                    suffixIcon: (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) ? IconButton(
-                      icon: const Icon(Icons.qr_code_scanner),
-                      onPressed: () async {
-                        var status = await Permission.camera.status;
-                        if (status != PermissionStatus.granted) {
-                          if (context.mounted) {
-                            await AppPermissionsDialog.show(context);
-                          }
-                          status = await Permission.camera.status;
-                          if (status != PermissionStatus.granted) {
-                            return;
-                          }
-                        }
-                        
-                        if (!context.mounted) return;
-                        final scanned = await showDialog<String>(
-                          context: context,
-                          builder: (context) => const CameraScannerDialog(),
-                        );
-                        if (scanned != null) {
-                          barcodeController.text = scanned;
-                        }
-                      },
-                      tooltip: 'Scan Barcode',
-                    ) : null,
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: skuController,
-                  decoration: InputDecoration(
-                    labelText: 'SKU / Kode Item (itemNo)',
-                    prefixIcon: const Icon(Icons.inventory_2),
-                    suffixIcon: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.auto_awesome, color: Colors.blue),
-                          onPressed: () {
-                            skuController.text = generateSKUFromName(nameController.text);
-                          },
-                          tooltip: 'Generate SKU Otomatis',
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.help_outline, color: Colors.grey),
-                          onPressed: () => _showSKUGuideDialog(context),
-                          tooltip: 'Panduan Aturan SKU',
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: priceController,
-                  decoration: const InputDecoration(
-                    labelText: 'Harga (price)',
-                    prefixIcon: Icon(Icons.monetization_on),
-                  ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Batal'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final newName = nameController.text.trim();
-                final newShortName = shortNameController.text.trim();
-                final newBarcode = barcodeController.text.trim();
-                final newSKU = skuController.text.trim();
-                final priceText = priceController.text.trim();
-                final newPrice = double.tryParse(priceText) ?? 0.0;
-
-                if (newName.isEmpty || newSKU.isEmpty || priceText.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Nama Produk, SKU, dan Harga wajib diisi')),
-                  );
-                  return;
-                }
-
-                Navigator.of(context).pop();
-
-                try {
-                  await ref.read(itemsNotifierProvider.notifier).updateItem(
-                    product.itemNo,
-                    product.copyWith(
-                      itemNo: newSKU,
-                      itemUPC: newBarcode,
-                      price: newPrice,
-                      itemName: newName,
-                      itemNameShort: newShortName,
-                    ),
-                  );
-                  _showSuccessToast('Produk berhasil diperbarui');
-                } catch (e) {
-                  final cleanMsg = _cleanErrorMessage(e, 'Gagal memperbarui produk');
-                  _showErrorToast(cleanMsg);
-                }
-              },
-              child: const Text('Simpan'),
-            ),
-          ],
-        );
-      },
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => ProductFormScreen(existingItem: product),
+      ),
     ).then((_) {
       BarcodeService.instance.resume();
     });
   }
 
   void _openAddProductPage({String? barcode, String? itemName}) {
-    Navigator.of(context).push(
+    BarcodeService.instance.pause();
+    Navigator.of(context).push<ItemModel>(
       MaterialPageRoute<ItemModel>(
-        fullscreenDialog: true,
-        builder: (context) => _AddProductDialog(
-          initialBarcode: barcode,
-          initialItemName: itemName,
+        builder: (context) => ProductFormScreen(
+          existingItem: (barcode != null || itemName != null)
+              ? ItemModel(
+                  itemNo: '',
+                  itemUPC: barcode ?? '',
+                  itemName: itemName ?? '',
+                  itemNameShort: '',
+                  categoryId: 0,
+                  price: 0,
+                  obQuantity: 10,
+                )
+              : null,
         ),
       ),
     ).then((newItem) {
+      BarcodeService.instance.resume();
       if (newItem != null) {
         ref.read(posNotifierProvider.notifier).addToCart(newItem);
         _showSuccessToast('Produk ${newItem.itemName} ditambahkan ke keranjang');
@@ -2851,387 +2701,6 @@ class _QuickMappingSearchBottomSheetState extends ConsumerState<_QuickMappingSea
   }
 }
 
-class _AddProductDialog extends ConsumerStatefulWidget {
-  final String? initialBarcode;
-  final String? initialItemName;
-
-  const _AddProductDialog({
-    this.initialBarcode,
-    this.initialItemName,
-  });
-
-  @override
-  ConsumerState<_AddProductDialog> createState() => _AddProductDialogState();
-}
-
-class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
-  final _formKey = GlobalKey<FormState>();
-  late TextEditingController _barcodeController;
-  late TextEditingController _skuController;
-  late TextEditingController _nameController;
-  late TextEditingController _shortNameController;
-  bool _isShortNameManuallyEdited = false;
-  late TextEditingController _priceController;
-  late TextEditingController _stockController;
-  int? _selectedCategoryId;
-
-  @override
-  void initState() {
-    super.initState();
-    BarcodeService.instance.pause();
-    _barcodeController = TextEditingController(text: widget.initialBarcode ?? '');
-    _skuController = TextEditingController(text: '');
-    _nameController = TextEditingController(text: widget.initialItemName ?? '');
-    _shortNameController = TextEditingController(text: generateItemNameShort(widget.initialItemName ?? ''));
-    _priceController = TextEditingController(text: '');
-    _stockController = TextEditingController(text: '10');
-
-    _nameController.addListener(() {
-      if (!_isShortNameManuallyEdited) {
-        final newShortName = generateItemNameShort(_nameController.text);
-        if (_shortNameController.text != newShortName) {
-          _shortNameController.text = newShortName;
-        }
-      }
-    });
-
-    // Attempt to set a default generated SKU
-    _skuController.text = 'SKU-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
-  }
-
-  @override
-  void dispose() {
-    BarcodeService.instance.resume();
-    _barcodeController.dispose();
-    _skuController.dispose();
-    _nameController.dispose();
-    _shortNameController.dispose();
-    _priceController.dispose();
-    _stockController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final categories = ref.watch(itemsNotifierProvider).categories;
-    if (_selectedCategoryId == null && categories.isNotEmpty) {
-      _selectedCategoryId = categories.first.id;
-    }
-
-    InputDecoration buildInputDecoration(String label, String hint, IconData prefixIcon, {Widget? suffixIcon, String? prefixText}) {
-      return InputDecoration(
-        labelText: label,
-        hintText: hint,
-        prefixIcon: Icon(prefixIcon, color: colorScheme.primary),
-        prefixText: prefixText,
-        suffixIcon: suffixIcon,
-        filled: true,
-        fillColor: colorScheme.surfaceContainerHighest.withOpacity(0.3),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: colorScheme.primary, width: 2),
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      );
-    }
-
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: colorScheme.surface,
-        scrolledUnderElevation: 0,
-        title: const Text('Tambah Produk Baru', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: -0.5)),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
-      body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-            children: [
-              // Header Card
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: colorScheme.primary.withOpacity(0.2)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: colorScheme.primary,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.inventory_2_rounded, color: Colors.white, size: 28),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Informasi Produk',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: colorScheme.onSurface),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Lengkapi detail produk untuk menambahkannya ke inventaris toko.',
-                            style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32),
-              
-              TextFormField(
-                controller: _nameController,
-                decoration: buildInputDecoration(
-                  'Nama Produk *',
-                  'Contoh: Aqua Botol 600ml',
-                  Icons.shopping_bag_rounded,
-                ),
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) return 'Nama produk tidak boleh kosong';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-              
-              TextFormField(
-                controller: _shortNameController,
-                onChanged: (val) {
-                  _isShortNameManuallyEdited = true;
-                },
-                decoration: buildInputDecoration(
-                  'Nama Singkat / Struk',
-                  'Nama pendek untuk cetak struk',
-                  Icons.short_text,
-                ),
-              ),
-              const SizedBox(height: 20),
-              
-              TextFormField(
-                controller: _skuController,
-                decoration: buildInputDecoration(
-                  'SKU / Kode Item *',
-                  'Contoh: AQUA-600',
-                  Icons.vpn_key_rounded,
-                  suffixIcon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.auto_awesome, color: Colors.amber),
-                        onPressed: () {
-                          _skuController.text = generateSKUFromName(_nameController.text);
-                        },
-                        tooltip: 'Generate SKU Otomatis',
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.help_outline, color: colorScheme.primary),
-                        onPressed: () => _showSKUGuideDialog(context),
-                        tooltip: 'Panduan Aturan SKU',
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                  ),
-                ),
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) return 'SKU tidak boleh kosong';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-              
-              TextFormField(
-                controller: _barcodeController,
-                autofocus: true,
-                decoration: buildInputDecoration(
-                  'Barcode / UPC',
-                  'Scan atau ketik barcode',
-                  Icons.qr_code_scanner_rounded,
-                  suffixIcon: (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) ? Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: IconButton(
-                      icon: Icon(Icons.camera_alt_rounded, color: colorScheme.primary),
-                      onPressed: () async {
-                        var status = await Permission.camera.status;
-                        if (status != PermissionStatus.granted) {
-                          if (context.mounted) {
-                            await AppPermissionsDialog.show(context);
-                          }
-                          status = await Permission.camera.status;
-                          if (status != PermissionStatus.granted) return;
-                        }
-                        
-                        if (!context.mounted) return;
-                        final scanned = await showDialog<String>(
-                          context: context,
-                          builder: (context) => const CameraScannerDialog(),
-                        );
-                        if (scanned != null) {
-                          _barcodeController.text = scanned;
-                        }
-                      },
-                      tooltip: 'Scan Barcode',
-                    ),
-                  ) : null,
-                ),
-              ),
-              const SizedBox(height: 32),
-              
-              const Text(
-                'Kategori & Harga',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              const SizedBox(height: 16),
-
-              DropdownButtonFormField<int>(
-                value: _selectedCategoryId,
-                decoration: buildInputDecoration(
-                  'Kategori Produk *',
-                  'Pilih kategori',
-                  Icons.category_rounded,
-                ),
-                icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                items: categories.map((cat) {
-                  return DropdownMenuItem<int>(
-                    value: cat.id,
-                    child: Text(cat.name),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  setState(() {
-                    _selectedCategoryId = val;
-                  });
-                },
-                validator: (val) => val == null ? 'Kategori wajib dipilih' : null,
-              ),
-              const SizedBox(height: 20),
-              
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _priceController,
-                      decoration: buildInputDecoration(
-                        'Harga Jual *',
-                        '0',
-                        Icons.payments_rounded,
-                        prefixText: 'Rp ',
-                      ),
-                      keyboardType: TextInputType.number,
-                      validator: (val) {
-                        if (val == null || val.trim().isEmpty) return 'Wajib diisi';
-                        if (double.tryParse(val) == null) return 'Format tidak valid';
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _stockController,
-                      decoration: buildInputDecoration(
-                        'Stok Awal *',
-                        '0',
-                        Icons.inventory_rounded,
-                      ),
-                      keyboardType: TextInputType.number,
-                      validator: (val) {
-                        if (val == null || val.trim().isEmpty) return 'Wajib diisi';
-                        if (double.tryParse(val) == null) return 'Format tidak valid';
-                        return null;
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 48),
-              
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 0,
-                  ),
-                  onPressed: () async {
-                    if (!_formKey.currentState!.validate()) return;
-
-                    final name = _nameController.text.trim();
-                    final sku = _skuController.text.trim();
-                    final barcode = _barcodeController.text.trim();
-                    final price = double.parse(_priceController.text.trim());
-                    final stock = double.parse(_stockController.text.trim());
-                    final catId = _selectedCategoryId!;
-
-                    try {
-                      showDialog(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (context) => const Center(child: CircularProgressIndicator()),
-                      );
-
-                      final newItem = await ref.read(itemsNotifierProvider.notifier).createItem(
-                        ItemModel(
-                          itemNo: sku,
-                          itemName: name,
-                          itemNameShort: _shortNameController.text.trim(),
-                          itemUPC: barcode,
-                          categoryId: catId,
-                          price: price,
-                          obQuantity: stock,
-                        ),
-                      );
-
-                      Navigator.of(context).pop(); // Dismiss loading
-                      Navigator.of(context).pop(newItem); // Return created item
-                    } catch (e) {
-                      Navigator.of(context).pop(); // Dismiss loading
-                      debugPrint('Gagal menyimpan produk: $e');
-                      final cleanMsg = _cleanErrorMessage(e, 'Gagal menyimpan produk');
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(cleanMsg),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  },
-                  icon: const Icon(Icons.check_circle_rounded),
-                  label: const Text(
-                    'Simpan Produk',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 0.5),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 String _cleanErrorMessage(dynamic error, String defaultMsg) {
   final errorStr = error.toString().toLowerCase();
 
@@ -3375,7 +2844,7 @@ String generateSKUFromName(String name) {
   return sku;
 }
 
-void _showSKUGuideDialog(BuildContext context) {
+void showSKUGuideDialog(BuildContext context) {
   showDialog(
     context: context,
     builder: (context) {

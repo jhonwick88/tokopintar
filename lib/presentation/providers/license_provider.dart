@@ -4,6 +4,8 @@ import 'package:uuid/uuid.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 class LicenseState {
   final bool isActivated;
@@ -85,6 +87,10 @@ class LicenseNotifier extends StateNotifier<LicenseState> {
     return prefs.getString('local_rest_api_url') ?? dotenv.env['API_BASE_URL'] ?? 'http://localhost:8181';
   }
 
+  Future<void> refreshStatus() async {
+    await _fetchStatus();
+  }
+
   Future<void> _fetchStatus() async {
     try {
       final baseUrl = await _getBaseUrl();
@@ -131,7 +137,7 @@ class LicenseNotifier extends StateNotifier<LicenseState> {
         'machine_fingerprint': state.machineFingerprint,
         'app_version': '1.0.0', 
         'hostname': 'TokoPintar-POS',
-        'platform': 'windows',
+        'platform': kIsWeb ? 'web' : Platform.operatingSystem,
       });
 
       

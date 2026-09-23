@@ -27,6 +27,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     _scrollController = ScrollController()..addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndPromptPermissions();
+      final now = DateTime.now();
+      ref.read(salesHistoryNotifierProvider.notifier).updateDateFilter(
+        DateTime(now.year, now.month, now.day),
+        DateTime(now.year, now.month, now.day, 23, 59, 59),
+      );
     });
   }
 

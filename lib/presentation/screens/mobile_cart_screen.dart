@@ -137,48 +137,89 @@ class _MobileCartScreenState extends ConsumerState<MobileCartScreen> {
     final posNotifier = ref.read(posNotifierProvider.notifier);
     final noteController = TextEditingController(text: cartItem.note);
     final discController = TextEditingController(text: cartItem.discount.toInt().toString());
+    int tempSelectedUnit = cartItem.selectedUnit;
 
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text(cartItem.item.itemName),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: noteController,
-                decoration: const InputDecoration(
-                  labelText: 'Catatan Item',
-                ),
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return AlertDialog(
+              title: Text(cartItem.item.itemName),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<int>(
+                    value: tempSelectedUnit,
+                    decoration: const InputDecoration(labelText: 'Pilih Satuan'),
+                    items: [
+                      if (cartItem.item.unit1.isNotEmpty)
+                        DropdownMenuItem(
+                          value: 1,
+                          child: Text('${getUnitName(cartItem.item.unit1, ref.read(unitsProvider))} (1) - ${_formatRupiah(cartItem.item.price)}'),
+                        )
+                      else
+                        DropdownMenuItem(
+                          value: 1,
+                          child: Text('PCS (1) - ${_formatRupiah(cartItem.item.price)}'),
+                        ),
+                      if (cartItem.item.unit2.isNotEmpty && cartItem.item.ratio2 > 0)
+                        DropdownMenuItem(
+                          value: 2,
+                          child: Text('${cartItem.item.unit2} (${cartItem.item.ratio2.toInt()}) - ${_formatRupiah(cartItem.item.defUnitPrice2)}'),
+                        ),
+                      if (cartItem.item.unit3.isNotEmpty && cartItem.item.ratio3 > 0)
+                        DropdownMenuItem(
+                          value: 3,
+                          child: Text('${cartItem.item.unit3} (${cartItem.item.ratio3.toInt()}) - ${_formatRupiah(cartItem.item.defUnitPrice3)}'),
+                        ),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setModalState(() {
+                          tempSelectedUnit = val;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: noteController,
+                    decoration: const InputDecoration(
+                      labelText: 'Catatan Item',
+                      hintText: 'Level pedas, ukuran, dll.',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: discController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Diskon Item (Nominal Rp)',
+                      prefixText: 'Rp ',
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: discController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Diskon Item (Nominal Rp)',
-                  prefixText: 'Rp ',
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Batal'),
                 ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Batal'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final note = noteController.text;
-                final discount = double.tryParse(discController.text) ?? 0.0;
-                posNotifier.updateNote(cartItem.item.itemNo, note);
-                posNotifier.applyItemDiscount(cartItem.item.itemNo, discount);
-                Navigator.of(context).pop();
-              },
-              child: const Text('Simpan'),
-            ),
-          ],
+                ElevatedButton(
+                  onPressed: () {
+                    final note = noteController.text;
+                    final discount = double.tryParse(discController.text) ?? 0.0;
+                    posNotifier.updateNote(cartItem.item.itemNo, note);
+                    posNotifier.applyItemDiscount(cartItem.item.itemNo, discount);
+                    posNotifier.updateSelectedUnit(cartItem.item.itemNo, tempSelectedUnit);
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Simpan'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -407,6 +448,11 @@ class _MobileCartScreenState extends ConsumerState<MobileCartScreen> {
                     separatorBuilder: (c, i) => const SizedBox(height: 4),
                     itemBuilder: (context, index) {
                       final cartItem = posState.cartItems[index];
+                      final unitName = cartItem.selectedUnit == 2
+                          ? cartItem.item.unit2
+                          : (cartItem.selectedUnit == 3
+                              ? cartItem.item.unit3
+                              : (cartItem.item.unit1.isNotEmpty ? getUnitName(cartItem.item.unit1, ref.watch(unitsProvider)) : 'PCS'));
                       return Dismissible(
                         key: Key('mobile-cart-${cartItem.item.itemNo}'),
                         direction: DismissDirection.endToStart,
@@ -455,7 +501,7 @@ class _MobileCartScreenState extends ConsumerState<MobileCartScreen> {
                                       Row(
                                         children: [
                                           Text(
-                                            '${cartItem.qty} x ${_formatRupiah(cartItem.price)}',
+                                            '${cartItem.qty} $unitName x ${_formatRupiah(cartItem.price)}',
                                             style: TextStyle(
                                               fontSize: 11,
                                               color: Colors.grey[600],

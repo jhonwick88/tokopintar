@@ -3,13 +3,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../providers/reconciliation_provider.dart';
 import '../../data/models/cash_reconciliation_model.dart';
+import '../../data/models/cash_movement_model.dart';
 import '../widgets/main_layout.dart';
+import '../widgets/cash_out_dialog.dart';
 
-class ReconciliationAnalysisScreen extends ConsumerWidget {
+class ReconciliationAnalysisScreen extends ConsumerStatefulWidget {
   const ReconciliationAnalysisScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ReconciliationAnalysisScreen> createState() => _ReconciliationAnalysisScreenState();
+}
+
+class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAnalysisScreen> {
+  int _selectedTab = 0; // 0: Rekonsiliasi Kas, 1: Kas Keluar
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(reconciliationProvider);
     final width = MediaQuery.of(context).size.width;
     final isLarge = width >= 900;
@@ -23,11 +32,25 @@ class ReconciliationAnalysisScreen extends ConsumerWidget {
           title: const Text('Analisis Kas Laci', style: TextStyle(fontWeight: FontWeight.bold)),
           centerTitle: false,
           actions: [
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange.shade700,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              icon: const Icon(Icons.add_circle_outline, size: 18),
+              label: const Text('Catat Kas Keluar', style: TextStyle(fontWeight: FontWeight.bold)),
+              onPressed: () => CashOutDialog.show(context),
+            ),
+            const SizedBox(width: 8),
             IconButton(
               icon: const Icon(Icons.refresh),
               tooltip: 'Muat Ulang',
               onPressed: () => ref.read(reconciliationProvider.notifier).fetchReconciliations(),
             ),
+            const SizedBox(width: 8),
           ],
         ),
         body: state.isLoading
@@ -47,54 +70,93 @@ class ReconciliationAnalysisScreen extends ConsumerWidget {
                           // ROW 2: Statistics Overview
                           _buildStatsRow(context, isLarge, state, currencyFormatter),
                           const SizedBox(height: 24),
+
+                          // ROW 3: Tab Selector (Rekonsiliasi vs Kas Keluar)
+                          _buildTabSelector(state),
+                          const SizedBox(height: 16),
                         ],
                       ),
                     ),
-                    SliverPersistentHeader(
-                      pinned: true,
-                      delegate: _StickyHeaderDelegate(
-                        child: Container(
-                          color: Theme.of(context).scaffoldBackgroundColor,
-                          alignment: Alignment.centerLeft,
-                          padding: const EdgeInsets.symmetric(vertical: 8.0),
-                          child: const Text(
-                            'Riwayat Rekonsiliasi Kas',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+
+                    // TAB 0: REKONSILIASI KAS
+                    if (_selectedTab == 0) ...[
+                      if (state.filteredReconciliations.isEmpty)
+                        const SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(32.0),
+                              child: Text(
+                                'Tidak ada data rekonsiliasi kas untuk periode ini.',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ),
                           ),
-                        ),
-                        height: 40.0,
-                      ),
-                    ),
-                    if (state.filteredReconciliations.isEmpty)
-                      const SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: Center(
-                          child: Text(
-                            'Tidak ada data rekonsiliasi kas untuk periode ini.',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        ),
-                      )
-                    else if (isLarge)
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
+                        )
+                      else if (isLarge)
+                        SliverToBoxAdapter(
                           child: _buildDesktopTable(state, currencyFormatter, dateFormatter),
+                        )
+                      else
+                        SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final rec = state.filteredReconciliations[index];
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: _buildMobileCard(rec, currencyFormatter, dateFormatter),
+                              );
+                            },
+                            childCount: state.filteredReconciliations.length,
+                          ),
                         ),
-                      )
-                    else
-                      SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final rec = state.filteredReconciliations[index];
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 8.0),
-                              child: _buildMobileCard(rec, currencyFormatter, dateFormatter),
-                            );
-                          },
-                          childCount: state.filteredReconciliations.length,
+                    ]
+                    // TAB 1: KAS KELUAR (PETTY CASH)
+                    else ...[
+                      if (state.filteredCashMovements.isEmpty)
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(32.0),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.output_rounded, size: 48, color: Colors.grey.shade400),
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    'Belum ada pengeluaran kas laci untuk periode ini.',
+                                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  ElevatedButton.icon(
+                                    onPressed: () => CashOutDialog.show(context),
+                                    icon: const Icon(Icons.add),
+                                    label: const Text('Catat Kas Keluar'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        )
+                      else if (isLarge)
+                        SliverToBoxAdapter(
+                          child: _buildCashMovementsDesktopTable(state, currencyFormatter, dateFormatter),
+                        )
+                      else
+                        SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final mov = state.filteredCashMovements[index];
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: _buildCashMovementMobileCard(mov, currencyFormatter, dateFormatter),
+                              );
+                            },
+                            childCount: state.filteredCashMovements.length,
+                          ),
                         ),
-                      ),
+                    ],
                   ],
                 ),
               ),
@@ -102,12 +164,32 @@ class ReconciliationAnalysisScreen extends ConsumerWidget {
     );
   }
 
-
+  Widget _buildTabSelector(ReconciliationState state) {
+    return SegmentedButton<int>(
+      segments: [
+        ButtonSegment<int>(
+          value: 0,
+          icon: const Icon(Icons.balance, size: 18),
+          label: Text('Tutup Kasir (${state.filteredReconciliations.length})'),
+        ),
+        ButtonSegment<int>(
+          value: 1,
+          icon: const Icon(Icons.output_rounded, size: 18),
+          label: Text('Kas Keluar (${state.filteredCashMovements.length})'),
+        ),
+      ],
+      selected: {_selectedTab},
+      onSelectionChanged: (newSelection) {
+        setState(() {
+          _selectedTab = newSelection.first;
+        });
+      },
+    );
+  }
 
   Widget _buildStatsRow(BuildContext context, bool isLarge, ReconciliationState state, NumberFormat currencyFormatter) {
     final double accuracy = state.averageAccuracy;
     
-    // Gradient definitions
     final accuracyGradient = [const Color(0xFF0F9B0F), const Color(0xFF4CAF50)];
     
     final discrepancyGradient = state.totalDiscrepancyCount > 0
@@ -120,6 +202,8 @@ class ReconciliationAnalysisScreen extends ConsumerWidget {
             ? [const Color(0xFFE65100), const Color(0xFFF57C00)]
             : [const Color(0xFF0288D1), const Color(0xFF29B6F6)]);
 
+    final cashOutGradient = [const Color(0xFFD84315), const Color(0xFFFF7043)];
+
     if (isLarge) {
       return Row(
         children: [
@@ -128,11 +212,23 @@ class ReconciliationAnalysisScreen extends ConsumerWidget {
               padding: const EdgeInsets.only(right: 12.0),
               child: _buildStatCard(
                 context: context,
-                title: 'Akurasi',
+                title: 'Akurasi Kas',
                 value: '${accuracy.toStringAsFixed(1)}%',
                 icon: Icons.percent,
                 gradientColors: accuracyGradient,
                 accuracy: accuracy,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(right: 12.0),
+              child: _buildStatCard(
+                context: context,
+                title: 'Total Kas Keluar',
+                value: currencyFormatter.format(state.totalCashOut),
+                icon: Icons.output_rounded,
+                gradientColors: cashOutGradient,
               ),
             ),
           ),
@@ -179,6 +275,21 @@ class ReconciliationAnalysisScreen extends ConsumerWidget {
               Expanded(
                 child: _buildStatCard(
                   context: context,
+                  title: 'Kas Keluar',
+                  value: currencyFormatter.format(state.totalCashOut),
+                  icon: Icons.output_rounded,
+                  gradientColors: cashOutGradient,
+                  isCompact: true,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatCard(
+                  context: context,
                   title: 'Selisih Kas',
                   value: '${state.totalDiscrepancyCount} kali',
                   icon: Icons.error_outline,
@@ -186,16 +297,18 @@ class ReconciliationAnalysisScreen extends ConsumerWidget {
                   isCompact: true,
                 ),
               ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildStatCard(
+                  context: context,
+                  title: 'Akumulasi Selisih',
+                  value: (state.totalDifference > 0 ? '+' : '') + currencyFormatter.format(state.totalDifference),
+                  icon: Icons.account_balance_wallet,
+                  gradientColors: differenceGradient,
+                  isCompact: true,
+                ),
+              ),
             ],
-          ),
-          const SizedBox(height: 8),
-          _buildStatCard(
-            context: context,
-            title: 'Akumulasi Selisih',
-            value: (state.totalDifference > 0 ? '+' : '') + currencyFormatter.format(state.totalDifference),
-            icon: Icons.account_balance_wallet,
-            gradientColors: differenceGradient,
-            isCompact: false,
           ),
         ],
       );
@@ -299,7 +412,7 @@ class ReconciliationAnalysisScreen extends ConsumerWidget {
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
-                            fontSize: isCompact ? 14 : 18,
+                            fontSize: isCompact ? 13 : 17,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -315,6 +428,7 @@ class ReconciliationAnalysisScreen extends ConsumerWidget {
     );
   }
 
+  // --- RECONCILIATION DESKTOP TABLE ---
   Widget _buildDesktopTable(
       ReconciliationState state, NumberFormat currencyFormatter, DateFormat dateFormatter) {
     return Card(
@@ -334,8 +448,8 @@ class ReconciliationAnalysisScreen extends ConsumerWidget {
               columns: const [
                 DataColumn(label: Text('Tanggal & Waktu', style: TextStyle(fontWeight: FontWeight.bold))),
                 DataColumn(label: Text('Kasir', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Omzet Sistem', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Uang di Laci', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Kas Sistem (Seharusnya)', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Uang Fisik Laci', style: TextStyle(fontWeight: FontWeight.bold))),
                 DataColumn(label: Text('Selisih', style: TextStyle(fontWeight: FontWeight.bold))),
                 DataColumn(label: Text('Akurasi', style: TextStyle(fontWeight: FontWeight.bold))),
                 DataColumn(label: Text('Catatan', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -371,6 +485,123 @@ class ReconciliationAnalysisScreen extends ConsumerWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // --- KAS KELUAR DESKTOP TABLE ---
+  Widget _buildCashMovementsDesktopTable(
+      ReconciliationState state, NumberFormat currencyFormatter, DateFormat dateFormatter) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.withOpacity(0.12)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.vertical,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              headingRowColor: WidgetStateProperty.all(Colors.grey.withOpacity(0.03)),
+              columns: const [
+                DataColumn(label: Text('Tanggal & Waktu', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Kategori', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Nominal', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Kasir / Operator', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Keperluan / Catatan', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Aksi', style: TextStyle(fontWeight: FontWeight.bold))),
+              ],
+              rows: state.filteredCashMovements.map((mov) {
+                return DataRow(
+                  cells: [
+                    DataCell(Text(dateFormatter.format(mov.date))),
+                    DataCell(_buildCategoryBadge(mov.category)),
+                    DataCell(
+                      Text(
+                        currencyFormatter.format(mov.amount),
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepOrange),
+                      ),
+                    ),
+                    DataCell(Text(mov.cashierName)),
+                    DataCell(
+                      SizedBox(
+                        width: 250,
+                        child: Text(
+                          mov.notes.isEmpty ? '-' : mov.notes,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                        tooltip: 'Hapus Catatan',
+                        onPressed: () => _confirmDeleteCashMovement(context, mov),
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryBadge(String category) {
+    Color bg;
+    Color fg;
+    IconData icon;
+
+    switch (category.toLowerCase()) {
+      case 'pengamen':
+        bg = Colors.purple.shade50;
+        fg = Colors.purple.shade800;
+        icon = Icons.music_note_rounded;
+        break;
+      case 'sumbangan':
+        bg = Colors.teal.shade50;
+        fg = Colors.teal.shade800;
+        icon = Icons.volunteer_activism_rounded;
+        break;
+      case 'operasional':
+        bg = Colors.blue.shade50;
+        fg = Colors.blue.shade800;
+        icon = Icons.shopping_bag_rounded;
+        break;
+      case 'konsumsi':
+        bg = Colors.green.shade50;
+        fg = Colors.green.shade800;
+        icon = Icons.local_cafe_rounded;
+        break;
+      default:
+        bg = Colors.grey.shade100;
+        fg = Colors.grey.shade800;
+        icon = Icons.label_outline_rounded;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: fg.withOpacity(0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: fg),
+          const SizedBox(width: 6),
+          Text(
+            category,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: fg),
+          ),
+        ],
       ),
     );
   }
@@ -440,13 +671,20 @@ class ReconciliationAnalysisScreen extends ConsumerWidget {
         color: bg,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Text(
-        '${accuracy.toStringAsFixed(1)}%',
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          color: fg,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.pie_chart_outline_rounded, size: 14, color: fg),
+          const SizedBox(width: 4),
+          Text(
+            '${accuracy.toStringAsFixed(1)}%',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: fg,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -487,7 +725,7 @@ class ReconciliationAnalysisScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildDetailRow('Omzet Sistem', currencyFormatter.format(rec.systemRevenue)),
+                  _buildDetailRow('Kas Seharusnya', currencyFormatter.format(rec.systemRevenue)),
                   const SizedBox(height: 8),
                   _buildDetailRow('Uang Fisik Laci', currencyFormatter.format(rec.actualDrawerCash)),
                   const SizedBox(height: 8),
@@ -522,6 +760,58 @@ class ReconciliationAnalysisScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildCashMovementMobileCard(
+      CashMovementModel mov, NumberFormat currencyFormatter, DateFormat dateFormatter) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.withOpacity(0.12)),
+      ),
+      margin: const EdgeInsets.symmetric(vertical: 6.0),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildCategoryBadge(mov.category),
+                Text(
+                  currencyFormatter.format(mov.amount),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.deepOrange),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            if (mov.notes.isNotEmpty) ...[
+              Text(
+                mov.notes,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 6),
+            ],
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '${mov.cashierName} • ${dateFormatter.format(mov.date)}',
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                  onPressed: () => _confirmDeleteCashMovement(context, mov),
+                  tooltip: 'Hapus',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDetailRow(String label, String value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -529,6 +819,48 @@ class ReconciliationAnalysisScreen extends ConsumerWidget {
         Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
         Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
       ],
+    );
+  }
+
+  void _confirmDeleteCashMovement(BuildContext context, CashMovementModel mov) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Hapus Catatan Kas Keluar?'),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus catatan pengeluaran ${mov.category} sebesar Rp ${NumberFormat("#,##0", "id_ID").format(mov.amount)}?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () async {
+              Navigator.of(dialogCtx).pop();
+              try {
+                await ref.read(reconciliationProvider.notifier).deleteCashMovement(mov.id);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Catatan kas keluar berhasil dihapus'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Gagal menghapus: $e'), backgroundColor: Colors.red),
+                  );
+                }
+              }
+            },
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -550,12 +882,12 @@ class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return child;
+    return SizedBox.expand(child: child);
   }
 
   @override
-  bool shouldRebuild(covariant _StickyHeaderDelegate oldDelegate) {
-    return child != oldDelegate.child || height != oldDelegate.height;
+  bool shouldRebuild(_StickyHeaderDelegate oldDelegate) {
+    return height != oldDelegate.height || child != oldDelegate.child;
   }
 }
 
@@ -567,191 +899,134 @@ class _ReconciliationFiltersBar extends ConsumerStatefulWidget {
 }
 
 class _ReconciliationFiltersBarState extends ConsumerState<_ReconciliationFiltersBar> {
-  final ScrollController _scrollController = ScrollController();
-  final List<GlobalKey> _keys = List.generate(4, (index) => GlobalKey());
+  DateTime? _customStart;
+  DateTime? _customEnd;
 
-  void _scrollToItem(int index) {
-    if (!_scrollController.hasClients) return;
-    final keyContext = _keys[index].currentContext;
-    if (keyContext != null) {
-      Scrollable.ensureVisible(
-        keyContext,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-        alignment: 0.0,
-      );
+  Future<void> _pickDateRange(BuildContext context) async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(now.year + 2),
+      initialDateRange: _customStart != null && _customEnd != null
+          ? DateTimeRange(start: _customStart!, end: _customEnd!)
+          : DateTimeRange(start: now.subtract(const Duration(days: 7)), end: now),
+    );
+
+    if (picked != null) {
+      setState(() {
+        _customStart = picked.start;
+        _customEnd = picked.end;
+      });
+      ref.read(reconciliationProvider.notifier).setCustomDateRange(picked.start, picked.end);
     }
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(reconciliationProvider);
-    final startStr = state.customStartDate != null ? DateFormat('dd/MM/yy').format(state.customStartDate!) : '';
-    final endStr = state.customEndDate != null ? DateFormat('dd/MM/yy').format(state.customEndDate!) : '';
-    final rangeText = state.filterType == 'custom' && state.customStartDate != null
-        ? ' ($startStr - $endStr)'
-        : '';
+    final isCustom = state.filterType == 'custom';
 
-    return SingleChildScrollView(
-      controller: _scrollController,
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Row(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.withOpacity(0.12)),
+      ),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        alignment: WrapAlignment.spaceBetween,
         children: [
-          _buildFilterChip(
-            key: _keys[0],
-            context: context,
-            label: 'Hari Ini',
-            icon: Icons.today_rounded,
-            isSelected: state.filterType == 'today',
-            onTap: () {
-              ref.read(reconciliationProvider.notifier).setFilterType('today');
-              _scrollToItem(0);
-            },
-          ),
-          const SizedBox(width: 8),
-          _buildFilterChip(
-            key: _keys[1],
-            context: context,
-            label: 'Minggu Ini',
-            icon: Icons.date_range_rounded,
-            isSelected: state.filterType == 'weekly',
-            onTap: () {
-              ref.read(reconciliationProvider.notifier).setFilterType('weekly');
-              _scrollToItem(1);
-            },
-          ),
-          const SizedBox(width: 8),
-          _buildFilterChip(
-            key: _keys[2],
-            context: context,
-            label: 'Bulan Ini',
-            icon: Icons.calendar_month_rounded,
-            isSelected: state.filterType == 'monthly',
-            onTap: () {
-              ref.read(reconciliationProvider.notifier).setFilterType('monthly');
-              _scrollToItem(2);
-            },
-          ),
-          const SizedBox(width: 8),
-          Container(
-            height: 24,
-            width: 1,
-            color: Theme.of(context).dividerColor.withOpacity(0.5),
-          ),
-          const SizedBox(width: 8),
-          _buildFilterChip(
-            key: _keys[3],
-            context: context,
-            label: state.filterType == 'custom' ? 'Kustom$rangeText' : 'Pilih Tanggal',
-            icon: Icons.edit_calendar_rounded,
-            isSelected: state.filterType == 'custom',
-            isCustom: true,
-            onTap: () async {
-              final picked = await showDateRangePicker(
-                context: context,
-                firstDate: DateTime(2025),
-                lastDate: DateTime(2030),
-                initialDateRange: state.customStartDate != null && state.customEndDate != null
-                    ? DateTimeRange(start: state.customStartDate!, end: state.customEndDate!)
-                    : null,
-                builder: (context, child) {
-                  return Theme(
-                    data: Theme.of(context).copyWith(
-                      colorScheme: Theme.of(context).colorScheme.copyWith(
-                        primary: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    child: child!,
-                  );
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildFilterChip(
+                label: 'Hari Ini',
+                isSelected: state.filterType == 'today',
+                onSelected: () {
+                  setState(() {
+                    _customStart = null;
+                    _customEnd = null;
+                  });
+                  ref.read(reconciliationProvider.notifier).setFilterType('today');
                 },
-              );
-              if (picked != null) {
-                ref.read(reconciliationProvider.notifier).setCustomDateRange(picked.start, picked.end);
-                _scrollToItem(3);
-              } else {
-                if (state.filterType == 'custom') {
-                  _scrollToItem(3);
-                }
-              }
-            },
+              ),
+              _buildFilterChip(
+                label: '7 Hari',
+                isSelected: state.filterType == 'weekly',
+                onSelected: () {
+                  setState(() {
+                    _customStart = null;
+                    _customEnd = null;
+                  });
+                  ref.read(reconciliationProvider.notifier).setFilterType('weekly');
+                },
+              ),
+              _buildFilterChip(
+                label: 'Bulan Ini',
+                isSelected: state.filterType == 'monthly',
+                onSelected: () {
+                  setState(() {
+                    _customStart = null;
+                    _customEnd = null;
+                  });
+                  ref.read(reconciliationProvider.notifier).setFilterType('monthly');
+                },
+              ),
+              _buildFilterChip(
+                label: isCustom && state.customStartDate != null && state.customEndDate != null
+                    ? '${DateFormat('dd/MM').format(state.customStartDate!)} - ${DateFormat('dd/MM').format(state.customEndDate!)}'
+                    : 'Kustom',
+                isSelected: isCustom,
+                icon: Icons.calendar_today_rounded,
+                onSelected: () => _pickDateRange(context),
+              ),
+            ],
           ),
+          if (isCustom)
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _customStart = null;
+                  _customEnd = null;
+                });
+                ref.read(reconciliationProvider.notifier).setFilterType('weekly');
+              },
+              icon: const Icon(Icons.close_rounded, size: 16),
+              label: const Text('Reset Filter'),
+            ),
         ],
       ),
     );
   }
 
   Widget _buildFilterChip({
-    required Key key,
-    required BuildContext context,
     required String label,
-    required IconData icon,
     required bool isSelected,
-    required VoidCallback onTap,
-    bool isCustom = false,
+    required VoidCallback onSelected,
+    IconData? icon,
   }) {
-    final colorScheme = Theme.of(context).colorScheme;
-    
-    return Material(
-      key: key,
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: isSelected 
-                ? (isCustom ? colorScheme.secondary : colorScheme.primary) 
-                : colorScheme.surfaceContainerHighest.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: isSelected 
-                  ? Colors.transparent 
-                  : colorScheme.outlineVariant.withOpacity(0.5),
-            ),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: (isCustom ? colorScheme.secondary : colorScheme.primary).withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    )
-                  ]
-                : null,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 16,
-                color: isSelected 
-                  ? (isCustom ? colorScheme.onSecondary : colorScheme.onPrimary) 
-                  : colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                  color: isSelected 
-                    ? (isCustom ? colorScheme.onSecondary : colorScheme.onPrimary) 
-                    : colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
+    return ChoiceChip(
+      avatar: icon != null
+          ? Icon(
+              icon,
+              size: 14,
+              color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey[700],
+            )
+          : null,
+      label: Text(label),
+      selected: isSelected,
+      selectedColor: Theme.of(context).colorScheme.primaryContainer,
+      labelStyle: TextStyle(
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey[800],
+        fontSize: 12,
       ),
+      onSelected: (_) => onSelected(),
     );
   }
 }

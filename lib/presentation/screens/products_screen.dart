@@ -262,12 +262,23 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
               ),
               const SizedBox(height: 16),
               Expanded(
-                child: itemsState.isLoading && itemsState.items.isEmpty
-                    ? const Center(child: CircularProgressIndicator())
-                    : itemsState.items.isEmpty
-                        ? const Center(child: Text('Tidak ada produk ditemukan'))
-                        : ListView.builder(
-                            itemCount: itemsState.sortedItems.length + (itemsState.hasReachedMax ? 0 : 1),
+                child: RefreshIndicator(
+                  onRefresh: () async {
+                    await ref.read(itemsNotifierProvider.notifier).loadItems(refresh: true);
+                  },
+                  child: itemsState.isLoading && itemsState.items.isEmpty
+                      ? const Center(child: CircularProgressIndicator())
+                      : itemsState.items.isEmpty
+                          ? ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              children: const [
+                                SizedBox(height: 100),
+                                Center(child: Text('Tidak ada produk ditemukan')),
+                              ],
+                            )
+                          : ListView.builder(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              itemCount: itemsState.sortedItems.length + (itemsState.hasReachedMax ? 0 : 1),
                             itemBuilder: (context, index) {
                               if (index >= itemsState.sortedItems.length) {
                                 // Reached the end, load more
@@ -408,6 +419,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                               }
                             },
                           ),
+                ),
               ),
             ],
           ),

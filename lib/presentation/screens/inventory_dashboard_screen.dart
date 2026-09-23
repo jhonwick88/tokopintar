@@ -10,9 +10,11 @@ class InventoryDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final features = ref.watch(licenseProvider).features;
-    final hasStockOpname = features?['stock_opname'] == true;
-    final hasSupplierManagement = features?['supplier_management'] == true;
-    final hasSalesAnalytics = features?['sales_analytics'] == true;
+    final hasStockOpname = features?['stock_opname'] == true || features?['stock_opname'] == 1 || features?['stock_opname'] == '1';
+    final hasSupplierManagement = features?['supplier_management'] == true || features?['supplier_management'] == 1 || features?['supplier_management'] == '1';
+    final hasSalesAnalytics = features?['sales_analytics'] == true || features?['sales_analytics'] == 1 || features?['sales_analytics'] == '1';
+    final hasSalesReports = features?['sales_reports'] == true || features?['sales_reports'] == 1 || features?['sales_reports'] == '1';
+    final hasMultiUser = features?['multi_user'] == true || features?['multi_user'] == 1 || features?['multi_user'] == '1';
 
     return MainLayout(
       currentRoute: '/inventory',
@@ -62,6 +64,26 @@ class InventoryDashboardScreen extends ConsumerWidget {
                       route: '/units',
                       isDesktop: isDesktop,
                     ),
+                    if (hasSalesReports)
+                      _buildInventoryCard(
+                        context: context,
+                        title: 'Laporan Penjualan',
+                        description: 'Laporan pergerakan produk, omset, dan analisis penjualan per kategori',
+                        icon: Icons.summarize_outlined,
+                        color: Colors.indigo,
+                        route: '/sales-report',
+                        isDesktop: isDesktop,
+                      ),
+                    if (hasMultiUser)
+                      _buildInventoryCard(
+                        context: context,
+                        title: 'Manajemen Pengguna',
+                        description: 'Kelola akun kasir dan staf toko dengan pembatasan lisensi',
+                        icon: Icons.manage_accounts_outlined,
+                        color: Colors.blueGrey,
+                        route: '/users',
+                        isDesktop: isDesktop,
+                      ),
                     if (hasStockOpname)
                       _buildInventoryCard(
                         context: context,

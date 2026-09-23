@@ -2,6 +2,7 @@ import '../../domain/repositories/sales_repository.dart';
 import '../datasources/api_client.dart';
 import '../models/sale_model.dart';
 import '../models/cash_reconciliation_model.dart';
+import '../models/cash_movement_model.dart';
 
 class SalesRepositoryImpl implements SalesRepository {
   final ApiClient _apiClient;
@@ -34,5 +35,20 @@ class SalesRepositoryImpl implements SalesRepository {
   @override
   Future<List<CashReconciliationModel>> getCashReconciliations() {
     return _apiClient.getCashReconciliations();
+  }
+
+  @override
+  Future<List<CashMovementModel>> getCashMovements({DateTime? startDate, DateTime? endDate}) {
+    return _apiClient.getCashMovements(startDate: startDate, endDate: endDate);
+  }
+
+  @override
+  Future<CashMovementModel> saveCashMovement(CashMovementModel movement) {
+    return _apiClient.saveCashMovement(movement);
+  }
+
+  @override
+  Future<void> deleteCashMovement(String id) {
+    return _apiClient.deleteCashMovement(id);
   }
 }
