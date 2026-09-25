@@ -262,7 +262,7 @@ class _CashOutDialogState extends ConsumerState<CashOutDialog> {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
-                          color: isCurrent ? Colors.orange.shade900 : Colors.black800,
+                          color: isCurrent ? Colors.orange.shade900 : Colors.grey.shade800,
                         ),
                       ),
                       onPressed: () => _selectQuickAmount(q),

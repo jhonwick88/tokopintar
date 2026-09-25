@@ -47,6 +47,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   bool _isShortNameManuallyEdited = false;
   bool _isLoading = false;
 
+  bool get isEditing => widget.existingItem != null && widget.existingItem!.itemNo.trim().isNotEmpty;
+
   @override
   void initState() {
     super.initState();
@@ -68,14 +70,20 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
           _nameShortController.text = newShort;
         }
       }
+      if (!isEditing && _skuController.text.isEmpty) {
+        final autoSku = generateSKUFromName(_nameController.text);
+        if (autoSku.isNotEmpty && _skuController.text != autoSku) {
+          _skuController.text = autoSku;
+        }
+      }
     });
 
     _upcController = TextEditingController(text: item?.itemUPC ?? '');
     _priceController = TextEditingController(
-      text: item != null ? item.price.toStringAsFixed(0) : '0',
+      text: (item != null && item.price > 0) ? item.price.toStringAsFixed(0) : '0',
     );
     _obQuantityController = TextEditingController(
-      text: item != null ? item.obQuantity.toStringAsFixed(0) : '0',
+      text: (item != null && item.obQuantity > 0) ? item.obQuantity.toStringAsFixed(0) : '10',
     );
     _notesController = TextEditingController(text: item?.notes ?? '');
     _attributeController = TextEditingController(text: item?.attribute ?? '');
@@ -164,21 +172,21 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     );
 
     try {
-      if (widget.existingItem == null) {
-        await ref.read(itemsNotifierProvider.notifier).createItem(newItem);
+      if (!isEditing) {
+        final created = await ref.read(itemsNotifierProvider.notifier).createItem(newItem);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Produk berhasil ditambahkan!'), backgroundColor: Colors.green),
           );
-          Navigator.pop(context, newItem);
+          Navigator.pop(context, created);
         }
       } else {
-        await ref.read(itemsNotifierProvider.notifier).updateItem(widget.existingItem!.itemNo, newItem);
+        final updated = await ref.read(itemsNotifierProvider.notifier).updateItem(widget.existingItem!.itemNo, newItem);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Produk berhasil diperbarui!'), backgroundColor: Colors.green),
           );
-          Navigator.pop(context, newItem);
+          Navigator.pop(context, updated);
         }
       }
     } catch (e) {
@@ -300,7 +308,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.existingItem == null ? 'Tambah Produk' : 'Edit Produk'),
+        title: Text(isEditing ? 'Edit Produk' : 'Tambah Produk'),
         actions: [
           IconButton(
             icon: const Icon(Icons.check),
@@ -333,7 +341,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                             icon: const Icon(Icons.save),
                             onPressed: _save,
                             label: Text(
-                              widget.existingItem == null ? 'Simpan Produk Baru' : 'Simpan Perubahan',
+                              isEditing ? 'Simpan Perubahan' : 'Simpan Produk Baru',
                               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                             ),
                           ),

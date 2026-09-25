@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' show DateTimeRange;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/cash_reconciliation_model.dart';
 import '../../data/models/cash_movement_model.dart';
@@ -118,11 +119,6 @@ class ReconciliationState {
   }
 }
 
-class DateTimeRange {
-  final DateTime start;
-  final DateTime end;
-  DateTimeRange({required this.start, required this.end});
-}
 
 class ReconciliationNotifier extends StateNotifier<ReconciliationState> {
   final SalesRepository _salesRepository;

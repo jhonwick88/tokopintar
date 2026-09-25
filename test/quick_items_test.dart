@@ -54,7 +54,7 @@ void main() {
       expect(json['icon_name'], 'description');
       expect(json['color_hex'], '0xff4caf50');
       expect(json['display_order'], 1);
-      expect(json['is_active'], true);
+      expect(json['is_active'], 1);
 
       final parsed = QuickItemModel.fromJson(json);
       expect(parsed.id, 'q_1');

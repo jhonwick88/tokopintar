@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../providers/reconciliation_provider.dart';
+import '../providers/reconciliation_provider.dart' hide DateTimeRange;
 import '../../data/models/cash_reconciliation_model.dart';
 import '../../data/models/cash_movement_model.dart';
 import '../widgets/main_layout.dart';

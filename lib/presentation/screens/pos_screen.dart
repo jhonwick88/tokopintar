@@ -1014,6 +1014,20 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 ),
                 const SizedBox(width: 8),
                 Tooltip(
+                  message: 'Tambah Produk Baru',
+                  child: IconButton.filledTonal(
+                    style: IconButton.styleFrom(
+                      foregroundColor: Colors.blue[800],
+                      backgroundColor: Colors.blue.withOpacity(0.12),
+                      padding: const EdgeInsets.all(14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.add_box_outlined, size: 20),
+                    onPressed: () => _openAddProductPage(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Tooltip(
                   message: 'Muat Ulang Katalog (Refresh)',
                   child: IconButton.filledTonal(
                     style: IconButton.styleFrom(
@@ -1065,6 +1079,17 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   padding: const EdgeInsets.only(bottom: 8.0),
                   child: Row(
                     children: [
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        style: IconButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                          foregroundColor: Theme.of(context).colorScheme.primary,
+                        ),
+                        icon: const Icon(Icons.add_box_outlined, size: 20),
+                        tooltip: 'Tambah Produk Baru',
+                        onPressed: () => _openAddProductPage(),
+                      ),
+                      const SizedBox(width: 8),
                       IconButton(
                         visualDensity: VisualDensity.compact,
                         style: IconButton.styleFrom(
