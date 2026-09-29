@@ -8,10 +8,8 @@ import 'package:excel/excel.dart' as excel_pkg;
 import 'package:file_selector/file_selector.dart';
 
 import '../../data/models/category_model.dart';
-import '../../data/models/item_model.dart';
 import '../providers/sales_history_provider.dart';
 import '../providers/categories_provider.dart';
-import '../providers/items_provider.dart';
 import '../widgets/main_layout.dart';
 import '../../utils/web_download.dart';
 
@@ -42,7 +40,6 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _applyDatePreset('today');
       ref.read(categoriesProvider.notifier).loadCategories();
-      ref.read(itemsNotifierProvider.notifier).loadItems(refresh: true);
     });
   }
 
@@ -203,14 +200,6 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
   Widget build(BuildContext context) {
     final salesState = ref.watch(salesHistoryNotifierProvider);
     final categories = ref.watch(categoriesProvider).categories;
-    final items = ref.watch(itemsNotifierProvider).items;
-
-    // Create item lookup map: itemNo / itemUPC -> ItemModel
-    final Map<String, ItemModel> itemLookup = {};
-    for (var it in items) {
-      if (it.itemNo.isNotEmpty) itemLookup[it.itemNo.toLowerCase()] = it;
-      if (it.itemUPC.isNotEmpty) itemLookup[it.itemUPC.toLowerCase()] = it;
-    }
 
     // Create category lookup map: categoryId -> CategoryModel
     final Map<int, CategoryModel> categoryLookup = {};
@@ -246,18 +235,13 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
 
     for (var sale in completedSales) {
       for (var item in sale.items) {
-        // Find category for this item
-        int catId = 0;
-        String catName = 'Tanpa Kategori';
+        // Read category directly from sale item
+        int catId = item.categoryId;
+        String catName = item.categoryName.isNotEmpty ? item.categoryName : 'Tanpa Kategori';
         String barcode = item.itemUPC;
 
-        final matchedMaster = itemLookup[item.itemNo.toLowerCase()] ?? itemLookup[item.itemUPC.toLowerCase()];
-        if (matchedMaster != null) {
-          catId = matchedMaster.categoryId;
-          if (matchedMaster.itemUPC.isNotEmpty) barcode = matchedMaster.itemUPC;
-          if (categoryLookup.containsKey(catId)) {
-            catName = categoryLookup[catId]!.name;
-          }
+        if (catId > 0 && categoryLookup.containsKey(catId)) {
+          catName = categoryLookup[catId]!.name;
         }
 
         final itemOmset = item.subtotal;
@@ -379,7 +363,6 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
         body: RefreshIndicator(
           onRefresh: () async {
             await ref.read(salesHistoryNotifierProvider.notifier).fetchSales();
-            await ref.read(itemsNotifierProvider.notifier).loadItems(refresh: true);
             await ref.read(categoriesProvider.notifier).loadCategories();
           },
           child: SingleChildScrollView(

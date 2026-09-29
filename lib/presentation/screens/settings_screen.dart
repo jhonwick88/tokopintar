@@ -1,8 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/foundation.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
@@ -16,7 +15,6 @@ import '../providers/license_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/main_layout.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import '../widgets/app_permissions_dialog.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'quick_add_item_settings_screen.dart';
@@ -45,6 +43,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late TextEditingController _adminPinController;
   late TextEditingController _taxPercentageController;
   late TextEditingController _serviceChargePercentageController;
+  late TextEditingController _licenseKeyController;
   
   bool _enableTax = false;
   bool _enableServiceCharge = false;
@@ -64,6 +63,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _isTestingConnection = false;
   String? _connectionStatus;
   bool _allPermissionsGranted = true;
+  bool _isUpdatingLicense = false;
+  bool _isRefreshingLicense = false;
 
   @override
   void initState() {
@@ -83,6 +84,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _adminPinController = TextEditingController(text: settings.adminPin);
     _taxPercentageController = TextEditingController(text: settings.taxPercentage.toString());
     _serviceChargePercentageController = TextEditingController(text: settings.serviceChargePercentage.toString());
+    _licenseKeyController = TextEditingController();
     _enableTax = settings.enableTax;
     _enableServiceCharge = settings.enableServiceCharge;
     _printerPaperSize = settings.printerPaperSize;
@@ -214,6 +216,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _adminPinController.dispose();
     _taxPercentageController.dispose();
     _serviceChargePercentageController.dispose();
+    _licenseKeyController.dispose();
     super.dispose();
   }
 
@@ -1078,8 +1081,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               const SizedBox(height: 24),
 
-                // Section 5: Sistem & Database (Hanya untuk Level Admin)
+                // Section 5: Lisensi & Fitur Aplikasi (Level Admin)
                 if (isAdmin) ...[
+                  _buildLicenseSettings(),
+                  const SizedBox(height: 24),
                   _buildDatabaseSettings(),
                   const SizedBox(height: 32),
                 ],
@@ -1188,6 +1193,383 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  Widget _buildLicenseSettings() {
+    final licenseState = ref.watch(licenseProvider);
+    final features = licenseState.features;
+    final isActivated = licenseState.isActivated;
+
+    return _buildCardSection(
+      title: 'Lisensi & Fitur Aplikasi',
+      icon: Icons.verified_user_rounded,
+      children: [
+        // Status Bar
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isActivated ? Colors.green.withOpacity(0.08) : Colors.amber.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isActivated ? Colors.green.withOpacity(0.3) : Colors.amber.withOpacity(0.4),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isActivated ? Colors.green.withOpacity(0.15) : Colors.amber.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isActivated ? Icons.verified_rounded : Icons.warning_amber_rounded,
+                  color: isActivated ? Colors.green.shade700 : Colors.amber.shade800,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          isActivated ? 'Lisensi Aktif' : 'Lisensi Belum Terpasang',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: isActivated ? Colors.green.shade800 : Colors.amber.shade900,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isActivated ? Colors.green.shade700 : Colors.amber.shade700,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            isActivated ? (features['tier']?.toString().toUpperCase() ?? 'PRO / ACTIVE') : 'UNREGISTERED',
+                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isActivated
+                          ? 'Perangkat ini terdaftar secara resmi. Fitur di bawah ini aktif sesuai paket lisensi Anda.'
+                          : 'Aplikasi berjalan dalam mode terbatas. Masukkan License Key untuk mengaktifkan modul lengkap.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: _isRefreshingLicense ? null : _handleRefreshLicense,
+                icon: _isRefreshingLicense
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.sync_rounded, size: 16),
+                label: const Text('Sinkron', style: TextStyle(fontSize: 12)),
+              ),
+            ],
+          ),
+        ),
+        if (isActivated) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.35),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.withOpacity(0.2)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.badge_outlined, size: 18, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Detail Identitas Lisensi Pelanggan',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 24,
+                  runSpacing: 12,
+                  children: [
+                    if (licenseState.licenseId != null && licenseState.licenseId!.isNotEmpty)
+                      _buildLicenseInfoItem(
+                        label: 'ID LISENSI',
+                        value: licenseState.licenseId!,
+                        allowCopy: true,
+                      ),
+                    if (licenseState.customerId != null && licenseState.customerId!.isNotEmpty)
+                      _buildLicenseInfoItem(
+                        label: 'ID PELANGGAN',
+                        value: licenseState.customerId!,
+                        allowCopy: true,
+                      ),
+                    if (licenseState.planId != null && licenseState.planId!.isNotEmpty)
+                      _buildLicenseInfoItem(
+                        label: 'PAKET / PLAN',
+                        value: licenseState.planId!.toUpperCase(),
+                      ),
+                    if (licenseState.maskedKey != null && licenseState.maskedKey!.isNotEmpty)
+                      _buildLicenseInfoItem(
+                        label: 'KODE LISENSI (MASKED)',
+                        value: licenseState.maskedKey!,
+                        allowCopy: true,
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 16),
+
+        // Features list
+        const Text(
+          'Daftar Modul & Fitur Lisensi:',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _buildFeatureBadge('Laporan Penjualan (sales_reports)', features['sales_reports'] == true || features['sales_reports'] == 1 || features['sales_reports'] == '1'),
+            _buildFeatureBadge('Stok Opname (stock_opname)', features['stock_opname'] == true || features['stock_opname'] == 1 || features['stock_opname'] == '1'),
+            _buildFeatureBadge('Auto-Backup Database', features['automatic_backup'] == true || features['automatic_backup'] == 1 || features['automatic_backup'] == '1'),
+            _buildFeatureBadge('Multi Kasir (${features['max_cashiers'] ?? 1} User)', features['multi_user'] == true || features['multi_user'] == 1 || features['multi_user'] == '1'),
+            _buildFeatureBadge('Fitur POS Kasir Lengkap', features['advanced_pos'] == true || features['advanced_pos'] == 1 || features['advanced_pos'] == '1'),
+          ],
+        ),
+        const SizedBox(height: 20),
+        const Divider(),
+        const SizedBox(height: 12),
+
+        // Update License Input Form
+        const Text(
+          'Perbarui / Ganti License Key:',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Masukkan License Key baru untuk upgrade paket atau memperpanjang masa aktif. Sistem akan langsung memperbarui lisensi tanpa perlu menghapus token lama.',
+          style: TextStyle(fontSize: 12, color: Colors.grey),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _licenseKeyController,
+                enabled: _isEditingUnlocked && !_isUpdatingLicense,
+                decoration: InputDecoration(
+                  labelText: 'License Key Baru',
+                  hintText: 'Contoh: TOKO-XXXX-XXXX-XXXX',
+                  prefixIcon: const Icon(Icons.vpn_key_rounded),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
+              ),
+              onPressed: (_isEditingUnlocked && !_isUpdatingLicense) ? _handleUpdateLicense : null,
+              icon: _isUpdatingLicense
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.check_circle_outline_rounded),
+              label: const Text('Terapkan Lisensi', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLicenseInfoItem({
+    required String label,
+    required String value,
+    bool allowCopy = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey, letterSpacing: 0.5),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SelectableText(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5),
+            ),
+            if (allowCopy) ...[
+              const SizedBox(width: 6),
+              InkWell(
+                borderRadius: BorderRadius.circular(4),
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: value));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('$label berhasil disalin ke clipboard!'),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                },
+                child: const Padding(
+                  padding: EdgeInsets.all(2.0),
+                  child: Icon(Icons.copy_rounded, size: 14, color: Colors.blue),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFeatureBadge(String name, bool isEnabled) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: isEnabled ? Colors.green.withOpacity(0.08) : Colors.grey.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isEnabled ? Colors.green.withOpacity(0.3) : Colors.grey.withOpacity(0.3),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isEnabled ? Icons.check_circle_rounded : Icons.cancel_outlined,
+            size: 14,
+            color: isEnabled ? Colors.green : Colors.grey,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            name,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isEnabled ? FontWeight.w600 : FontWeight.normal,
+              color: isEnabled ? Colors.green.shade800 : Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleUpdateLicense() async {
+    final key = _licenseKeyController.text.trim();
+    if (key.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Silakan masukkan License Key terlebih dahulu'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isUpdatingLicense = true;
+    });
+
+    try {
+      final success = await ref.read(licenseProvider.notifier).activate(key);
+      if (!mounted) return;
+
+      if (success) {
+        _licenseKeyController.clear();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Lisensi berhasil diperbarui! Seluruh fitur baru langsung aktif.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      } else {
+        final error = ref.read(licenseProvider).errorMessage ?? 'Gagal memperbarui lisensi';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingLicense = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleRefreshLicense() async {
+    setState(() {
+      _isRefreshingLicense = true;
+    });
+    try {
+      await ref.read(licenseProvider.notifier).refreshStatus();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Status dan fitur lisensi berhasil disinkronkan.'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal sinkronisasi lisensi: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRefreshingLicense = false;
+        });
+      }
+    }
+  }
 
   Widget _buildDatabaseSettings() {
     final licenseState = ref.watch(licenseProvider);
@@ -1537,3 +1919,4 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 }
+

@@ -8,6 +8,7 @@ import '../../domain/services/printer_service.dart';
 import 'auth_provider.dart';
 import 'settings_provider.dart';
 import 'sales_history_provider.dart';
+import 'categories_provider.dart';
 import '../providers/license_provider.dart';
 
 class CartItem {
@@ -386,8 +387,17 @@ class PosNotifier extends StateNotifier<PosState> {
 
     final double change = paidAmount - state.grandTotal;
 
+    // Category lookup map for fast category name resolution
+    final categories = _ref.read(categoriesProvider).categories;
+    final Map<int, String> categoryNames = {
+      for (var cat in categories) cat.id: cat.name,
+    };
+
     // Convert CartItems to SaleItemModels
     final saleItems = state.cartItems.map((c) {
+      final catId = c.item.categoryId;
+      final catName = categoryNames[catId] ?? 'Tanpa Kategori';
+
       return SaleItemModel(
         itemNo: c.item.itemNo,
         itemUPC: c.item.itemUPC,
@@ -399,6 +409,8 @@ class PosNotifier extends StateNotifier<PosState> {
         discount: c.discount,
         unitName: c.unitName,
         ratio: c.ratio,
+        categoryId: catId,
+        categoryName: catName,
       );
     }).toList();
 

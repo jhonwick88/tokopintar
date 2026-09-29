@@ -203,14 +203,10 @@ class _QuickAddItemSettingsScreenState extends ConsumerState<QuickAddItemSetting
     // Load available database items
     final itemsState = ref.read(itemsNotifierProvider);
     final allItems = itemsState.items;
+    final itemMap = {for (var item in allItems) item.itemNo: item};
 
     if (existingItem != null) {
-      for (var item in allItems) {
-        if (item.itemNo == existingItem.itemNo) {
-          selectedProduct = item;
-          break;
-        }
-      }
+      selectedProduct = itemMap[existingItem.itemNo];
     }
 
     final nameController = TextEditingController(text: name);

@@ -30,29 +30,40 @@ class SalesHistoryState {
   });
 
   List<SaleModel> get filteredSales {
+    if (sales.isEmpty) return const [];
+
+    final query = searchQuery.trim().toLowerCase();
+    final paymentFilter = selectedPaymentMethod.toLowerCase();
+    final statusFilter = selectedStatus.toLowerCase();
+    final isAllPayment = paymentFilter == 'all';
+    final isAllStatus = statusFilter == 'all';
+    final hasQuery = query.isNotEmpty;
+
     final list = sales.where((s) {
-      bool matchesQuery = searchQuery.isEmpty || 
-          s.invoiceNo.toLowerCase().contains(searchQuery.toLowerCase());
-          
-      if (!matchesQuery && searchQuery.isNotEmpty) {
-        // Also search in items
-        final query = searchQuery.toLowerCase();
-        for (var item in s.items) {
-          if (item.itemName.toLowerCase().contains(query) || 
-              item.itemNo.toLowerCase().contains(query)) {
-            matchesQuery = true;
-            break;
-          }
+      if (!isAllPayment && s.paymentMethod.toLowerCase() != paymentFilter) {
+        return false;
+      }
+      if (!isAllStatus && s.status.toLowerCase() != statusFilter) {
+        return false;
+      }
+      if (!hasQuery) {
+        return true;
+      }
+
+      if (s.invoiceNo.toLowerCase().contains(query) ||
+          s.cashier.toLowerCase().contains(query)) {
+        return true;
+      }
+
+      // Check item names / codes
+      for (final item in s.items) {
+        if (item.itemName.toLowerCase().contains(query) || 
+            item.itemNo.toLowerCase().contains(query) ||
+            item.itemUPC.toLowerCase().contains(query)) {
+          return true;
         }
       }
-      
-      final matchesPayment = selectedPaymentMethod == 'all' || 
-          s.paymentMethod.toLowerCase() == selectedPaymentMethod.toLowerCase();
-          
-      final matchesStatus = selectedStatus == 'all' || 
-          s.status.toLowerCase() == selectedStatus.toLowerCase();
-          
-      return matchesQuery && matchesPayment && matchesStatus;
+      return false;
     }).toList();
     
     // Sort by date descending (newest time at the top)

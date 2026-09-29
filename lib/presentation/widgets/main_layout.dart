@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/license_provider.dart';
-import 'dart:io';
 import '../providers/items_provider.dart';
 import '../providers/pos_provider.dart';
 import '../screens/mobile_cart_screen.dart';

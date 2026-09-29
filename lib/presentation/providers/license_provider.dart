@@ -11,6 +11,10 @@ class LicenseState {
   final bool isActivated;
   final String? token;
   final String? machineFingerprint;
+  final String? licenseId;
+  final String? customerId;
+  final String? planId;
+  final String? maskedKey;
   final Map<String, dynamic> features;
   final bool isLoading;
   final String? errorMessage;
@@ -20,6 +24,10 @@ class LicenseState {
     this.isActivated = false,
     this.token,
     this.machineFingerprint,
+    this.licenseId,
+    this.customerId,
+    this.planId,
+    this.maskedKey,
     this.features = const {},
     this.isLoading = false,
     this.errorMessage,
@@ -30,6 +38,10 @@ class LicenseState {
     bool? isActivated,
     String? token,
     String? machineFingerprint,
+    String? licenseId,
+    String? customerId,
+    String? planId,
+    String? maskedKey,
     Map<String, dynamic>? features,
     bool? isLoading,
     String? errorMessage,
@@ -39,6 +51,10 @@ class LicenseState {
       isActivated: isActivated ?? this.isActivated,
       token: token ?? this.token,
       machineFingerprint: machineFingerprint ?? this.machineFingerprint,
+      licenseId: licenseId ?? this.licenseId,
+      customerId: customerId ?? this.customerId,
+      planId: planId ?? this.planId,
+      maskedKey: maskedKey ?? this.maskedKey,
       features: features ?? this.features,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage, 
@@ -52,6 +68,14 @@ class LicenseNotifier extends StateNotifier<LicenseState> {
     _init();
   }
 
+  static String maskKey(String key) {
+    final clean = key.trim();
+    if (clean.length <= 8) return clean;
+    final start = clean.substring(0, 4);
+    final end = clean.substring(clean.length - 4);
+    return '$start-****-****-$end';
+  }
+
   Future<void> _init() async {
     final prefs = await SharedPreferences.getInstance();
     
@@ -63,6 +87,11 @@ class LicenseNotifier extends StateNotifier<LicenseState> {
 
     final token = prefs.getString('license_token');
     final featuresStr = prefs.getString('license_features');
+    final licenseId = prefs.getString('license_id');
+    final customerId = prefs.getString('license_customer_id');
+    final planId = prefs.getString('license_plan_id');
+    final maskedKey = prefs.getString('license_masked_key');
+
     Map<String, dynamic> features = {};
     if (featuresStr != null) {
       try {
@@ -73,6 +102,10 @@ class LicenseNotifier extends StateNotifier<LicenseState> {
     state = state.copyWith(
       machineFingerprint: fingerprint,
       token: token,
+      licenseId: licenseId,
+      customerId: customerId,
+      planId: planId,
+      maskedKey: maskedKey,
       isActivated: token != null && token.isNotEmpty,
       features: features,
       hasInitialized: true,
@@ -104,13 +137,29 @@ class LicenseNotifier extends StateNotifier<LicenseState> {
       final bool isActivated = response.data['is_activated'] == true;
       if (isActivated) {
         final Map<String, dynamic> features = response.data['features'] ?? {};
+        final String? licenseId = response.data['license_id']?.toString();
+        final String? customerId = response.data['customer_id']?.toString();
+        final String? planId = response.data['plan_id']?.toString();
+
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('license_token', 'activated');
         await prefs.setString('license_features', jsonEncode(features));
+        if (licenseId != null && licenseId.isNotEmpty) {
+          await prefs.setString('license_id', licenseId);
+        }
+        if (customerId != null && customerId.isNotEmpty) {
+          await prefs.setString('license_customer_id', customerId);
+        }
+        if (planId != null && planId.isNotEmpty) {
+          await prefs.setString('license_plan_id', planId);
+        }
         
         state = state.copyWith(
           isActivated: true,
           token: 'activated',
+          licenseId: licenseId ?? state.licenseId,
+          customerId: customerId ?? state.customerId,
+          planId: planId ?? state.planId,
           features: features,
         );
       } else {
@@ -140,11 +189,23 @@ class LicenseNotifier extends StateNotifier<LicenseState> {
         'platform': kIsWeb ? 'web' : Platform.operatingSystem,
       });
 
-      
+      final masked = maskKey(licenseKey);
+      final String? licenseId = response.data['license_id']?.toString();
+      final String? customerId = response.data['customer_id']?.toString();
+      final String? planId = response.data['plan_id']?.toString();
 
-      
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('license_token', 'activated');
+      await prefs.setString('license_masked_key', masked);
+      if (licenseId != null && licenseId.isNotEmpty) {
+        await prefs.setString('license_id', licenseId);
+      }
+      if (customerId != null && customerId.isNotEmpty) {
+        await prefs.setString('license_customer_id', customerId);
+      }
+      if (planId != null && planId.isNotEmpty) {
+        await prefs.setString('license_plan_id', planId);
+      }
       
       Map<String, dynamic> features = {};
       if (response.data['features'] != null) {
@@ -152,16 +213,17 @@ class LicenseNotifier extends StateNotifier<LicenseState> {
         await prefs.setString('license_features', jsonEncode(features));
       }
 
-      state = state.copyWith(isLoading: false);
-      
-      Future.delayed(const Duration(seconds: 2), () {
-        state = state.copyWith(
-          token: 'activated',
-          isActivated: true,
-          features: features,
-        );
-      });
-
+      state = state.copyWith(
+        isLoading: false,
+        token: 'activated',
+        isActivated: true,
+        maskedKey: masked,
+        licenseId: licenseId ?? state.licenseId,
+        customerId: customerId ?? state.customerId,
+        planId: planId ?? state.planId,
+        features: features,
+        errorMessage: null,
+      );
       
       return true;
     } catch (e) {
@@ -204,15 +266,13 @@ class LicenseNotifier extends StateNotifier<LicenseState> {
         await prefs.setString('license_features', jsonEncode(features));
       }
 
-      state = state.copyWith(isLoading: false);
-      
-      Future.delayed(const Duration(seconds: 2), () {
-        state = state.copyWith(
-          token: 'activated',
-          isActivated: true,
-          features: features,
-        );
-      });
+      state = state.copyWith(
+        isLoading: false,
+        token: 'activated',
+        isActivated: true,
+        features: features,
+        errorMessage: null,
+      );
 
       return true;
     } catch (e) {
@@ -233,7 +293,19 @@ class LicenseNotifier extends StateNotifier<LicenseState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('license_token');
     await prefs.remove('license_features');
-    state = state.copyWith(isActivated: false, token: null, features: {});
+    await prefs.remove('license_id');
+    await prefs.remove('license_customer_id');
+    await prefs.remove('license_plan_id');
+    await prefs.remove('license_masked_key');
+    state = state.copyWith(
+      isActivated: false,
+      token: null,
+      licenseId: null,
+      customerId: null,
+      planId: null,
+      maskedKey: null,
+      features: {},
+    );
   }
 }
 

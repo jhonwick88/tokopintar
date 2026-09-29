@@ -194,6 +194,8 @@ class SaleItemModel {
   final double discount;
   final String unitName;
   final double ratio;
+  final int categoryId;
+  final String categoryName;
 
   SaleItemModel({
     this.id,
@@ -207,6 +209,8 @@ class SaleItemModel {
     this.discount = 0.0,
     this.unitName = '',
     this.ratio = 0.0,
+    this.categoryId = 0,
+    this.categoryName = 'Tanpa Kategori',
   });
 
   factory SaleItemModel.fromJson(Map<String, dynamic> json) {
@@ -225,6 +229,8 @@ class SaleItemModel {
       discount: (json['discount'] as num?)?.toDouble() ?? 0.0,
       unitName: json['unit_name'] as String? ?? '',
       ratio: (json['ratio'] as num?)?.toDouble() ?? 0.0,
+      categoryId: (json['category_id'] as num?)?.toInt() ?? (json['categoryid'] as num?)?.toInt() ?? 0,
+      categoryName: json['category_name'] as String? ?? json['categoryname'] as String? ?? 'Tanpa Kategori',
     );
   }
 
@@ -241,6 +247,8 @@ class SaleItemModel {
       'discount': discount,
       if (unitName.isNotEmpty) 'unit_name': unitName,
       if (ratio > 0) 'ratio': ratio,
+      if (categoryId > 0) 'category_id': categoryId,
+      if (categoryName.isNotEmpty) 'category_name': categoryName,
     };
   }
 }

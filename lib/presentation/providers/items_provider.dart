@@ -343,7 +343,9 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
   }
 
   Future<void> search(String query) async {
-    state = state.copyWith(searchQuery: query, clearCategory: true);
+    final trimmed = query.trim();
+    if (state.searchQuery == trimmed) return;
+    state = state.copyWith(searchQuery: trimmed, clearCategory: true);
     await loadItems(refresh: true);
   }
 
