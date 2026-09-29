@@ -22,7 +22,10 @@ class CashReconciliationModel {
   factory CashReconciliationModel.fromJson(Map<String, dynamic> json) {
     DateTime parseDateTime(dynamic val) {
       if (val == null) return DateTime.now();
-      if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
+      if (val is String) {
+        final parsed = DateTime.tryParse(val);
+        if (parsed != null) return parsed.toLocal();
+      }
       return DateTime.now();
     }
 

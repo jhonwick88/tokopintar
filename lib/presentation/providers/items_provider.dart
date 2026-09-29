@@ -138,9 +138,14 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
     state = state.copyWith(sortByPrice: order);
   }
 
+  Future<void> clearFiltersAndReload() async {
+    state = state.copyWith(searchQuery: '', clearCategory: true, sortByPrice: 'none');
+    await loadItems(refresh: true);
+  }
+
   Future<void> initCatalog() async {
     await loadCategories();
-    await loadItems(refresh: true);
+    await clearFiltersAndReload();
   }
 
   Future<void> loadCategories() async {

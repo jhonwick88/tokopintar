@@ -104,12 +104,12 @@ class _PosReceiptPreview extends ConsumerWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('  ${item.qty} x ${currencyFormatter.format(item.price)}'),
+                          Text('  ${item.qty} x ${currencyFormatter.format(item.price)} ${item.note.isNotEmpty ? '| ${item.note}' : ''}'),
                           Text(currencyFormatter.format(item.subtotal)),
+                         
                         ],
                       ),
-                      if (item.note.isNotEmpty)
-                        Text('  * Note: ${item.note}', style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                      
                     ],
                   ),
                 );
@@ -179,6 +179,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
       DateTime(now.year, now.month, now.day),
       DateTime(now.year, now.month, now.day, 23, 59, 59),
     );
+    ref.read(reconciliationProvider.notifier).fetchData();
   }
 
   @override
@@ -501,7 +502,10 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: RefreshIndicator(
                   onRefresh: () async {
-                    await ref.read(salesHistoryNotifierProvider.notifier).fetchSales();
+                    await Future.wait([
+                      ref.read(salesHistoryNotifierProvider.notifier).fetchSales(),
+                      ref.read(reconciliationProvider.notifier).fetchData(),
+                    ]);
                   },
                   child: CustomScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
@@ -924,6 +928,9 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
   }
 
   void _showCashReconciliationDialog(double todayRevenue, double todayCashRevenue) {
+    // Fetch latest cash movements data immediately upon opening dialog
+    ref.read(reconciliationProvider.notifier).fetchData();
+
     final authState = ref.read(authNotifierProvider);
     final defaultOperator = authState.currentUser?.fullname.isNotEmpty == true
         ? authState.currentUser!.fullname
@@ -1014,6 +1021,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                     onTap: () async {
                                       final res = await CashOutDialog.show(context);
                                       if (res == true) {
+                                        await ref.read(reconciliationProvider.notifier).fetchData();
                                         setState(() {});
                                       }
                                     },

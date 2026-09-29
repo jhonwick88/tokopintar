@@ -216,9 +216,9 @@ class SaleItemModel {
   factory SaleItemModel.fromJson(Map<String, dynamic> json) {
     return SaleItemModel(
       id: (json['id'] as num?)?.toInt(),
-      itemNo: json['itemno'] as String? ?? '',
-      itemUPC: json['itemupc'] as String? ?? '',
-      itemName: json['itemname'] as String? ?? '',
+      itemNo: json['itemno'] as String? ?? json['item_no'] as String? ?? json['itemNo'] as String? ?? '',
+      itemUPC: json['itemupc'] as String? ?? json['item_upc'] as String? ?? json['itemUPC'] as String? ?? '',
+      itemName: json['itemname'] as String? ?? json['item_name'] as String? ?? json['itemName'] as String? ?? '',
       qty: (json['qty'] as num?)?.toInt() ?? 1,
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       subtotal:
@@ -227,10 +227,10 @@ class SaleItemModel {
           0.0,
       note: json['note'] as String? ?? '',
       discount: (json['discount'] as num?)?.toDouble() ?? 0.0,
-      unitName: json['unit_name'] as String? ?? '',
+      unitName: json['unit_name'] as String? ?? json['unitName'] as String? ?? '',
       ratio: (json['ratio'] as num?)?.toDouble() ?? 0.0,
-      categoryId: (json['category_id'] as num?)?.toInt() ?? (json['categoryid'] as num?)?.toInt() ?? 0,
-      categoryName: json['category_name'] as String? ?? json['categoryname'] as String? ?? 'Tanpa Kategori',
+      categoryId: (json['category_id'] as num?)?.toInt() ?? (json['categoryid'] as num?)?.toInt() ?? (json['categoryId'] as num?)?.toInt() ?? 0,
+      categoryName: json['category_name'] as String? ?? json['categoryname'] as String? ?? json['categoryName'] as String? ?? 'Tanpa Kategori',
     );
   }
 

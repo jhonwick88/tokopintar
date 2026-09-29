@@ -23,8 +23,9 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   @override
   void initState() {
     super.initState();
+    _searchController.text = '';
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(itemsNotifierProvider.notifier).loadItems(refresh: true);
+      ref.read(itemsNotifierProvider.notifier).clearFiltersAndReload();
     });
   }
 
@@ -251,12 +252,23 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
             children: [
               TextField(
                 controller: _searchController,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
                   hintText: 'Cari nama produk, SKU, atau Barcode...',
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            ref.read(itemsNotifierProvider.notifier).search('');
+                            setState(() {});
+                          },
+                        )
+                      : null,
                 ),
                 onChanged: (val) {
+                  setState(() {});
                   ref.read(itemsNotifierProvider.notifier).search(val.trim());
                 },
               ),

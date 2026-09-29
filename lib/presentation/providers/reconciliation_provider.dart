@@ -51,16 +51,18 @@ class ReconciliationState {
   List<CashReconciliationModel> get filteredReconciliations {
     final range = _activeRange;
     return reconciliations.where((rec) {
-      return (rec.date.isAfter(range.start) || rec.date.isAtSameMomentAs(range.start)) &&
-             (rec.date.isBefore(range.end) || rec.date.isAtSameMomentAs(range.end));
+      final d = rec.date.toLocal();
+      return (d.isAfter(range.start) || d.isAtSameMomentAs(range.start)) &&
+             (d.isBefore(range.end) || d.isAtSameMomentAs(range.end));
     }).toList();
   }
 
   List<CashMovementModel> get filteredCashMovements {
     final range = _activeRange;
     return cashMovements.where((mov) {
-      return (mov.date.isAfter(range.start) || mov.date.isAtSameMomentAs(range.start)) &&
-             (mov.date.isBefore(range.end) || mov.date.isAtSameMomentAs(range.end));
+      final d = mov.date.toLocal();
+      return (d.isAfter(range.start) || d.isAtSameMomentAs(range.start)) &&
+             (d.isBefore(range.end) || d.isAtSameMomentAs(range.end));
     }).toList();
   }
 
@@ -89,11 +91,13 @@ class ReconciliationState {
   double get todayCashOut {
     final now = DateTime.now();
     return cashMovements
-        .where((m) =>
-            m.type == 'OUT' &&
-            m.date.year == now.year &&
-            m.date.month == now.month &&
-            m.date.day == now.day)
+        .where((m) {
+          final d = m.date.toLocal();
+          return m.type == 'OUT' &&
+              d.year == now.year &&
+              d.month == now.month &&
+              d.day == now.day;
+        })
         .fold(0.0, (sum, m) => sum + m.amount);
   }
 

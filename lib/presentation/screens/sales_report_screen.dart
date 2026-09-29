@@ -10,6 +10,7 @@ import 'package:file_selector/file_selector.dart';
 import '../../data/models/category_model.dart';
 import '../providers/sales_history_provider.dart';
 import '../providers/categories_provider.dart';
+import '../providers/items_provider.dart';
 import '../widgets/main_layout.dart';
 import '../../utils/web_download.dart';
 
@@ -40,6 +41,7 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _applyDatePreset('today');
       ref.read(categoriesProvider.notifier).loadCategories();
+      ref.read(itemsNotifierProvider.notifier).loadItems();
     });
   }
 
@@ -200,6 +202,17 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
   Widget build(BuildContext context) {
     final salesState = ref.watch(salesHistoryNotifierProvider);
     final categories = ref.watch(categoriesProvider).categories;
+    final masterItems = ref.watch(itemsNotifierProvider).items;
+
+    // Create item to category lookup map from master inventory
+    final Map<String, int> itemToCategoryMap = {};
+    for (var m in masterItems) {
+      if (m.categoryId != null && m.categoryId! > 0) {
+        if (m.itemNo.isNotEmpty) itemToCategoryMap[m.itemNo.toLowerCase()] = m.categoryId!;
+        if (m.itemUPC.isNotEmpty) itemToCategoryMap[m.itemUPC.toLowerCase()] = m.categoryId!;
+        if (m.itemName.isNotEmpty) itemToCategoryMap[m.itemName.toLowerCase()] = m.categoryId!;
+      }
+    }
 
     // Create category lookup map: categoryId -> CategoryModel
     final Map<int, CategoryModel> categoryLookup = {};
@@ -208,7 +221,7 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
     }
 
     // Only count completed sales (exclude voided)
-    final completedSales = salesState.sales.where((s) => s.status == 'completed').toList();
+    final completedSales = salesState.sales.where((s) => s.status.toLowerCase() != 'voided').toList();
 
     // 1. Calculate Product Sales & map to Category
     final Map<String, _ProductSalesSummary> productSalesMap = {};
@@ -239,6 +252,17 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
         int catId = item.categoryId;
         String catName = item.categoryName.isNotEmpty ? item.categoryName : 'Tanpa Kategori';
         String barcode = item.itemUPC;
+
+        // Fallback from master inventory item if not set or Tanpa Kategori
+        if (catId == 0 || catName == 'Tanpa Kategori') {
+          if (item.itemNo.isNotEmpty && itemToCategoryMap.containsKey(item.itemNo.toLowerCase())) {
+            catId = itemToCategoryMap[item.itemNo.toLowerCase()]!;
+          } else if (item.itemUPC.isNotEmpty && itemToCategoryMap.containsKey(item.itemUPC.toLowerCase())) {
+            catId = itemToCategoryMap[item.itemUPC.toLowerCase()]!;
+          } else if (item.itemName.isNotEmpty && itemToCategoryMap.containsKey(item.itemName.toLowerCase())) {
+            catId = itemToCategoryMap[item.itemName.toLowerCase()]!;
+          }
+        }
 
         if (catId > 0 && categoryLookup.containsKey(catId)) {
           catName = categoryLookup[catId]!.name;

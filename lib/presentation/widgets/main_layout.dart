@@ -226,6 +226,14 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
     );
   }
 
+  void _navigateTo(String route) {
+    if (widget.currentRoute != route) {
+      _searchController.clear();
+      ref.read(itemsNotifierProvider.notifier).search('');
+    }
+    context.go(route);
+  }
+
   @override
   Widget build(BuildContext context) {
     // Sync external query reset
@@ -333,7 +341,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                             child: Tooltip(
                               message: item.label,
                               child: InkWell(
-                                onTap: () => context.go(item.route),
+                                onTap: () => _navigateTo(item.route),
                                 borderRadius: BorderRadius.circular(10),
                                 child: Container(
                                   width: 48,
@@ -374,7 +382,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                             selectedTileColor: Theme.of(context).colorScheme.primary.withOpacity(0.08),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             onTap: () {
-                              context.go(item.route);
+                              _navigateTo(item.route);
                             },
                           ),
                         );
@@ -611,7 +619,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
         bottomNavigationBar: NavigationBar(
           selectedIndex: activeIndex,
           onDestinationSelected: (idx) {
-            context.go(navItems[idx].route);
+            _navigateTo(navItems[idx].route);
           },
           destinations: navItems.map((item) {
             return NavigationDestination(

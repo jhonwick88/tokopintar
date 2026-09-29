@@ -1343,23 +1343,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         const SizedBox(height: 16),
 
         // Features list
-        const Text(
-          'Daftar Modul & Fitur Lisensi:',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _buildFeatureBadge('Laporan Penjualan (sales_reports)', features['sales_reports'] == true || features['sales_reports'] == 1 || features['sales_reports'] == '1'),
-            _buildFeatureBadge('Stok Opname (stock_opname)', features['stock_opname'] == true || features['stock_opname'] == 1 || features['stock_opname'] == '1'),
-            _buildFeatureBadge('Auto-Backup Database', features['automatic_backup'] == true || features['automatic_backup'] == 1 || features['automatic_backup'] == '1'),
-            _buildFeatureBadge('Multi Kasir (${features['max_cashiers'] ?? 1} User)', features['multi_user'] == true || features['multi_user'] == 1 || features['multi_user'] == '1'),
-            _buildFeatureBadge('Fitur POS Kasir Lengkap', features['advanced_pos'] == true || features['advanced_pos'] == 1 || features['advanced_pos'] == '1'),
-          ],
-        ),
-        const SizedBox(height: 20),
+        // const Text(
+        //   'Daftar Modul & Fitur Lisensi:',
+        //   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        // ),
+        // const SizedBox(height: 8),
+        // Wrap(
+        //   spacing: 8,
+        //   runSpacing: 8,
+        //   children: [
+        //     _buildFeatureBadge('Laporan Penjualan (sales_reports)', features['sales_reports'] == true || features['sales_reports'] == 1 || features['sales_reports'] == '1'),
+        //     _buildFeatureBadge('Stok Opname (stock_opname)', features['stock_opname'] == true || features['stock_opname'] == 1 || features['stock_opname'] == '1'),
+        //     _buildFeatureBadge('Auto-Backup Database', features['automatic_backup'] == true || features['automatic_backup'] == 1 || features['automatic_backup'] == '1'),
+        //     _buildFeatureBadge('Multi Kasir (${features['max_cashiers'] ?? 1} User)', features['multi_user'] == true || features['multi_user'] == 1 || features['multi_user'] == '1'),
+        //     _buildFeatureBadge('Fitur POS Kasir Lengkap', features['advanced_pos'] == true || features['advanced_pos'] == 1 || features['advanced_pos'] == '1'),
+        //   ],
+        // ),
+        // const SizedBox(height: 20),
         const Divider(),
         const SizedBox(height: 12),
 

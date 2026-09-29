@@ -22,8 +22,9 @@ class _StockOpnameScreenState extends ConsumerState<StockOpnameScreen> {
   @override
   void initState() {
     super.initState();
+    _searchController.text = '';
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(itemsNotifierProvider.notifier).loadItems(refresh: true);
+      ref.read(itemsNotifierProvider.notifier).clearFiltersAndReload();
     });
   }
 
@@ -132,32 +133,49 @@ class _StockOpnameScreenState extends ConsumerState<StockOpnameScreen> {
                 labelText: 'Cari Produk (SKU / Nama / Barcode)',
                 prefixIcon: const Icon(Icons.search),
                 border: const OutlineInputBorder(),
-                suffixIcon: (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) ? IconButton(
-                  icon: const Icon(Icons.camera_alt_rounded),
-                  onPressed: () async {
-                    var status = await Permission.camera.status;
-                    if (status != PermissionStatus.granted) {
-                      if (context.mounted) {
-                        await AppPermissionsDialog.show(context);
-                      }
-                      status = await Permission.camera.status;
-                      if (status != PermissionStatus.granted) return;
-                    }
-                    
-                    if (!context.mounted) return;
-                    final barcode = await showDialog<String>(
-                      context: context,
-                      builder: (context) => const CameraScannerDialog(),
-                    );
-                    if (barcode != null) {
-                      _searchController.text = barcode;
-                      ref.read(itemsNotifierProvider.notifier).search(barcode);
-                    }
-                  },
-                  tooltip: 'Scan Barcode',
-                ) : null,
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_searchController.text.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          ref.read(itemsNotifierProvider.notifier).search('');
+                          setState(() {});
+                        },
+                      ),
+                    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS))
+                      IconButton(
+                        icon: const Icon(Icons.camera_alt_rounded),
+                        onPressed: () async {
+                          var status = await Permission.camera.status;
+                          if (status != PermissionStatus.granted) {
+                            if (context.mounted) {
+                              await AppPermissionsDialog.show(context);
+                            }
+                            status = await Permission.camera.status;
+                            if (status != PermissionStatus.granted) return;
+                          }
+                          
+                          if (!context.mounted) return;
+                          final barcode = await showDialog<String>(
+                            context: context,
+                            builder: (context) => const CameraScannerDialog(),
+                          );
+                          if (barcode != null) {
+                            _searchController.text = barcode;
+                            ref.read(itemsNotifierProvider.notifier).search(barcode);
+                            setState(() {});
+                          }
+                        },
+                        tooltip: 'Scan Barcode',
+                      ),
+                  ],
+                ),
               ),
               onChanged: (val) {
+                setState(() {});
                 ref.read(itemsNotifierProvider.notifier).search(val.trim());
               },
             ),
