@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../data/models/item_model.dart';
 import '../../data/models/quick_item_model.dart';
@@ -234,7 +235,11 @@ class _QuickAddItemSettingsScreenState extends ConsumerState<QuickAddItemSetting
                         borderRadius: BorderRadius.circular(10),
                       ),
                       title: Text(selectedProduct?.itemName ?? 'Belum memilih produk'),
-                      subtitle: Text(selectedProduct != null ? 'Code: ${selectedProduct!.itemNo}' : 'Pilih produk dari database'),
+                      subtitle: Text(
+                        selectedProduct != null
+                            ? 'Code: ${selectedProduct!.itemNo} • ${NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0).format(selectedProduct!.price)}'
+                            : 'Pilih produk dari database',
+                      ),
                       trailing: const Icon(Icons.arrow_drop_down),
                       onTap: () async {
                         final chosen = await showDialog<ItemModel>(
@@ -361,6 +366,7 @@ class _QuickAddItemSettingsScreenState extends ConsumerState<QuickAddItemSetting
                       colorHex: '0x${selectedColor.value.toRadixString(16)}',
                       displayOrder: existingItem?.displayOrder ?? list.length,
                       isActive: isActive,
+                      price: selectedProduct?.price ?? existingItem?.price,
                     );
 
                     if (existingItem == null) {
@@ -387,6 +393,8 @@ class _QuickAddItemSettingsScreenState extends ConsumerState<QuickAddItemSetting
   @override
   Widget build(BuildContext context) {
     final quickItems = ref.watch(quickItemsNotifierProvider);
+    final itemsState = ref.watch(itemsNotifierProvider);
+    final itemMap = {for (var i in itemsState.items) i.itemNo: i};
 
     return Scaffold(
       appBar: AppBar(
@@ -420,6 +428,12 @@ class _QuickAddItemSettingsScreenState extends ConsumerState<QuickAddItemSetting
                       final cardColor = item.colorHex != null 
                           ? Color(int.parse(item.colorHex!)) 
                           : Colors.teal;
+                      final itemPrice = (item.price != null && item.price! > 0)
+                          ? item.price!
+                          : (itemMap[item.itemNo]?.price ?? 0.0);
+                      final priceText = itemPrice > 0
+                          ? ' • ${NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0).format(itemPrice)}'
+                          : '';
 
                       return Card(
                         key: ValueKey(item.id),
@@ -438,7 +452,7 @@ class _QuickAddItemSettingsScreenState extends ConsumerState<QuickAddItemSetting
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           subtitle: Text(
-                            'Code: ${item.itemNo} • Status: ${item.isActive ? 'Aktif' : 'Nonaktif'}',
+                            'Code: ${item.itemNo}$priceText • Status: ${item.isActive ? 'Aktif' : 'Nonaktif'}',
                           ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,

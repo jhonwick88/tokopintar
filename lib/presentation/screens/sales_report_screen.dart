@@ -1,18 +1,15 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:excel/excel.dart' as excel_pkg;
-import 'package:file_selector/file_selector.dart';
 
 import '../../data/models/category_model.dart';
 import '../providers/sales_history_provider.dart';
 import '../providers/categories_provider.dart';
 import '../providers/items_provider.dart';
 import '../widgets/main_layout.dart';
-import '../../utils/web_download.dart';
+import '../../core/utils/file_saver_helper.dart';
 
 class SalesReportScreen extends ConsumerStatefulWidget {
   const SalesReportScreen({super.key});
@@ -174,19 +171,16 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
       final fileBytes = excel.save();
       if (fileBytes != null) {
         final filename = 'laporan_penjualan_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.xlsx';
-        if (kIsWeb) {
-          downloadFileWeb(fileBytes, filename);
-        } else {
-          final FileSaveLocation? result = await getSaveLocation(suggestedName: filename);
-          if (result != null) {
-            final file = File(result.path);
-            await file.writeAsBytes(fileBytes);
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Laporan Excel berhasil disimpan'), backgroundColor: Colors.green),
-              );
-            }
-          }
+        final saved = await FileSaverHelper.saveFile(
+          bytes: fileBytes,
+          fileName: filename,
+          dialogTitle: 'Simpan Laporan Penjualan Excel',
+          allowedExtensions: ['xlsx'],
+        );
+        if (saved && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Laporan Excel berhasil disimpan'), backgroundColor: Colors.green),
+          );
         }
       }
     } catch (e) {

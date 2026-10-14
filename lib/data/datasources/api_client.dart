@@ -689,6 +689,25 @@ class ApiClient {
       }
     } catch (e) {
       dev.log('API Error: $e');
+    }
+  }
+
+  Future<List<int>> getBackupBytes() async {
+    try {
+      final response = await _dio.get(
+        '/api/backup',
+        options: Options(responseType: ResponseType.bytes),
+      );
+      if (response.statusCode == 200) {
+        if (response.data is List<int>) {
+          return response.data as List<int>;
+        }
+        return (response.data as List).cast<int>();
+      } else {
+        throw Exception('Failed to download backup');
+      }
+    } catch (e) {
+      dev.log('API Error: $e');
       rethrow;
     }
   }

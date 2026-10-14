@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/datasources/api_client.dart';
 import '../../data/models/settings_model.dart';
 import '../../data/repositories/audit_repository_impl.dart';
@@ -60,6 +61,12 @@ class SettingsNotifier extends StateNotifier<SettingsModel> {
     } catch (_) {
       // Keep defaults
     }
+  }
+
+  Future<void> setServerUrl(String newUrl) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('local_rest_api_url', newUrl);
+    await loadSettings();
   }
 
   Future<void> updateSettings(SettingsModel newSettings) async {

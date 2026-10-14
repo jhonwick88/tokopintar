@@ -122,8 +122,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           initialUrl: settings.restApiUrl,
           onSave: (newUrl) async {
             if (newUrl.isNotEmpty) {
-              final updated = settings.copyWith(restApiUrl: newUrl);
-              await ref.read(settingsNotifierProvider.notifier).updateSettings(updated);
+              await ref.read(settingsNotifierProvider.notifier).setServerUrl(newUrl);
               await ref.read(licenseProvider.notifier).refreshStatus();
             }
           },

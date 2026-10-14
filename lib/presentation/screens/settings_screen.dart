@@ -18,6 +18,7 @@ import 'package:file_picker/file_picker.dart';
 import '../widgets/app_permissions_dialog.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'quick_add_item_settings_screen.dart';
+import '../../core/utils/file_saver_helper.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -108,6 +109,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       });
     }
     _checkAppPermissions();
+    _loadFreshSettings();
+  }
+
+  Future<void> _loadFreshSettings() async {
+    try {
+      final fresh = await ref.read(settingsRepositoryProvider).getSettings();
+      if (mounted) {
+        setState(() {
+          _shopNameController.text = fresh.shopName;
+          _shopAddressController.text = fresh.shopAddress;
+          _shopPhoneController.text = fresh.shopPhone;
+          _receiptHeaderController.text = fresh.receiptHeader;
+          _receiptFooterController.text = fresh.receiptFooter;
+          if (fresh.adminPin.isNotEmpty) {
+            _adminPinController.text = fresh.adminPin;
+          }
+          _enableTax = fresh.enableTax;
+          _taxPercentageController.text = fresh.taxPercentage.toString();
+          _enableServiceCharge = fresh.enableServiceCharge;
+          _serviceChargePercentageController.text = fresh.serviceChargePercentage.toString();
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _checkAppPermissions() async {
@@ -335,6 +359,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         setState(() {
           _connectionStatus = 'connected';
         });
+
+        // Automatically pull and sync company settings from server
+        try {
+          final compRes = await dio.get('$url/api/company');
+          if (compRes.statusCode == 200 && compRes.data != null) {
+            final success = compRes.data['success'] as bool? ?? false;
+            if (success) {
+              final data = compRes.data['data'];
+              if (data != null && data is Map<String, dynamic>) {
+                final serverSettings = SettingsModel.fromJson(data);
+                if (mounted) {
+                  setState(() {
+                    _shopNameController.text = serverSettings.shopName;
+                    _shopAddressController.text = serverSettings.shopAddress;
+                    _shopPhoneController.text = serverSettings.shopPhone;
+                    _receiptHeaderController.text = serverSettings.receiptHeader;
+                    _receiptFooterController.text = serverSettings.receiptFooter;
+                    if (serverSettings.adminPin.isNotEmpty) {
+                      _adminPinController.text = serverSettings.adminPin;
+                    }
+                    _enableTax = serverSettings.enableTax;
+                    _taxPercentageController.text = serverSettings.taxPercentage.toString();
+                    _enableServiceCharge = serverSettings.enableServiceCharge;
+                    _serviceChargePercentageController.text = serverSettings.serviceChargePercentage.toString();
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Koneksi berhasil! Data toko "${serverSettings.shopName}" disinkronkan dari server.'),
+                      backgroundColor: Colors.green,
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('Gagal mengambil data toko saat tes koneksi: $e');
+        }
       } else {
         setState(() {
           _connectionStatus = 'error';
@@ -345,9 +408,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         _connectionStatus = 'disconnected';
       });
     } finally {
-      setState(() {
-        _isTestingConnection = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isTestingConnection = false;
+        });
+      }
     }
   }
 
@@ -360,7 +425,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       case 'connected':
         color = Colors.green;
         icon = Icons.check_circle;
-        text = 'Koneksi Berhasil! Terhubung ke Server.';
+        text = 'Koneksi Berhasil! Terhubung ke Server & data toko disinkronkan.';
         break;
       case 'error':
         color = Colors.orange;
@@ -662,7 +727,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           onPressed: (_isTestingConnection || !_isEditingUnlocked) ? null : _testApiConnection,
-                          label: const Text('Tes'),
+                          icon: const Icon(Icons.sync, size: 18),
+                          label: const Text('Tes & Sinkron'),
                         ),
                       ],
                     ),
@@ -1766,28 +1832,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     try {
       final apiClient = ref.read(apiClientProvider);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sedang mengunduh backup dari server...')));
 
-      if (kIsWeb) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sedang mengunduh backup...')));
-        await apiClient.downloadBackupWeb();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Backup berhasil diunduh'), backgroundColor: Colors.green));
-        }
-        return;
+      final backupBytes = await apiClient.getBackupBytes();
+      final fileName = 'tokopintar_manual_${DateTime.now().millisecondsSinceEpoch}.db';
+
+      final saved = await FileSaverHelper.saveFile(
+        bytes: backupBytes,
+        fileName: fileName,
+        dialogTitle: 'Simpan Backup Database (.db)',
+        allowedExtensions: ['db'],
+      );
+
+      if (saved && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Backup berhasil disimpan.'), backgroundColor: Colors.green),
+        );
       }
-
-      final String? selectedDirectory = await FilePicker.getDirectoryPath();
-      if (selectedDirectory == null) return;
-
-      final savePath = '${selectedDirectory}/tokopintar_manual_${DateTime.now().millisecondsSinceEpoch}.db';
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sedang mengunduh backup...')));
-      
-      await apiClient.downloadBackup(savePath);
-      
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Backup berhasil disimpan di $savePath'), backgroundColor: Colors.green));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal melakukan backup.'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal melakukan backup: $e'), backgroundColor: Colors.red),
+        );
       }
     }
   }
@@ -1805,7 +1871,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Peringatan Restore'),
-        content: const Text('Melakukan restore akan menimpa seluruh data toko saat ini. Aplikasi akan ditutup otomatis setelah restore berhasil. Anda yakin?'),
+        content: const Text(
+          'Melakukan restore akan menimpa seluruh data toko di server saat ini.\n\n'
+          'Setelah restore berhasil:\n'
+          '1. Server database di PC Utama akan otomatis dimatikan.\n'
+          '2. Buka terminal PC Utama dan jalankan ulang server.\n\n'
+          'Anda yakin ingin melanjutkan?',
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
           FilledButton(
@@ -1820,48 +1892,89 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (confirm != true) return;
 
     try {
-      final result = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['db'],
-        withData: true,
-      );
-
-      if (result == null || result.isEmpty) return;
-      
-      final apiClient = ref.read(apiClientProvider);
-      String message;
-      
-      if (kIsWeb) {
-        final bytes = await result.first.readAsBytes();
-        final name = result.first.name;
-        if (bytes == null) {
-           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal membaca file.'), backgroundColor: Colors.red));
-           return;
-        }
-        message = await apiClient.restoreBackupBytes(bytes, name);
+      List<PlatformFile> files;
+      // On Android, use FileType.any so that custom .db extensions are never grayed out by Samsung/Google Files
+      if (!kIsWeb && Platform.isAndroid) {
+        files = await FilePicker.pickFiles(
+          type: FileType.any,
+        );
       } else {
-        final filePath = result.first.path;
-        if (filePath == null) return;
-        message = await apiClient.restoreBackup(filePath);
+        files = await FilePicker.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['db'],
+        );
       }
-      
+
+      if (files.isEmpty) return;
+
+      final pickedFile = files.first;
+
+      // Validate file extension
+      if (!pickedFile.name.toLowerCase().endsWith('.db')) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Format file salah! Harap pilih file cadangan berekstensi .db'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sedang mengunggah dan merestore database ke server...')),
+        );
+      }
+
+      final apiClient = ref.read(apiClientProvider);
+      final bytes = await pickedFile.readAsBytes();
+      if (bytes.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Gagal membaca data file database.'), backgroundColor: Colors.red),
+          );
+        }
+        return;
+      }
+
+      final message = await apiClient.restoreBackupBytes(bytes, pickedFile.name);
+
       if (!mounted) return;
+      final isAndroid = !kIsWeb && Platform.isAndroid;
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (context) => AlertDialog(
           title: const Text('Restore Berhasil!'),
-          content: Text('$message\n\n1. Buka terminal backend dan jalankan ulang.\n2. Restart aplikasi TokoPintar.'),
+          content: Text(
+            '$message\n\n'
+            'Langkah Selanjutnya:\n'
+            '1. Server TokoPintar di PC Utama telah dimatikan otomatis.\n'
+            '2. Buka terminal server di PC Utama dan jalankan ulang server.\n'
+            '3. Buka/Restart aplikasi TokoPintar di semua kasir.',
+          ),
           actions: [
             FilledButton(
-              onPressed: () => exit(0),
+              onPressed: () {
+                if (isAndroid) {
+                  SystemNavigator.pop();
+                } else {
+                  exit(0);
+                }
+              },
               child: const Text('Tutup Aplikasi'),
             ),
           ],
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal restore: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 

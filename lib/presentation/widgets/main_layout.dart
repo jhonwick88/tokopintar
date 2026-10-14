@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
@@ -79,7 +81,11 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
           try {
             final apiClient = ref.read(apiClientProvider);
             final fileName = 'tokopintar_autobackup_${now.millisecondsSinceEpoch}.db';
-            final savePath = '${settings.autoBackupLocation}\\$fileName';
+            final separator = Platform.pathSeparator;
+            final baseDir = settings.autoBackupLocation.endsWith('/') || settings.autoBackupLocation.endsWith('\\')
+                ? settings.autoBackupLocation.substring(0, settings.autoBackupLocation.length - 1)
+                : settings.autoBackupLocation;
+            final savePath = '$baseDir$separator$fileName';
             
             await apiClient.downloadBackup(savePath);
             
@@ -120,14 +126,20 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
       final matchedItem = exactMatches.first;
       ref.read(posNotifierProvider.notifier).addToCart(matchedItem);
       
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Produk ${matchedItem.itemName} ditambahkan', style: const TextStyle(fontWeight: FontWeight.bold)),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      final width = MediaQuery.of(context).size.width;
+      final isDesktop = width >= 900;
+      if (!isDesktop) {
+        HapticFeedback.lightImpact();
+      } else {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Produk ${matchedItem.itemName} ditambahkan', style: const TextStyle(fontWeight: FontWeight.bold)),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
       
       try {
         await _audioPlayer.play(AssetSource('sounds/scanner-beep.mp3'));

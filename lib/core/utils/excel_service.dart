@@ -1,16 +1,13 @@
-import 'dart:io';
 import 'package:excel/excel.dart';
-import 'package:file_selector/file_selector.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../data/models/item_model.dart';
 import 'dart:developer' as dev;
+import 'file_saver_helper.dart';
 
 class ExcelService {
-  /// Generates and saves an empty Excel template for product import
+  /// Generates and saves an empty Excel template for product import across multi-devices
   static Future<bool> generateProductTemplate() async {
     try {
-      final FileSaveLocation? result = await getSaveLocation(suggestedName: 'template_produk.xlsx');
-      if (result == null) return false;
-
       var excel = Excel.createExcel();
       Sheet sheetObject = excel['Sheet1'];
 
@@ -32,9 +29,12 @@ class ExcelService {
 
       var fileBytes = excel.save();
       if (fileBytes != null) {
-        final file = File(result.path);
-        await file.writeAsBytes(fileBytes);
-        return true;
+        return await FileSaverHelper.saveFile(
+          bytes: fileBytes,
+          fileName: 'template_produk.xlsx',
+          dialogTitle: 'Download Template Produk Excel',
+          allowedExtensions: ['xlsx'],
+        );
       }
       return false;
     } catch (e) {
@@ -43,22 +43,26 @@ class ExcelService {
     }
   }
 
-  /// Opens a file picker, reads the Excel file, and returns a list of ItemModels
+  /// Opens a file picker, reads the Excel file, and returns a list of ItemModels across multi-devices
   static Future<List<ItemModel>> importProductsFromExcel() async {
     try {
-      const XTypeGroup typeGroup = XTypeGroup(
-        label: 'Excel',
-        extensions: <String>['xlsx'],
+      final List<PlatformFile> files = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx'],
       );
-      final XFile? file = await openFile(acceptedTypeGroups: <XTypeGroup>[typeGroup]);
 
-      if (file == null) {
+      if (files.isEmpty) {
         return [];
       }
 
-      var bytes = await file.readAsBytes();
-      var excel = Excel.decodeBytes(bytes);
+      final pickedFile = files.first;
+      final bytes = await pickedFile.readAsBytes();
 
+      if (bytes.isEmpty) {
+        throw Exception('Tidak dapat membaca data file Excel atau file kosong.');
+      }
+
+      var excel = Excel.decodeBytes(bytes);
       List<ItemModel> parsedItems = [];
 
       for (var table in excel.tables.keys) {
@@ -71,7 +75,7 @@ class ExcelService {
           if (row.isEmpty) continue;
 
           // Safely extract string values
-          String sku = row.length > 0 ? row[0]?.value?.toString().trim() ?? '' : '';
+          String sku = row.isNotEmpty ? row[0]?.value?.toString().trim() ?? '' : '';
           String barcode = row.length > 1 ? row[1]?.value?.toString().trim() ?? '' : '';
           String name = row.length > 2 ? row[2]?.value?.toString().trim() ?? '' : '';
           

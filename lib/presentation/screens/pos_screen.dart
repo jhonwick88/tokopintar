@@ -139,8 +139,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       _showUnregisteredBarcodeDialog(barcode);
     } else if (items.length == 1) {
       final item = items.first;
-      ref.read(posNotifierProvider.notifier).addToCart(item);
-      _showSuccessToast('Produk ${item.itemName}');
+      _onProductAddedToCart(item);
     } else {
       // Multiple items found for the same barcode
       _showDuplicateBarcodeSelectionDialog(barcode, items);
@@ -166,8 +165,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   trailing: const Icon(Icons.add_shopping_cart),
                   onTap: () {
                     Navigator.of(context).pop();
-                    ref.read(posNotifierProvider.notifier).addToCart(item);
-                    _showSuccessToast('Produk ${item.itemName}');
+                    _onProductAddedToCart(item);
                   },
                 );
               },
@@ -182,6 +180,17 @@ class _PosScreenState extends ConsumerState<PosScreen> {
         );
       },
     );
+  }
+
+  void _onProductAddedToCart(ItemModel item) {
+    ref.read(posNotifierProvider.notifier).addToCart(item);
+    final width = MediaQuery.of(context).size.width;
+    final isDesktop = width >= 900;
+    if (isDesktop) {
+      _showSuccessToast('Produk ${item.itemName}');
+    } else {
+      HapticFeedback.lightImpact();
+    }
   }
 
   void _showSuccessToast(String msg) {
@@ -245,6 +254,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
         ),
       );
     } else {
+      HapticFeedback.lightImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -265,7 +275,12 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             ],
           ),
           backgroundColor: Colors.green,
-          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          margin: const EdgeInsets.only(bottom: 84, left: 16, right: 16),
+          duration: const Duration(milliseconds: 900),
         ),
       );
     }
@@ -295,8 +310,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     if (exactMatches.length == 1) {
       // Auto Add to Cart
       final matchedItem = exactMatches.first;
-      ref.read(posNotifierProvider.notifier).addToCart(matchedItem);
-      _showSuccessToast('Produk ${matchedItem.itemName}');
+      _onProductAddedToCart(matchedItem);
       try {
         await _audioPlayer.play(AssetSource('sounds/scanner-beep.mp3'));
       } catch (_) {}
@@ -422,6 +436,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           builder: (context, ref, child) {
             final quickItems = ref.watch(quickItemsNotifierProvider);
             final activeItems = quickItems.where((item) => item.isActive).toList();
+            final itemsState = ref.watch(itemsNotifierProvider);
+            final itemMap = {for (var it in itemsState.items) it.itemNo: it};
 
             return Padding(
               padding: const EdgeInsets.all(20.0),
@@ -493,7 +509,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                           crossAxisCount: 3,
                           mainAxisSpacing: 10,
                           crossAxisSpacing: 10,
-                          childAspectRatio: 1.1,
+                          childAspectRatio: 0.88,
                         ),
                         itemBuilder: (context, index) {
                           final item = activeItems[index];
@@ -501,6 +517,10 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                           final cardColor = item.colorHex != null 
                               ? Color(int.parse(item.colorHex!)) 
                               : Colors.teal;
+                          final matchedProduct = itemMap[item.itemNo];
+                          final itemPrice = (item.price != null && item.price! > 0)
+                              ? item.price!
+                              : (matchedProduct?.price ?? 0.0);
 
                           return Card(
                             elevation: 1,
@@ -527,25 +547,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                 }
 
                                 if (matchedItem != null) {
-                                  ref.read(posNotifierProvider.notifier).addToCart(matchedItem);
-                                  
-                                  ScaffoldMessenger.of(context).clearSnackBars();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      duration: const Duration(seconds: 1),
-                                      behavior: SnackBarBehavior.floating,
-                                      margin: const EdgeInsets.only(bottom: 80, left: 24, right: 24),
-                                      content: Row(
-                                        children: [
-                                          Icon(iconData, color: Colors.white, size: 18),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text('${item.itemName} ditambahkan ke keranjang'),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
+                                  _onProductAddedToCart(matchedItem);
                                 } else {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
@@ -556,12 +558,12 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                 }
                               },
                               child: Padding(
-                                padding: const EdgeInsets.all(8.0),
+                                padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 8.0),
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.all(8),
+                                      padding: const EdgeInsets.all(6),
                                       decoration: BoxDecoration(
                                         color: cardColor.withOpacity(0.12),
                                         shape: BoxShape.circle,
@@ -569,7 +571,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                       child: Icon(
                                         iconData,
                                         color: cardColor,
-                                        size: 24,
+                                        size: 22,
                                       ),
                                     ),
                                     const SizedBox(height: 6),
@@ -579,6 +581,18 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                       style: const TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      itemPrice > 0 ? _formatRupiah(itemPrice) : '-',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: cardColor,
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -1290,7 +1304,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                             color: Colors.transparent,
                             child: InkWell(
                               onTap: () {
-                                ref.read(posNotifierProvider.notifier).addToCart(product);
+                                _onProductAddedToCart(product);
                               },
                               onLongPress: () => _showEditProductDialog(product),
                               borderRadius: BorderRadius.circular(16),
@@ -1433,8 +1447,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                             color: Colors.transparent,
                             child: InkWell(
                               onTap: () {
-                                ref.read(posNotifierProvider.notifier).addToCart(product);
-                                _showSuccessToast('${product.itemName}');
+                                _onProductAddedToCart(product);
                               },
                               onLongPress: () => _showEditProductDialog(product),
                               borderRadius: BorderRadius.circular(12),
@@ -2243,9 +2256,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                     ),
                   );
 
-                  ref.read(posNotifierProvider.notifier).addToCart(updatedItem);
-
-                  _showSuccessToast('Pemetaan berhasil. Produk ditambahkan ke keranjang.');
+                  _onProductAddedToCart(updatedItem);
                 } catch (e) {
                   final cleanMsg = _cleanErrorMessage(e, 'Gagal memetakan barcode');
                   _showErrorToast(cleanMsg);
@@ -2292,8 +2303,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     ).then((newItem) {
       BarcodeService.instance.resume();
       if (newItem != null) {
-        ref.read(posNotifierProvider.notifier).addToCart(newItem);
-        _showSuccessToast('Produk ${newItem.itemName} ditambahkan ke keranjang');
+        _onProductAddedToCart(newItem);
       }
     });
   }

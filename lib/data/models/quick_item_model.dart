@@ -6,6 +6,7 @@ class QuickItemModel {
   final String? colorHex;
   final int displayOrder;
   final bool isActive;
+  final double? price;
 
   QuickItemModel({
     required this.id,
@@ -15,6 +16,7 @@ class QuickItemModel {
     this.colorHex,
     required this.displayOrder,
     this.isActive = true,
+    this.price,
   });
 
   Map<String, dynamic> toJson() {
@@ -26,6 +28,7 @@ class QuickItemModel {
       'color_hex': colorHex,
       'display_order': displayOrder,
       'is_active': isActive ? 1 : 0,
+      if (price != null) 'price': price,
     };
   }
 
@@ -38,6 +41,7 @@ class QuickItemModel {
       colorHex: json['color_hex'] as String?,
       displayOrder: (json['display_order'] as num?)?.toInt() ?? 0,
       isActive: json['is_active'] == 1 || json['is_active'] == true,
+      price: (json['price'] as num?)?.toDouble() ?? (json['def_unitprice1'] as num?)?.toDouble(),
     );
   }
 
@@ -49,6 +53,7 @@ class QuickItemModel {
     String? colorHex,
     int? displayOrder,
     bool? isActive,
+    double? price,
   }) {
     return QuickItemModel(
       id: id ?? this.id,
@@ -58,6 +63,7 @@ class QuickItemModel {
       colorHex: colorHex ?? this.colorHex,
       displayOrder: displayOrder ?? this.displayOrder,
       isActive: isActive ?? this.isActive,
+      price: price ?? this.price,
     );
   }
 }
