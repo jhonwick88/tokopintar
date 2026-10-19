@@ -51,7 +51,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   int _printerPaperSize = 58;
   int _printReceiptCopies = 1;
   bool _autoPrintOnCheckout = false;
-  bool _enableFloatingCalculator = true;
+  bool _enableFloatingCalculator = false;
+  bool _allowCashierStockOpname = false;
 
   String _printerType = 'LAN';
   String _printerMacAddress = '';
@@ -92,6 +93,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _printReceiptCopies = settings.printReceiptCopies;
     _autoPrintOnCheckout = settings.autoPrintOnCheckout;
     _enableFloatingCalculator = settings.enableFloatingCalculator;
+    _allowCashierStockOpname = settings.allowCashierStockOpname;
 
     // Check if the current user is already an Admin to unlock editing
     final currentUser = ref.read(authNotifierProvider).currentUser;
@@ -129,6 +131,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _taxPercentageController.text = fresh.taxPercentage.toString();
           _enableServiceCharge = fresh.enableServiceCharge;
           _serviceChargePercentageController.text = fresh.serviceChargePercentage.toString();
+          _allowCashierStockOpname = fresh.allowCashierStockOpname;
         });
       }
     } catch (_) {}
@@ -293,7 +296,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _saveSettings() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final updated = SettingsModel(
+    final currentSettings = ref.read(settingsNotifierProvider);
+    final updated = currentSettings.copyWith(
       shopName: _shopNameController.text,
       shopAddress: _shopAddressController.text,
       shopPhone: _shopPhoneController.text,
@@ -313,6 +317,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       printReceiptCopies: _printReceiptCopies,
       autoPrintOnCheckout: _autoPrintOnCheckout,
       enableFloatingCalculator: _enableFloatingCalculator,
+      allowCashierStockOpname: _allowCashierStockOpname,
     );
 
     await ref.read(settingsNotifierProvider.notifier).updateSettings(updated);
@@ -576,6 +581,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final themeMode = ref.watch(themeModeProvider);
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width >= 900;
+    final isMobile = width < 600;
     final currentUser = ref.watch(authNotifierProvider).currentUser;
     final isAdmin = currentUser?.role == 'admin';
     return MainLayout(
@@ -604,7 +610,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.15),
+                    color: Colors.green.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: Colors.green.shade600, width: 1),
                   ),
@@ -625,7 +631,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         body: Form(
           key: _formKey,
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 12 : 24,
+              vertical: isMobile ? 12 : 24,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -803,6 +812,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           size: 22,
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Divider(),
+                    const SizedBox(height: 4),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      secondary: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.inventory_outlined, color: Colors.orange, size: 20),
+                      ),
+                      title: const Text(
+                        'Izinkan Kasir Melakukan Stok Opname',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      subtitle: const Text(
+                        'Jika aktif, staf/kasir dapat mengakses menu Stok Opname untuk memperbarui stok barang fisik.',
+                        style: TextStyle(fontSize: 11.5, color: Colors.grey),
+                      ),
+                      value: _allowCashierStockOpname,
+                      onChanged: _isEditingUnlocked
+                          ? (val) {
+                              setState(() {
+                                _allowCashierStockOpname = val;
+                              });
+                            }
+                          : null,
                     ),
                   ],
                 ),
@@ -1145,14 +1184,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: isMobile ? 16 : 24),
 
                 // Section 5: Lisensi & Fitur Aplikasi (Level Admin)
                 if (isAdmin) ...[
                   _buildLicenseSettings(),
-                  const SizedBox(height: 24),
+                  SizedBox(height: isMobile ? 16 : 24),
                   _buildDatabaseSettings(),
-                  const SizedBox(height: 32),
+                  SizedBox(height: isMobile ? 20 : 32),
                 ],
 
                 // Section 4: Aplikasi & Sistem
@@ -1161,8 +1200,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   icon: Icons.settings_display_rounded,
                   children: [
                     ListTile(
-                      leading: Icon(themeMode == ThemeMode.dark ? Icons.dark_mode : Icons.light_mode),
-                      title: Text(themeMode == ThemeMode.dark ? 'Mode Gelap Aktif' : 'Mode Terang Aktif'),
+                      dense: isMobile,
+                      contentPadding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8),
+                      leading: Container(
+                        padding: EdgeInsets.all(isMobile ? 6 : 8),
+                        decoration: BoxDecoration(
+                          color: (themeMode == ThemeMode.dark ? Colors.amber : Colors.blue).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          themeMode == ThemeMode.dark ? Icons.dark_mode : Icons.light_mode,
+                          size: isMobile ? 18 : 20,
+                          color: themeMode == ThemeMode.dark ? Colors.amber : Colors.blue,
+                        ),
+                      ),
+                      title: Text(
+                        themeMode == ThemeMode.dark ? 'Mode Gelap Aktif' : 'Mode Terang Aktif',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: isMobile ? 13.5 : 14.5),
+                      ),
+                      subtitle: Text(
+                        themeMode == ThemeMode.dark ? 'Tampilan layar gelap' : 'Tampilan layar cerah',
+                        style: TextStyle(fontSize: isMobile ? 11 : 12),
+                      ),
                       trailing: Switch(
                         value: themeMode == ThemeMode.dark,
                         onChanged: (val) {
@@ -1171,11 +1230,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         },
                       ),
                     ),
-                    const Divider(),
+                    Divider(height: isMobile ? 12 : 16, indent: isMobile ? 42 : 48),
                     ListTile(
-                      leading: const Icon(Icons.calculate_rounded, color: Colors.blue),
-                      title: const Text('Kalkulator Melayang (POS)'),
-                      subtitle: const Text('Tampilkan kalkulator yang bisa digeser di layar kasir'),
+                      dense: isMobile,
+                      contentPadding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8),
+                      leading: Container(
+                        padding: EdgeInsets.all(isMobile ? 6 : 8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.calculate_rounded, color: Colors.blue, size: isMobile ? 18 : 20),
+                      ),
+                      title: Text(
+                        'Kalkulator Melayang (POS)',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: isMobile ? 13.5 : 14.5),
+                      ),
+                      subtitle: Text(
+                        'Kalkulator mini geser di kasir',
+                        style: TextStyle(fontSize: isMobile ? 11 : 12),
+                      ),
                       trailing: Switch(
                         value: _enableFloatingCalculator,
                         onChanged: _isEditingUnlocked
@@ -1187,70 +1261,147 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             : null,
                       ),
                     ),
-                    const Divider(),
+                    Divider(height: isMobile ? 12 : 16, indent: isMobile ? 42 : 48),
                     ListTile(
-                      leading: const Icon(Icons.bolt, color: Colors.amber),
-                      title: const Text('Quick Add Item', style: TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: const Text('Konfigurasi tombol cepat untuk produk kasir'),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      dense: isMobile,
+                      contentPadding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8),
+                      leading: Container(
+                        padding: EdgeInsets.all(isMobile ? 6 : 8),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.bolt, color: Colors.amber[800], size: isMobile ? 18 : 20),
+                      ),
+                      title: Text(
+                        'Quick Add Item',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 13.5 : 14.5),
+                      ),
+                      subtitle: Text(
+                        'Tombol cepat untuk produk kasir',
+                        style: TextStyle(fontSize: isMobile ? 11 : 12),
+                      ),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 14),
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(builder: (context) => const QuickAddItemSettingsScreen()),
                         );
                       },
                     ),
-                    const Divider(),
+                    Divider(height: isMobile ? 12 : 16, indent: isMobile ? 42 : 48),
                     ListTile(
-                      leading: const Icon(Icons.rocket_launch, color: Colors.purple),
-                      title: const Text('Hubungi Developer', style: TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: const Text('Tanya fitur, kustomisasi, atau kendala aplikasi'),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      dense: isMobile,
+                      contentPadding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8),
+                      leading: Container(
+                        padding: EdgeInsets.all(isMobile ? 6 : 8),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.rocket_launch, color: Colors.purple, size: isMobile ? 18 : 20),
+                      ),
+                      title: Text(
+                        'Hubungi Developer',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 13.5 : 14.5),
+                      ),
+                      subtitle: Text(
+                        'Bantuan & kendala aplikasi',
+                        style: TextStyle(fontSize: isMobile ? 11 : 12),
+                      ),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 14),
                       onTap: () {
                         context.push('/developer-contact');
                       },
                     ),
-                    const Divider(),
+                    Divider(height: isMobile ? 12 : 16, indent: isMobile ? 42 : 48),
                     ListTile(
-                      leading: const Icon(Icons.logout, color: Colors.red),
-                      title: const Text('Logout', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                      subtitle: const Text('Mengakhiri sesi kasir aktif saat ini'),
+                      dense: isMobile,
+                      contentPadding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8),
+                      leading: Container(
+                        padding: EdgeInsets.all(isMobile ? 6 : 8),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.logout, color: Colors.red, size: isMobile ? 18 : 20),
+                      ),
+                      title: Text(
+                        'Logout Kasir',
+                        style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: isMobile ? 13.5 : 14.5),
+                      ),
+                      subtitle: Text(
+                        'Akhiri sesi aktif kasir saat ini',
+                        style: TextStyle(fontSize: isMobile ? 11 : 12),
+                      ),
                       onTap: () => _confirmAndLogout(context),
                     ),
                   ],
                 ),
-                const SizedBox(height: 32),
+                SizedBox(height: isMobile ? 20 : 32),
 
-                  // Submit Buttons Row
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                // Submit Buttons
+                if (isMobile)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: _isEditingUnlocked ? _saveSettings : null,
+                        icon: const Icon(Icons.save),
+                        label: const Text('Simpan Pengaturan', style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
-                      onPressed: _isTestingPrinter ? null : _printTestPage,
-                      icon: _isTestingPrinter
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.receipt_long_rounded),
-                      label: const Text('Cetak Hal Uji'),
-                    ),
-                    const SizedBox(width: 16),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: _isTestingPrinter ? null : _printTestPage,
+                        icon: _isTestingPrinter
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.receipt_long_rounded),
+                        label: const Text('Cetak Halaman Uji'),
                       ),
-                      onPressed: _isEditingUnlocked ? _saveSettings : null,
-                      icon: const Icon(Icons.save),
-                      label: const Text('Simpan'),
-                    ),
-                  ],
-                ),
+                    ],
+                  )
+                else
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: _isTestingPrinter ? null : _printTestPage,
+                        icon: _isTestingPrinter
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.receipt_long_rounded),
+                        label: const Text('Cetak Hal Uji'),
+                      ),
+                      const SizedBox(width: 16),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: _isEditingUnlocked ? _saveSettings : null,
+                        icon: const Icon(Icons.save),
+                        label: const Text('Simpan'),
+                      ),
+                    ],
+                  ),
               ],
             ),
           ),
@@ -1263,6 +1414,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final licenseState = ref.watch(licenseProvider);
     final features = licenseState.features;
     final isActivated = licenseState.isActivated;
+    final width = MediaQuery.of(context).size.width;
+    final isMobile = width < 600;
 
     return _buildCardSection(
       title: 'Lisensi & Fitur Aplikasi',
@@ -1270,213 +1423,360 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       children: [
         // Status Bar
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(isMobile ? 10 : 16),
           decoration: BoxDecoration(
-            color: isActivated ? Colors.green.withOpacity(0.08) : Colors.amber.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(12),
+            color: isActivated ? Colors.green.withValues(alpha: 0.08) : Colors.amber.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isActivated ? Colors.green.withOpacity(0.3) : Colors.amber.withOpacity(0.4),
+              color: isActivated ? Colors.green.withValues(alpha: 0.3) : Colors.amber.withValues(alpha: 0.4),
             ),
           ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: isActivated ? Colors.green.withOpacity(0.15) : Colors.amber.withOpacity(0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  isActivated ? Icons.verified_rounded : Icons.warning_amber_rounded,
-                  color: isActivated ? Colors.green.shade700 : Colors.amber.shade800,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
+          child: isMobile
+              ? Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Text(
-                          isActivated ? 'Lisensi Aktif' : 'Lisensi Belum Terpasang',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: isActivated ? Colors.green.shade800 : Colors.amber.shade900,
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: isActivated ? Colors.green.withValues(alpha: 0.15) : Colors.amber.withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            isActivated ? Icons.verified_rounded : Icons.warning_amber_rounded,
+                            color: isActivated ? Colors.green.shade700 : Colors.amber.shade800,
+                            size: 18,
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: isActivated ? Colors.green.shade700 : Colors.amber.shade700,
-                            borderRadius: BorderRadius.circular(6),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isActivated ? 'Lisensi Aktif' : 'Lisensi Belum Terpasang',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: isActivated ? Colors.green.shade800 : Colors.amber.shade900,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: isActivated ? Colors.green.shade700 : Colors.amber.shade700,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  isActivated ? (features['tier']?.toString().toUpperCase() ?? 'PRO / ACTIVE') : 'UNREGISTERED',
+                                  style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
                           ),
-                          child: Text(
-                            isActivated ? (features['tier']?.toString().toUpperCase() ?? 'PRO / ACTIVE') : 'UNREGISTERED',
-                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            visualDensity: VisualDensity.compact,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                           ),
+                          onPressed: _isRefreshingLicense ? null : _handleRefreshLicense,
+                          icon: _isRefreshingLicense
+                              ? const SizedBox(
+                                  width: 11,
+                                  height: 11,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.sync_rounded, size: 14),
+                          label: const Text('Sinkron', style: TextStyle(fontSize: 10.5)),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Text(
                       isActivated
-                          ? 'Perangkat ini terdaftar secara resmi. Fitur di bawah ini aktif sesuai paket lisensi Anda.'
-                          : 'Aplikasi berjalan dalam mode terbatas. Masukkan License Key untuk mengaktifkan modul lengkap.',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                          ? 'Perangkat ini terdaftar secara resmi dengan fitur penuh.'
+                          : 'Mode terbatas. Masukkan License Key untuk membuka fitur.',
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isActivated ? Colors.green.withValues(alpha: 0.15) : Colors.amber.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isActivated ? Icons.verified_rounded : Icons.warning_amber_rounded,
+                        color: isActivated ? Colors.green.shade700 : Colors.amber.shade800,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                isActivated ? 'Lisensi Aktif' : 'Lisensi Belum Terpasang',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: isActivated ? Colors.green.shade800 : Colors.amber.shade900,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isActivated ? Colors.green.shade700 : Colors.amber.shade700,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  isActivated ? (features['tier']?.toString().toUpperCase() ?? 'PRO / ACTIVE') : 'UNREGISTERED',
+                                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            isActivated
+                                ? 'Perangkat ini terdaftar secara resmi. Fitur di bawah ini aktif sesuai paket lisensi Anda.'
+                                : 'Aplikasi berjalan dalam mode terbatas. Masukkan License Key untuk mengaktifkan modul lengkap.',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: _isRefreshingLicense ? null : _handleRefreshLicense,
+                      icon: _isRefreshingLicense
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.sync_rounded, size: 16),
+                      label: const Text('Sinkron', style: TextStyle(fontSize: 12)),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: _isRefreshingLicense ? null : _handleRefreshLicense,
-                icon: _isRefreshingLicense
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.sync_rounded, size: 16),
-                label: const Text('Sinkron', style: TextStyle(fontSize: 12)),
-              ),
-            ],
-          ),
         ),
         if (isActivated) ...[
-          const SizedBox(height: 16),
+          SizedBox(height: isMobile ? 10 : 16),
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(isMobile ? 10 : 16),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.35),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.withOpacity(0.2)),
+              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(Icons.badge_outlined, size: 18, color: Theme.of(context).colorScheme.primary),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Detail Identitas Lisensi Pelanggan',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    Icon(Icons.badge_outlined, size: isMobile ? 16 : 18, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 6),
+                    Text(
+                      isMobile ? 'Detail Lisensi' : 'Detail Identitas Lisensi Pelanggan',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 12 : 13),
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
-                Wrap(
-                  spacing: 24,
-                  runSpacing: 12,
-                  children: [
-                    if (licenseState.licenseId != null && licenseState.licenseId!.isNotEmpty)
-                      _buildLicenseInfoItem(
-                        label: 'ID LISENSI',
-                        value: licenseState.licenseId!,
-                        allowCopy: true,
+                SizedBox(height: isMobile ? 8 : 12),
+                if (isMobile)
+                  Column(
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (licenseState.licenseId != null && licenseState.licenseId!.isNotEmpty)
+                            Expanded(
+                              child: _buildLicenseInfoItem(
+                                label: 'ID LISENSI',
+                                value: licenseState.licenseId!,
+                                allowCopy: true,
+                                isMobile: true,
+                              ),
+                            ),
+                          const SizedBox(width: 8),
+                          if (licenseState.customerId != null && licenseState.customerId!.isNotEmpty)
+                            Expanded(
+                              child: _buildLicenseInfoItem(
+                                label: 'ID PELANGGAN',
+                                value: licenseState.customerId!,
+                                allowCopy: true,
+                                isMobile: true,
+                              ),
+                            ),
+                        ],
                       ),
-                    if (licenseState.customerId != null && licenseState.customerId!.isNotEmpty)
-                      _buildLicenseInfoItem(
-                        label: 'ID PELANGGAN',
-                        value: licenseState.customerId!,
-                        allowCopy: true,
+                      const SizedBox(height: 8),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (licenseState.planId != null && licenseState.planId!.isNotEmpty)
+                            Expanded(
+                              child: _buildLicenseInfoItem(
+                                label: 'PAKET / PLAN',
+                                value: licenseState.planId!.toUpperCase(),
+                                isMobile: true,
+                              ),
+                            ),
+                          const SizedBox(width: 8),
+                          if (licenseState.maskedKey != null && licenseState.maskedKey!.isNotEmpty)
+                            Expanded(
+                              child: _buildLicenseInfoItem(
+                                label: 'KODE LISENSI',
+                                value: licenseState.maskedKey!,
+                                allowCopy: true,
+                                isMobile: true,
+                              ),
+                            ),
+                        ],
                       ),
-                    if (licenseState.planId != null && licenseState.planId!.isNotEmpty)
-                      _buildLicenseInfoItem(
-                        label: 'PAKET / PLAN',
-                        value: licenseState.planId!.toUpperCase(),
-                      ),
-                    if (licenseState.maskedKey != null && licenseState.maskedKey!.isNotEmpty)
-                      _buildLicenseInfoItem(
-                        label: 'KODE LISENSI (MASKED)',
-                        value: licenseState.maskedKey!,
-                        allowCopy: true,
-                      ),
-                  ],
-                ),
+                    ],
+                  )
+                else
+                  Wrap(
+                    spacing: 24,
+                    runSpacing: 12,
+                    children: [
+                      if (licenseState.licenseId != null && licenseState.licenseId!.isNotEmpty)
+                        _buildLicenseInfoItem(
+                          label: 'ID LISENSI',
+                          value: licenseState.licenseId!,
+                          allowCopy: true,
+                        ),
+                      if (licenseState.customerId != null && licenseState.customerId!.isNotEmpty)
+                        _buildLicenseInfoItem(
+                          label: 'ID PELANGGAN',
+                          value: licenseState.customerId!,
+                          allowCopy: true,
+                        ),
+                      if (licenseState.planId != null && licenseState.planId!.isNotEmpty)
+                        _buildLicenseInfoItem(
+                          label: 'PAKET / PLAN',
+                          value: licenseState.planId!.toUpperCase(),
+                        ),
+                      if (licenseState.maskedKey != null && licenseState.maskedKey!.isNotEmpty)
+                        _buildLicenseInfoItem(
+                          label: 'KODE LISENSI (MASKED)',
+                          value: licenseState.maskedKey!,
+                          allowCopy: true,
+                        ),
+                    ],
+                  ),
               ],
             ),
           ),
         ],
-        const SizedBox(height: 16),
-
-        // Features list
-        // const Text(
-        //   'Daftar Modul & Fitur Lisensi:',
-        //   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-        // ),
-        // const SizedBox(height: 8),
-        // Wrap(
-        //   spacing: 8,
-        //   runSpacing: 8,
-        //   children: [
-        //     _buildFeatureBadge('Laporan Penjualan (sales_reports)', features['sales_reports'] == true || features['sales_reports'] == 1 || features['sales_reports'] == '1'),
-        //     _buildFeatureBadge('Stok Opname (stock_opname)', features['stock_opname'] == true || features['stock_opname'] == 1 || features['stock_opname'] == '1'),
-        //     _buildFeatureBadge('Auto-Backup Database', features['automatic_backup'] == true || features['automatic_backup'] == 1 || features['automatic_backup'] == '1'),
-        //     _buildFeatureBadge('Multi Kasir (${features['max_cashiers'] ?? 1} User)', features['multi_user'] == true || features['multi_user'] == 1 || features['multi_user'] == '1'),
-        //     _buildFeatureBadge('Fitur POS Kasir Lengkap', features['advanced_pos'] == true || features['advanced_pos'] == 1 || features['advanced_pos'] == '1'),
-        //   ],
-        // ),
-        // const SizedBox(height: 20),
+        SizedBox(height: isMobile ? 12 : 16),
         const Divider(),
-        const SizedBox(height: 12),
+        SizedBox(height: isMobile ? 10 : 12),
 
         // Update License Input Form
-        const Text(
-          'Perbarui / Ganti License Key:',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        Text(
+          'Perbarui License Key:',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 13 : 14),
         ),
-        const SizedBox(height: 4),
-        const Text(
-          'Masukkan License Key baru untuk upgrade paket atau memperpanjang masa aktif. Sistem akan langsung memperbarui lisensi tanpa perlu menghapus token lama.',
-          style: TextStyle(fontSize: 12, color: Colors.grey),
+        const SizedBox(height: 2),
+        Text(
+          isMobile
+              ? 'Masukkan key baru untuk upgrade atau perpanjang lisensi.'
+              : 'Masukkan License Key baru untuk upgrade paket atau memperpanjang masa aktif. Sistem akan langsung memperbarui lisensi tanpa perlu menghapus token lama.',
+          style: TextStyle(fontSize: isMobile ? 11 : 12, color: Colors.grey.shade600),
         ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextFormField(
+        SizedBox(height: isMobile ? 8 : 12),
+        if (isMobile)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextFormField(
                 controller: _licenseKeyController,
                 enabled: _isEditingUnlocked && !_isUpdatingLicense,
                 decoration: InputDecoration(
                   labelText: 'License Key Baru',
                   hintText: 'Contoh: TOKO-XXXX-XXXX-XXXX',
-                  prefixIcon: const Icon(Icons.vpn_key_rounded),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  prefixIcon: const Icon(Icons.vpn_key_rounded, size: 20),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                elevation: 0,
+              const SizedBox(height: 8),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
+                ),
+                onPressed: (_isEditingUnlocked && !_isUpdatingLicense) ? _handleUpdateLicense : null,
+                icon: _isUpdatingLicense
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.check_circle_outline_rounded, size: 18),
+                label: const Text('Terapkan Lisensi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               ),
-              onPressed: (_isEditingUnlocked && !_isUpdatingLicense) ? _handleUpdateLicense : null,
-              icon: _isUpdatingLicense
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.check_circle_outline_rounded),
-              label: const Text('Terapkan Lisensi', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
+            ],
+          )
+        else
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _licenseKeyController,
+                  enabled: _isEditingUnlocked && !_isUpdatingLicense,
+                  decoration: InputDecoration(
+                    labelText: 'License Key Baru',
+                    hintText: 'Contoh: TOKO-XXXX-XXXX-XXXX',
+                    prefixIcon: const Icon(Icons.vpn_key_rounded),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                onPressed: (_isEditingUnlocked && !_isUpdatingLicense) ? _handleUpdateLicense : null,
+                icon: _isUpdatingLicense
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.check_circle_outline_rounded),
+                label: const Text('Terapkan Lisensi', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
       ],
     );
   }
@@ -1485,24 +1785,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     required String label,
     required String value,
     bool allowCopy = false,
+    bool isMobile = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey, letterSpacing: 0.5),
+          style: TextStyle(
+            fontSize: isMobile ? 9.5 : 10,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey,
+            letterSpacing: 0.5,
+          ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 2),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SelectableText(
-              value,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5),
+            Flexible(
+              child: SelectableText(
+                value,
+                maxLines: 1,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: isMobile ? 11.5 : 13,
+                  letterSpacing: 0.5,
+                ),
+              ),
             ),
             if (allowCopy) ...[
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               InkWell(
                 borderRadius: BorderRadius.circular(4),
                 onTap: () {
@@ -1516,7 +1829,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 },
                 child: const Padding(
                   padding: EdgeInsets.all(2.0),
-                  child: Icon(Icons.copy_rounded, size: 14, color: Colors.blue),
+                  child: Icon(Icons.copy_rounded, size: 13, color: Colors.blue),
                 ),
               ),
             ],
@@ -1526,37 +1839,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildFeatureBadge(String name, bool isEnabled) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: isEnabled ? Colors.green.withOpacity(0.08) : Colors.grey.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isEnabled ? Colors.green.withOpacity(0.3) : Colors.grey.withOpacity(0.3),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isEnabled ? Icons.check_circle_rounded : Icons.cancel_outlined,
-            size: 14,
-            color: isEnabled ? Colors.green : Colors.grey,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            name,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: isEnabled ? FontWeight.w600 : FontWeight.normal,
-              color: isEnabled ? Colors.green.shade800 : Colors.grey.shade600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Future<void> _handleUpdateLicense() async {
     final key = _licenseKeyController.text.trim();
@@ -1642,85 +1924,122 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final features = licenseState.features;
     final bool hasAutoBackup = features['automatic_backup'] == true;
     final settings = ref.watch(settingsNotifierProvider);
+    final width = MediaQuery.of(context).size.width;
+    final isMobile = width < 600;
 
     return _buildCardSection(
       title: 'Sistem & Database',
       icon: Icons.storage_rounded,
       children: [
-        const Text(
-          'Backup database untuk mengamankan data Anda atau memindahkan ke perangkat lain menggunakan Restore.',
-          style: TextStyle(color: Colors.grey),
+        Text(
+          isMobile
+              ? 'Amankan data transaksi Anda atau restore ke perangkat lain.'
+              : 'Backup database untuk mengamankan data Anda atau memindahkan ke perangkat lain menggunakan Restore.',
+          style: TextStyle(color: Colors.grey.shade600, fontSize: isMobile ? 11.5 : 13),
         ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: ElevatedButton.icon(
+        SizedBox(height: isMobile ? 10 : 16),
+        if (isMobile)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ElevatedButton.icon(
                 onPressed: _handleBackup,
-                icon: const Icon(Icons.download_rounded),
-                label: const Text('Manual Backup'),
+                icon: const Icon(Icons.download_rounded, size: 18),
+                label: const Text('Manual Backup Database', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
                   backgroundColor: Colors.blue.shade50,
                   foregroundColor: Colors.blue.shade700,
                   elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: OutlinedButton.icon(
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
                 onPressed: _handleRestore,
-                icon: const Icon(Icons.upload_file_rounded),
-                label: const Text('Manual Restore'),
+                icon: const Icon(Icons.upload_file_rounded, size: 18),
+                label: const Text('Manual Restore Database', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
                   foregroundColor: Colors.deepPurple.shade700,
                   side: BorderSide(color: Colors.deepPurple.shade200),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _handleBackup,
+                  icon: const Icon(Icons.download_rounded),
+                  label: const Text('Manual Backup'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: Colors.blue.shade50,
+                    foregroundColor: Colors.blue.shade700,
+                    elevation: 0,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _handleRestore,
+                  icon: const Icon(Icons.upload_file_rounded),
+                  label: const Text('Manual Restore'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    foregroundColor: Colors.deepPurple.shade700,
+                    side: BorderSide(color: Colors.deepPurple.shade200),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        SizedBox(height: isMobile ? 12 : 24),
         const Divider(),
-        const SizedBox(height: 16),
+        SizedBox(height: isMobile ? 10 : 16),
         Row(
           children: [
-            const Icon(Icons.cloud_sync_rounded, color: Colors.green),
+            Icon(Icons.cloud_sync_rounded, color: Colors.green, size: isMobile ? 18 : 22),
             const SizedBox(width: 8),
-            const Text(
+            Text(
               'Automatic Backup',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: isMobile ? 14 : 16, fontWeight: FontWeight.bold),
             ),
             if (!hasAutoBackup) ...[
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                 decoration: BoxDecoration(
                   color: Colors.amber.shade100,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(4),
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.lock, size: 14, color: Colors.amber),
-                    SizedBox(width: 4),
-                    Text('PRO', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.amber)),
+                    Icon(Icons.lock, size: 10, color: Colors.amber),
+                    SizedBox(width: 2),
+                    Text('PRO', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.amber)),
                   ],
                 ),
               ),
             ],
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 2),
         Text(
-          'Biarkan sistem melakukan backup otomatis ke komputer Anda sesuai jadwal.',
-          style: TextStyle(color: Colors.grey.shade600),
+          isMobile
+              ? 'Backup otomatis berkala ke penyimpanan lokal sesuai jadwal.'
+              : 'Biarkan sistem melakukan backup otomatis ke komputer Anda sesuai jadwal.',
+          style: TextStyle(color: Colors.grey.shade600, fontSize: isMobile ? 11 : 12.5),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: isMobile ? 10 : 16),
         if (kIsWeb)
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(isMobile ? 10 : 16),
             decoration: BoxDecoration(
               color: Colors.blue.shade50,
               borderRadius: BorderRadius.circular(8),
@@ -1728,12 +2047,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             child: Row(
               children: [
-                Icon(Icons.info_outline, color: Colors.blue.shade700),
-                const SizedBox(width: 12),
+                Icon(Icons.info_outline, color: Colors.blue.shade700, size: isMobile ? 18 : 22),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Fitur Auto-Backup tidak didukung saat dijalankan melalui Web Browser karena keterbatasan akses penyimpanan (File System). Silakan gunakan aplikasi versi Desktop (Windows) untuk fitur ini.',
-                    style: TextStyle(color: Colors.blue.shade800),
+                    'Fitur Auto-Backup tidak didukung di Web Browser. Gunakan aplikasi Desktop (Windows) untuk fitur ini.',
+                    style: TextStyle(color: Colors.blue.shade800, fontSize: isMobile ? 11 : 13),
                   ),
                 ),
               ],
@@ -1745,78 +2064,91 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Column(
               children: [
                 SwitchListTile(
+                  dense: isMobile,
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Aktifkan Auto-Backup'),
+                  title: Text(
+                    'Aktifkan Auto-Backup',
+                    style: TextStyle(fontSize: isMobile ? 13 : 15, fontWeight: FontWeight.w600),
+                  ),
                   value: settings.autoBackupEnabled,
-                onChanged: hasAutoBackup ? (val) {
-                  ref.read(settingsNotifierProvider.notifier).updateSettings(
-                    settings.copyWith(autoBackupEnabled: val),
-                  );
-                } : null,
-              ),
-              if (settings.autoBackupEnabled) ...[
-                const SizedBox(height: 16),
-                DropdownButtonFormField<int>(
-                  value: settings.autoBackupIntervalDays,
-                  decoration: const InputDecoration(labelText: 'Interval (Hari)'),
-                  items: const [
-                    DropdownMenuItem(value: 1, child: Text('Tiap 1 Hari')),
-                    DropdownMenuItem(value: 3, child: Text('Tiap 3 Hari')),
-                    DropdownMenuItem(value: 7, child: Text('Tiap 7 Hari')),
-                    DropdownMenuItem(value: 30, child: Text('Tiap 30 Hari')),
-                  ],
-                  onChanged: hasAutoBackup ? (val) {
-                    if (val != null) {
-                      ref.read(settingsNotifierProvider.notifier).updateSettings(
-                        settings.copyWith(autoBackupIntervalDays: val),
-                      );
-                    }
-                  } : null,
+                  onChanged: hasAutoBackup
+                      ? (val) {
+                          ref.read(settingsNotifierProvider.notifier).updateSettings(
+                            settings.copyWith(autoBackupEnabled: val),
+                          );
+                        }
+                      : null,
                 ),
-                const SizedBox(height: 16),
-                InkWell(
-                  onTap: hasAutoBackup ? () async {
-                    final String? selectedDirectory = await FilePicker.getDirectoryPath();
-                    if (selectedDirectory != null) {
-                      ref.read(settingsNotifierProvider.notifier).updateSettings(
-                        settings.copyWith(autoBackupLocation: selectedDirectory),
-                      );
-                    }
-                  } : null,
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(8),
-                      color: Colors.grey.shade50,
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.folder_open, color: Colors.blue),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Lokasi Penyimpanan', style: TextStyle(fontWeight: FontWeight.bold)),
-                              Text(
-                                settings.autoBackupLocation.isEmpty 
-                                  ? 'Belum diatur' 
-                                  : settings.autoBackupLocation,
-                                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                              ),
-                            ],
+                if (settings.autoBackupEnabled) ...[
+                  SizedBox(height: isMobile ? 8 : 16),
+                  DropdownButtonFormField<int>(
+                    value: settings.autoBackupIntervalDays,
+                    decoration: const InputDecoration(labelText: 'Interval (Hari)'),
+                    items: const [
+                      DropdownMenuItem(value: 1, child: Text('Tiap 1 Hari')),
+                      DropdownMenuItem(value: 3, child: Text('Tiap 3 Hari')),
+                      DropdownMenuItem(value: 7, child: Text('Tiap 7 Hari')),
+                      DropdownMenuItem(value: 30, child: Text('Tiap 30 Hari')),
+                    ],
+                    onChanged: hasAutoBackup
+                        ? (val) {
+                            if (val != null) {
+                              ref.read(settingsNotifierProvider.notifier).updateSettings(
+                                settings.copyWith(autoBackupIntervalDays: val),
+                              );
+                            }
+                          }
+                        : null,
+                  ),
+                  SizedBox(height: isMobile ? 8 : 16),
+                  InkWell(
+                    onTap: hasAutoBackup
+                        ? () async {
+                            final String? selectedDirectory = await FilePicker.getDirectoryPath();
+                            if (selectedDirectory != null) {
+                              ref.read(settingsNotifierProvider.notifier).updateSettings(
+                                settings.copyWith(autoBackupLocation: selectedDirectory),
+                              );
+                            }
+                          }
+                        : null,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 16, vertical: isMobile ? 10 : 14),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                        color: Colors.grey.shade50,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.folder_open, color: Colors.blue, size: isMobile ? 18 : 22),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Lokasi Penyimpanan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 12 : 13)),
+                                const SizedBox(height: 2),
+                                Text(
+                                  settings.autoBackupLocation.isEmpty 
+                                    ? 'Belum diatur' 
+                                    : settings.autoBackupLocation,
+                                  style: TextStyle(color: Colors.grey.shade600, fontSize: isMobile ? 11 : 11.5),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        const Icon(Icons.edit, size: 20, color: Colors.grey),
-                      ],
+                          Icon(Icons.edit, size: isMobile ? 16 : 18, color: Colors.grey),
+                        ],
+                      ),
                     ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
       ],
     );
   }
@@ -1983,26 +2315,48 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     required dynamic icon,
     required List<Widget> children,
   }) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Card(
+      elevation: isMobile ? 0.5 : 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
+        side: isMobile ? BorderSide(color: Colors.grey.withValues(alpha: 0.15)) : BorderSide.none,
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: EdgeInsets.all(isMobile ? 14.0 : 20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 if (icon is IconData)
-                  Icon(icon, color: Theme.of(context).colorScheme.primary)
+                  Container(
+                    padding: EdgeInsets.all(isMobile ? 6 : 8),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      icon,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: isMobile ? 18 : 20,
+                    ),
+                  )
                 else if (icon is Widget)
                   icon,
-                const SizedBox(width: 12),
-                Text(
-                  title,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: isMobile ? 15 : 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: isMobile ? 14 : 20),
             ...children,
           ],
         ),

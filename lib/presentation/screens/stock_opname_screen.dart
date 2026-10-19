@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:go_router/go_router.dart';
+import '../providers/auth_provider.dart';
 import '../providers/items_provider.dart';
 import '../widgets/camera_scanner_dialog.dart';
 import '../widgets/app_permissions_dialog.dart';
@@ -103,15 +105,27 @@ class _StockOpnameScreenState extends ConsumerState<StockOpnameScreen> {
   @override
   Widget build(BuildContext context) {
     final itemsState = ref.watch(itemsNotifierProvider);
+    final authState = ref.watch(authNotifierProvider);
+    final isAdmin = authState.currentUser?.role == 'admin';
 
     return MainLayout(
-      currentRoute: '/inventory',
+      currentRoute: isAdmin ? '/inventory' : '/stock-opname',
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Stok Opname'),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () {
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              } else {
+                if (isAdmin) {
+                  context.go('/inventory');
+                } else {
+                  context.go('/pos');
+                }
+              }
+            },
           ),
           actions: [
             IconButton(

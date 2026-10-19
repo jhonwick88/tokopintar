@@ -14,8 +14,8 @@ class ItemsRepositoryImpl implements ItemsRepository {
   }
 
   @override
-  Future<List<ItemModel>> getItems({required int page, int limit = 50}) {
-    return _apiClient.getItems(page: page, limit: limit);
+  Future<List<ItemModel>> getItems({required int page, int limit = 50, String? barcodeStatus}) {
+    return _apiClient.getItems(page: page, limit: limit, barcodeStatus: barcodeStatus);
   }
 
   @override
@@ -24,13 +24,13 @@ class ItemsRepositoryImpl implements ItemsRepository {
   }
 
   @override
-  Future<List<ItemModel>> searchItems(String query, {required int page, int limit = 50}) {
-    return _apiClient.searchItems(query, page: page, limit: limit);
+  Future<List<ItemModel>> searchItems(String query, {required int page, int limit = 50, String? barcodeStatus}) {
+    return _apiClient.searchItems(query, page: page, limit: limit, barcodeStatus: barcodeStatus);
   }
 
   @override
-  Future<List<ItemModel>> getItemsByCategory(int categoryId, {required int page, int limit = 50}) {
-    return _apiClient.getItemsByCategory(categoryId, page: page, limit: limit);
+  Future<List<ItemModel>> getItemsByCategory(int categoryId, {required int page, int limit = 50, String? barcodeStatus}) {
+    return _apiClient.getItemsByCategory(categoryId, page: page, limit: limit, barcodeStatus: barcodeStatus);
   }
 
   @override
@@ -56,5 +56,20 @@ class ItemsRepositoryImpl implements ItemsRepository {
   @override
   Future<List<ItemModel>> getItemsByBarcode(String barcode) {
     return _apiClient.getItemsByBarcode(barcode);
+  }
+
+  @override
+  Future<Map<String, int>> getBarcodeStats() {
+    return _apiClient.getBarcodeStats();
+  }
+
+  @override
+  Future<void> updateItemBarcode(String itemNo, String barcode) {
+    return _apiClient.updateItemBarcode(itemNo, barcode);
+  }
+
+  @override
+  Future<List<ItemModel>> getAllItems({String? barcodeStatus}) {
+    return _apiClient.getAllItems(barcodeStatus: barcodeStatus);
   }
 }

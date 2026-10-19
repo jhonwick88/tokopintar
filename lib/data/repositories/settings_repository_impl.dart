@@ -45,6 +45,8 @@ class SettingsRepositoryImpl implements SettingsRepository {
     final localPrinterPaperSize = prefs.getInt('local_printer_paper_size') ?? globalSettings.printerPaperSize;
     final localPrintReceiptCopies = prefs.getInt('local_print_receipt_copies') ?? globalSettings.printReceiptCopies;
     final localAutoPrintOnCheckout = prefs.getBool('local_auto_print_on_checkout') ?? globalSettings.autoPrintOnCheckout;
+    final localEnableFloatingCalculator = prefs.getBool('local_enable_floating_calculator') ?? globalSettings.enableFloatingCalculator;
+    final localAllowCashierStockOpname = prefs.getBool('local_allow_cashier_stock_opname') ?? globalSettings.allowCashierStockOpname;
 
     // 4. Merge global settings with local printer settings
     return globalSettings.copyWith(
@@ -56,6 +58,8 @@ class SettingsRepositoryImpl implements SettingsRepository {
       printerPaperSize: localPrinterPaperSize,
       printReceiptCopies: localPrintReceiptCopies,
       autoPrintOnCheckout: localAutoPrintOnCheckout,
+      enableFloatingCalculator: localEnableFloatingCalculator,
+      allowCashierStockOpname: globalSettings.allowCashierStockOpname || localAllowCashierStockOpname,
     );
   }
 
@@ -72,6 +76,8 @@ class SettingsRepositoryImpl implements SettingsRepository {
     await prefs.setInt('local_printer_paper_size', settings.printerPaperSize);
     await prefs.setInt('local_print_receipt_copies', settings.printReceiptCopies);
     await prefs.setBool('local_auto_print_on_checkout', settings.autoPrintOnCheckout);
+    await prefs.setBool('local_enable_floating_calculator', settings.enableFloatingCalculator);
+    await prefs.setBool('local_allow_cashier_stock_opname', settings.allowCashierStockOpname);
 
     // 2. Save global settings (shop name, etc.) to the database via REST API
     try {

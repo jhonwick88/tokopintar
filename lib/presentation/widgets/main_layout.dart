@@ -60,7 +60,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
     final features = ref.read(licenseProvider).features;
     
     // Check if auto backup is enabled and license is PRO
-    if (settings.autoBackupEnabled && features != null && features['automatic_backup'] == true) {
+    if (settings.autoBackupEnabled && features['automatic_backup'] == true) {
       if (kIsWeb) return;
       
       final settings = ref.read(settingsNotifierProvider);
@@ -258,11 +258,15 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
     final isDesktop = width >= 900;
     final authState = ref.watch(authNotifierProvider);
     final isAdmin = authState.currentUser?.role == 'admin';
+    final settings = ref.watch(settingsNotifierProvider);
     
-    final licenseFeatures = ref.watch(licenseProvider).features ?? {};
+    final licenseFeatures = ref.watch(licenseProvider).features;
     final hasDashboardAnalytics = licenseFeatures['dashboard_analytics'] == true || 
                                   licenseFeatures['dashboard_analytics'] == 1 || 
                                   licenseFeatures['dashboard_analytics'] == '1';
+    final hasStockOpnameLicense = licenseFeatures['stock_opname'] == true || 
+                                  licenseFeatures['stock_opname'] == 1 || 
+                                  licenseFeatures['stock_opname'] == '1';
 
     final navItems = [
       _NavItem(icon: Icons.point_of_sale, label: 'POS', route: '/pos'),
@@ -271,6 +275,8 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
       _NavItem(icon: Icons.history, label: 'Riwayat', route: '/history'),
       if (isAdmin)
         _NavItem(icon: Icons.inventory_2, label: 'Inventori', route: '/inventory'),
+      if (!isAdmin && settings.allowCashierStockOpname && hasStockOpnameLicense)
+        _NavItem(icon: Icons.inventory_outlined, label: 'Stok Opname', route: '/stock-opname'),
       _NavItem(icon: Icons.settings, label: 'Pengaturan', route: '/settings'),
     ];
 

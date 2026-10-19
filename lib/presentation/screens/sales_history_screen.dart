@@ -7,7 +7,7 @@ import '../../data/models/sale_model.dart';
 import '../providers/sales_history_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/auth_provider.dart';
-import '../providers/reconciliation_provider.dart' hide DateTimeRange;
+import '../providers/reconciliation_provider.dart';
 import '../widgets/main_layout.dart';
 import '../widgets/cash_out_dialog.dart';
 
@@ -189,12 +189,21 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
     super.dispose();
   }
 
+  bool _isReprinting = false;
+  DateTime? _lastF8PressTime;
+
   void _handleRawKeyEvent(KeyEvent event) {
     if (event is! KeyDownEvent) return;
 
     final key = event.logicalKey;
 
     if (key == LogicalKeyboardKey.f8) {
+      if (_isReprinting) return;
+      final now = DateTime.now();
+      if (_lastF8PressTime != null && now.difference(_lastF8PressTime!).inMilliseconds < 1500) {
+        return;
+      }
+      _lastF8PressTime = now;
       if (_selectedSale != null) {
         _reprint(_selectedSale!.invoiceNo);
       } else {
@@ -204,15 +213,23 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
   }
 
   void _reprintLastReceipt() async {
-    final success = await ref.read(salesHistoryNotifierProvider.notifier).reprintLastReceipt();
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cetak ulang nota terakhir berhasil dikirim'), backgroundColor: Colors.green),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gagal cetak ulang. Riwayat transaksi kosong!'), backgroundColor: Colors.red),
-      );
+    if (_isReprinting) return;
+    _isReprinting = true;
+    try {
+      final success = await ref.read(salesHistoryNotifierProvider.notifier).reprintLastReceipt();
+      if (mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Cetak ulang nota terakhir berhasil dikirim'), backgroundColor: Colors.green),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Gagal cetak ulang. Riwayat transaksi kosong!'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    } finally {
+      _isReprinting = false;
     }
   }
 

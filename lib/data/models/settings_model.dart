@@ -22,6 +22,7 @@ class SettingsModel {
   final bool autoPrintOnCheckout;
 
   final bool enableFloatingCalculator;
+  final bool allowCashierStockOpname;
   final bool autoBackupEnabled;
   final int autoBackupIntervalDays;
   final String autoBackupLocation;
@@ -48,7 +49,8 @@ class SettingsModel {
     this.printReceiptCopies = 1,
     this.autoPrintOnCheckout = false,
 
-    this.enableFloatingCalculator = true,
+    this.enableFloatingCalculator = false,
+    this.allowCashierStockOpname = false,
     this.autoBackupEnabled = false,
     this.autoBackupIntervalDays = 1,
     this.autoBackupLocation = '',
@@ -76,7 +78,8 @@ class SettingsModel {
       printReceiptCopies: json['print_receipt_copies'] as int? ?? 1,
       autoPrintOnCheckout: json['auto_print_on_checkout'] as bool? ?? false,
 
-      enableFloatingCalculator: json['enable_floating_calculator'] as bool? ?? true,
+      enableFloatingCalculator: json['enable_floating_calculator'] as bool? ?? false,
+      allowCashierStockOpname: json['allow_cashier_stock_opname'] == true || json['allow_cashier_stock_opname'] == 1,
       autoBackupEnabled: json['auto_backup_enabled'] as bool? ?? false,
       autoBackupIntervalDays: json['auto_backup_interval_days'] as int? ?? 1,
       autoBackupLocation: json['auto_backup_location'] as String? ?? '',
@@ -106,6 +109,7 @@ class SettingsModel {
       'auto_print_on_checkout': autoPrintOnCheckout,
 
       'enable_floating_calculator': enableFloatingCalculator,
+      'allow_cashier_stock_opname': allowCashierStockOpname,
       'auto_backup_enabled': autoBackupEnabled,
       'auto_backup_interval_days': autoBackupIntervalDays,
       'auto_backup_location': autoBackupLocation,
@@ -134,6 +138,7 @@ class SettingsModel {
     bool? autoPrintOnCheckout,
 
     bool? enableFloatingCalculator,
+    bool? allowCashierStockOpname,
     bool? autoBackupEnabled,
     int? autoBackupIntervalDays,
     String? autoBackupLocation,
@@ -160,6 +165,7 @@ class SettingsModel {
       autoPrintOnCheckout: autoPrintOnCheckout ?? this.autoPrintOnCheckout,
 
       enableFloatingCalculator: enableFloatingCalculator ?? this.enableFloatingCalculator,
+      allowCashierStockOpname: allowCashierStockOpname ?? this.allowCashierStockOpname,
       autoBackupEnabled: autoBackupEnabled ?? this.autoBackupEnabled,
       autoBackupIntervalDays: autoBackupIntervalDays ?? this.autoBackupIntervalDays,
       autoBackupLocation: autoBackupLocation ?? this.autoBackupLocation,

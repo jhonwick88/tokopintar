@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'dart:developer' as dev;
 import '../../utils/web_download.dart';
@@ -69,12 +68,16 @@ class ApiClient {
     }
   }
 
-  Future<List<ItemModel>> getItems({required int page, int limit = 50}) async {
+  Future<List<ItemModel>> getItems({required int page, int limit = 50, String? barcodeStatus}) async {
     try {
-      final response = await _dio.get('/api/items', queryParameters: {
+      final queryParams = <String, dynamic>{
         'page': page,
         'limit': limit,
-      });
+      };
+      if (barcodeStatus != null && barcodeStatus.isNotEmpty && barcodeStatus != 'all') {
+        queryParams['barcode_status'] = barcodeStatus;
+      }
+      final response = await _dio.get('/api/items', queryParameters: queryParams);
       if (response.statusCode == 200 && response.data != null) {
         final success = response.data['success'] as bool? ?? false;
         if (success) {
@@ -87,6 +90,45 @@ class ApiClient {
       return [];
     } catch (e) {
       dev.log('Error in getItems: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<ItemModel>> getAllItems({String? barcodeStatus}) async {
+    return getItems(page: 1, limit: 100000, barcodeStatus: barcodeStatus);
+  }
+
+  Future<Map<String, int>> getBarcodeStats() async {
+    try {
+      final response = await _dio.get('/api/items/barcode-stats');
+      if (response.statusCode == 200 && response.data != null) {
+        final success = response.data['success'] as bool? ?? false;
+        if (success && response.data['data'] != null) {
+          final data = response.data['data'] as Map<String, dynamic>;
+          return {
+            'total': (data['total'] as num?)?.toInt() ?? 0,
+            'with_barcode': (data['with_barcode'] as num?)?.toInt() ?? 0,
+            'without_barcode': (data['without_barcode'] as num?)?.toInt() ?? 0,
+          };
+        }
+      }
+      return {'total': 0, 'with_barcode': 0, 'without_barcode': 0};
+    } catch (e) {
+      dev.log('Error in getBarcodeStats: $e');
+      return {'total': 0, 'with_barcode': 0, 'without_barcode': 0};
+    }
+  }
+
+  Future<void> updateItemBarcode(String itemNo, String barcode) async {
+    try {
+      final response = await _dio.patch('/api/items/$itemNo/barcode', data: {
+        'barcode': barcode,
+      });
+      if (response.statusCode != 200) {
+        throw Exception('Gagal memperbarui barcode');
+      }
+    } catch (e) {
+      dev.log('Error in updateItemBarcode: $e');
       rethrow;
     }
   }
@@ -110,16 +152,20 @@ class ApiClient {
     }
   }
 
-  Future<List<ItemModel>> searchItems(String query, {required int page, int limit = 50}) async {
+  Future<List<ItemModel>> searchItems(String query, {required int page, int limit = 50, String? barcodeStatus}) async {
     try {
       if (query.isEmpty) {
-        return getItems(page: page, limit: limit);
+        return getItems(page: page, limit: limit, barcodeStatus: barcodeStatus);
       }
-      final response = await _dio.get('/api/items/search', queryParameters: {
+      final queryParams = <String, dynamic>{
         'q': query,
         'page': page,
         'limit': limit,
-      });
+      };
+      if (barcodeStatus != null && barcodeStatus.isNotEmpty && barcodeStatus != 'all') {
+        queryParams['barcode_status'] = barcodeStatus;
+      }
+      final response = await _dio.get('/api/items/search', queryParameters: queryParams);
       if (response.statusCode == 200 && response.data != null) {
         final success = response.data['success'] as bool? ?? false;
         if (success) {
@@ -136,12 +182,16 @@ class ApiClient {
     }
   }
 
-  Future<List<ItemModel>> getItemsByCategory(int categoryId, {required int page, int limit = 50}) async {
+  Future<List<ItemModel>> getItemsByCategory(int categoryId, {required int page, int limit = 50, String? barcodeStatus}) async {
     try {
-      final response = await _dio.get('/api/categories/$categoryId/items', queryParameters: {
+      final queryParams = <String, dynamic>{
         'page': page,
         'limit': limit,
-      });
+      };
+      if (barcodeStatus != null && barcodeStatus.isNotEmpty) {
+        queryParams['barcode_status'] = barcodeStatus;
+      }
+      final response = await _dio.get('/api/categories/$categoryId/items', queryParameters: queryParams);
       if (response.statusCode == 200 && response.data != null) {
         final success = response.data['success'] as bool? ?? false;
         if (success) {

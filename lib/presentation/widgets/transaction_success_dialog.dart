@@ -20,134 +20,149 @@ class TransactionSuccessDialog extends ConsumerStatefulWidget {
 }
 
 class _TransactionSuccessDialogState extends ConsumerState<TransactionSuccessDialog> {
+  bool _isPrinting = false;
+
   Future<void> _printReceiptDirect(SaleModel sale) async {
-    final settings = ref.read(settingsNotifierProvider);
+    if (_isPrinting) return;
+    setState(() {
+      _isPrinting = true;
+    });
 
-    // Pre-flight check printer configuration
-    if (settings.printerType == 'Bluetooth') {
-      if (settings.printerMacAddress.trim().isEmpty || settings.printerMacAddress == 'none') {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Printer Bluetooth belum dipilih. Silakan atur printer di menu Pengaturan.'),
-              backgroundColor: Colors.orange,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-        return;
-      }
-      if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
-        final locGranted = await Permission.locationWhenInUse.isGranted;
-        final btConnectGranted = await Permission.bluetoothConnect.isGranted;
-        final btScanGranted = await Permission.bluetoothScan.isGranted;
-
-        if (!locGranted || !btConnectGranted || !btScanGranted) {
-          if (mounted) {
-            await AppPermissionsDialog.show(context);
-          }
-          final locNow = await Permission.locationWhenInUse.isGranted;
-          final btConnectNow = await Permission.bluetoothConnect.isGranted;
-          final btScanNow = await Permission.bluetoothScan.isGranted;
-          if (!locNow || !btConnectNow || !btScanNow) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Izin Lokasi & Perangkat Sekitar diperlukan untuk mencetak via Bluetooth.'),
-                  backgroundColor: Colors.orange,
-                ),
-              );
-            }
-            return;
-          }
-        }
-      }
-    } else if (settings.printerType == 'LAN') {
-      if (settings.printerIp.trim().isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('IP Printer LAN belum diatur. Silakan atur printer di menu Pengaturan.'),
-              backgroundColor: Colors.orange,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-        return;
-      }
-    } else if (settings.printerType == 'USB') {
-      if (!kIsWeb && Platform.isWindows && settings.printerMacAddress.trim().isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Printer USB/Windows belum dipilih. Silakan atur di menu Pengaturan.'),
-              backgroundColor: Colors.orange,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-        return;
-      }
-    }
-
-    final printBytes = PrinterService.instance.generateReceiptBytes(sale, settings);
-    bool success = false;
-    
     try {
-      if (settings.printerType == 'LAN') {
-        success = await PrinterService.instance.printToLan(
-          settings.printerIp,
-          settings.printerPort,
-          printBytes,
-          copies: settings.printReceiptCopies,
-        );
-      } else if (settings.printerType == 'Bluetooth') {
-        success = await PrinterService.instance.printToBluetooth(
-          settings.printerMacAddress,
-          printBytes,
-          copies: settings.printReceiptCopies,
-        );
+      final settings = ref.read(settingsNotifierProvider);
+
+      // Pre-flight check printer configuration
+      if (settings.printerType == 'Bluetooth') {
+        if (settings.printerMacAddress.trim().isEmpty || settings.printerMacAddress == 'none') {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Printer Bluetooth belum dipilih. Silakan atur printer di menu Pengaturan.'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+          return;
+        }
+        if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+          final locGranted = await Permission.locationWhenInUse.isGranted;
+          final btConnectGranted = await Permission.bluetoothConnect.isGranted;
+          final btScanGranted = await Permission.bluetoothScan.isGranted;
+
+          if (!locGranted || !btConnectGranted || !btScanGranted) {
+            if (mounted) {
+              await AppPermissionsDialog.show(context);
+            }
+            final locNow = await Permission.locationWhenInUse.isGranted;
+            final btConnectNow = await Permission.bluetoothConnect.isGranted;
+            final btScanNow = await Permission.bluetoothScan.isGranted;
+            if (!locNow || !btConnectNow || !btScanNow) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Izin Lokasi & Perangkat Sekitar diperlukan untuk mencetak via Bluetooth.'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              }
+              return;
+            }
+          }
+        }
+      } else if (settings.printerType == 'LAN') {
+        if (settings.printerIp.trim().isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('IP Printer LAN belum diatur. Silakan atur printer di menu Pengaturan.'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+          return;
+        }
       } else if (settings.printerType == 'USB') {
-        success = await PrinterService.instance.printToWindows(
-          settings.printerMacAddress,
-          sale,
-          settings,
-        );
-      } else {
-        dev.log('Mock print direct: Invoice ${sale.invoiceNo} printed.');
-        success = true;
+        if (!kIsWeb && Platform.isWindows && settings.printerMacAddress.trim().isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Printer USB/Windows belum dipilih. Silakan atur di menu Pengaturan.'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+          return;
+        }
       }
+
+      final printBytes = PrinterService.instance.generateReceiptBytes(sale, settings);
+      bool success = false;
       
-      if (success) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Print job berhasil dikirim'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
-            ),
+      try {
+        if (settings.printerType == 'LAN') {
+          success = await PrinterService.instance.printToLan(
+            settings.printerIp,
+            settings.printerPort,
+            printBytes,
+            copies: settings.printReceiptCopies,
           );
+        } else if (settings.printerType == 'Bluetooth') {
+          success = await PrinterService.instance.printToBluetooth(
+            settings.printerMacAddress,
+            printBytes,
+            copies: settings.printReceiptCopies,
+          );
+        } else if (settings.printerType == 'USB') {
+          success = await PrinterService.instance.printToWindows(
+            settings.printerMacAddress,
+            sale,
+            settings,
+          );
+        } else {
+          dev.log('Mock print direct: Invoice ${sale.invoiceNo} printed.');
+          success = true;
         }
-      } else {
+        
+        if (success) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Print job berhasil dikirim'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Gagal mengirim print job. Periksa printer Anda.'),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+        }
+      } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Gagal mengirim print job. Periksa printer Anda.'),
+            SnackBar(
+              content: Text('Terjadi kesalahan saat mencetak: $e'),
               backgroundColor: Colors.red,
-              duration: Duration(seconds: 3),
+              duration: const Duration(seconds: 3),
             ),
           );
         }
       }
-    } catch (e) {
+    } finally {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Terjadi kesalahan saat mencetak: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        setState(() {
+          _isPrinting = false;
+        });
       }
     }
   }
@@ -182,7 +197,9 @@ class _TransactionSuccessDialogState extends ConsumerState<TransactionSuccessDia
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent) {
           if (event.logicalKey == LogicalKeyboardKey.f8) {
-            _printReceiptDirect(sale);
+            if (!_isPrinting) {
+              _printReceiptDirect(sale);
+            }
             return KeyEventResult.handled;
           } else if (event.logicalKey == LogicalKeyboardKey.f6) {
             Navigator.of(context).pop();
@@ -246,10 +263,18 @@ class _TransactionSuccessDialogState extends ConsumerState<TransactionSuccessDia
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      onPressed: () {
-                        _printReceiptDirect(sale);
-                      },
-                      icon: const Icon(Icons.print),
+                      onPressed: _isPrinting
+                          ? null
+                          : () {
+                              _printReceiptDirect(sale);
+                            },
+                      icon: _isPrinting
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.print),
                       label: const Text('Cetak Ulang(F8)'),
                     ),
                   ),

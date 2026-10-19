@@ -15,6 +15,10 @@ class ItemsState {
   final bool hasReachedMax;
   final String? errorMessage;
   final String sortByPrice; // 'none', 'asc', 'desc'
+  final String barcodeFilter; // 'all', 'has_barcode', 'no_barcode'
+  final int totalCount;
+  final int withBarcodeCount;
+  final int withoutBarcodeCount;
 
   ItemsState({
     this.categories = const [],
@@ -26,12 +30,23 @@ class ItemsState {
     this.hasReachedMax = false,
     this.errorMessage,
     this.sortByPrice = 'none',
+    this.barcodeFilter = 'all',
+    this.totalCount = 0,
+    this.withBarcodeCount = 0,
+    this.withoutBarcodeCount = 0,
   });
 
   List<ItemModel> get sortedItems {
-    if (searchQuery.isEmpty && sortByPrice == 'none') return items;
+    var baseList = items;
+    if (barcodeFilter == 'has_barcode') {
+      baseList = baseList.where((i) => i.itemUPC.trim().isNotEmpty).toList();
+    } else if (barcodeFilter == 'no_barcode') {
+      baseList = baseList.where((i) => i.itemUPC.trim().isEmpty).toList();
+    }
+
+    if (searchQuery.isEmpty && sortByPrice == 'none') return baseList;
     
-    final sorted = List<ItemModel>.from(items);
+    final sorted = List<ItemModel>.from(baseList);
     
     // Split search query into lowercase keywords if present
     final queryWords = searchQuery.isEmpty
@@ -112,6 +127,10 @@ class ItemsState {
     String? errorMessage,
     bool clearError = false,
     String? sortByPrice,
+    String? barcodeFilter,
+    int? totalCount,
+    int? withBarcodeCount,
+    int? withoutBarcodeCount,
   }) {
     return ItemsState(
       categories: categories ?? this.categories,
@@ -123,6 +142,10 @@ class ItemsState {
       hasReachedMax: hasReachedMax ?? this.hasReachedMax,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       sortByPrice: sortByPrice ?? this.sortByPrice,
+      barcodeFilter: barcodeFilter ?? this.barcodeFilter,
+      totalCount: totalCount ?? this.totalCount,
+      withBarcodeCount: withBarcodeCount ?? this.withBarcodeCount,
+      withoutBarcodeCount: withoutBarcodeCount ?? this.withoutBarcodeCount,
     );
   }
 }
@@ -138,6 +161,57 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
     state = state.copyWith(sortByPrice: order);
   }
 
+  Future<void> setBarcodeFilter(String filter) async {
+    if (state.barcodeFilter == filter) return;
+    state = state.copyWith(barcodeFilter: filter);
+    await loadItems(refresh: true);
+  }
+
+  Future<void> loadBarcodeStats() async {
+    try {
+      final stats = await _itemsRepository.getBarcodeStats();
+      state = state.copyWith(
+        totalCount: stats['total'] ?? 0,
+        withBarcodeCount: stats['with_barcode'] ?? 0,
+        withoutBarcodeCount: stats['without_barcode'] ?? 0,
+      );
+    } catch (_) {}
+  }
+
+  Future<void> updateItemBarcode(String itemNo, String barcode) async {
+    await _itemsRepository.updateItemBarcode(itemNo, barcode);
+    final updated = state.items.map((i) {
+      if (i.itemNo == itemNo) {
+        return ItemModel(
+          itemNo: i.itemNo,
+          itemUPC: barcode,
+          itemName: i.itemName,
+          itemNameShort: i.itemNameShort,
+          categoryId: i.categoryId,
+          price: i.price,
+          obQuantity: i.obQuantity,
+          notes: i.notes,
+          attribute: i.attribute,
+          unit1: i.unit1,
+          unit2: i.unit2,
+          unit3: i.unit3,
+          ratio2: i.ratio2,
+          ratio3: i.ratio3,
+          defUnitPrice2: i.defUnitPrice2,
+          defUnitPrice3: i.defUnitPrice3,
+        );
+      }
+      return i;
+    }).toList();
+    state = state.copyWith(items: updated);
+    await loadBarcodeStats();
+  }
+
+  Future<List<ItemModel>> getAllItemsForExport() async {
+    final status = state.barcodeFilter != 'all' ? state.barcodeFilter : null;
+    return await _itemsRepository.getAllItems(barcodeStatus: status);
+  }
+
   Future<void> clearFiltersAndReload() async {
     state = state.copyWith(searchQuery: '', clearCategory: true, sortByPrice: 'none');
     await loadItems(refresh: true);
@@ -145,6 +219,7 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
 
   Future<void> initCatalog() async {
     await loadCategories();
+    await loadBarcodeStats();
     await clearFiltersAndReload();
   }
 
@@ -167,6 +242,7 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
     try {
       List<ItemModel> fetchedItems = [];
       const limit = 50;
+      final barcodeStatus = state.barcodeFilter != 'all' ? state.barcodeFilter : null;
 
       if (state.selectedCategoryId != null && state.searchQuery.isNotEmpty) {
         int currentPage = targetPage;
@@ -178,6 +254,7 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
             state.searchQuery,
             page: currentPage,
             limit: limit,
+            barcodeStatus: barcodeStatus,
           );
           if (searchResults.isEmpty) {
             reachedEnd = true;
@@ -206,17 +283,20 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
           state.selectedCategoryId!,
           page: targetPage,
           limit: limit,
+          barcodeStatus: barcodeStatus,
         );
       } else if (state.searchQuery.isNotEmpty) {
         fetchedItems = await _performMultiWordSearch(
           state.searchQuery,
           page: targetPage,
           limit: limit,
+          barcodeStatus: barcodeStatus,
         );
       } else {
         fetchedItems = await _itemsRepository.getItems(
           page: targetPage,
           limit: limit,
+          barcodeStatus: barcodeStatus,
         );
       }
 
@@ -234,7 +314,12 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
     }
   }
 
-  Future<List<ItemModel>> _performMultiWordSearch(String query, {required int page, required int limit}) async {
+  Future<List<ItemModel>> _performMultiWordSearch(
+    String query, {
+    required int page,
+    required int limit,
+    String? barcodeStatus,
+  }) async {
     final queryWords = query
         .toLowerCase()
         .split(' ')
@@ -254,6 +339,7 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
           queryWords[0],
           page: 1,
           limit: limit * 3, // Fetch more to enable local filtering/sorting
+          barcodeStatus: barcodeStatus,
         );
         for (final item in results) {
           if (seenIds.add(item.itemNo)) {
@@ -270,6 +356,7 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
             word,
             page: 1,
             limit: limit * 3, // Fetch more to enable local filtering/sorting
+            barcodeStatus: barcodeStatus,
           );
           for (final item in results) {
             if (seenIds.add(item.itemNo)) {

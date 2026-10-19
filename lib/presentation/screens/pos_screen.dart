@@ -10,7 +10,6 @@ import '../../domain/services/barcode_service.dart';
 import '../../data/models/item_model.dart';
 import '../providers/items_provider.dart';
 import '../providers/pos_provider.dart';
-import '../providers/license_provider.dart';
 import '../providers/sales_history_provider.dart';
 import '../widgets/camera_scanner_dialog.dart';
 import '../widgets/app_permissions_dialog.dart';
@@ -325,8 +324,14 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   }
 
   // --- KEYBOARD SHORTCUTS CONTROLLER ---
+  bool _isReprintingLastNota = false;
+  DateTime? _lastF8PressTime;
+
   bool _handleGlobalKeyEvent(KeyEvent event) {
+    if (!mounted) return false;
     if (_isPaymentModalOpen) return false;
+    // Jangan proses shortcut global jika ada modal/dialog (misal TransactionSuccessDialog) atau rute lain di atas POS
+    if (ModalRoute.of(context)?.isCurrent != true) return false;
     if (event is! KeyDownEvent) return false;
 
     final key = event.logicalKey;
@@ -412,11 +417,24 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   }
 
   void _reprintLastNota() async {
-    final success = await ref.read(salesHistoryNotifierProvider.notifier).reprintLastReceipt();
-    if (success) {
-      _showSuccessToast('Cetak ulang nota berhasil dikirim.');
-    } else {
-      _showErrorToast('Gagal cetak ulang. Riwayat transaksi kosong!');
+    if (_isReprintingLastNota) return;
+    final now = DateTime.now();
+    if (_lastF8PressTime != null && now.difference(_lastF8PressTime!).inMilliseconds < 1500) {
+      return;
+    }
+    _lastF8PressTime = now;
+    _isReprintingLastNota = true;
+    try {
+      final success = await ref.read(salesHistoryNotifierProvider.notifier).reprintLastReceipt();
+      if (mounted) {
+        if (success) {
+          _showSuccessToast('Cetak ulang nota berhasil dikirim.');
+        } else {
+          _showErrorToast('Gagal cetak ulang. Riwayat transaksi kosong!');
+        }
+      }
+    } finally {
+      _isReprintingLastNota = false;
     }
   }
 

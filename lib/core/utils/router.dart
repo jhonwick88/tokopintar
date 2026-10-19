@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../presentation/providers/auth_provider.dart';
 import '../../presentation/providers/license_provider.dart';
+import '../../presentation/providers/settings_provider.dart';
 import '../../presentation/screens/activation_screen.dart';
 import '../../presentation/screens/dashboard_screen.dart';
 import '../../presentation/screens/login_screen.dart';
@@ -25,6 +25,7 @@ import '../../data/models/category_model.dart';
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authNotifierProvider);
   final licenseState = ref.watch(licenseProvider);
+  final settings = ref.watch(settingsNotifierProvider);
 
   return GoRouter(
     initialLocation: '/activation',
@@ -56,6 +57,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
       }
 
+      final isAdmin = authState.currentUser?.role == 'admin';
+      final canAccessStockOpname = isAdmin || settings.allowCashierStockOpname;
+
+      if (state.matchedLocation == '/stock-opname') {
+        if (!canAccessStockOpname) {
+          return '/pos';
+        }
+        return null;
+      }
+
       final adminRoutes = [
         '/reconciliation-analysis',
         '/inventory',
@@ -64,12 +75,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         '/categories/new',
         '/categories/edit',
         '/units',
-        '/stock-opname',
         '/suppliers',
         '/sales-report',
         '/users',
       ];
-      if (adminRoutes.contains(state.matchedLocation) && authState.currentUser?.role != 'admin') {
+      if (adminRoutes.contains(state.matchedLocation) && !isAdmin) {
         return '/pos';
       }
       return null;
