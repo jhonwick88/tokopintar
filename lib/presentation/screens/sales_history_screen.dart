@@ -614,8 +614,6 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                       icon: Icons.receipt_long,
                                       color: Colors.blue,
                                       subtitle: isAdmin ? _getDateFilterLabel() : null,
-                                      onTap: isAdmin ? _showDateFilterDialog : null,
-                                      tooltip: isAdmin ? 'Klik untuk filter tanggal Transaksi' : null,
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -638,8 +636,6 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                       icon: Icons.cancel,
                                       color: Colors.red,
                                       subtitle: isAdmin ? _getDateFilterLabel() : null,
-                                      onTap: isAdmin ? _showDateFilterDialog : null,
-                                      tooltip: isAdmin ? 'Klik untuk filter tanggal' : null,
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -650,8 +646,6 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                       icon: Icons.percent,
                                       color: Colors.purple,
                                       subtitle: isAdmin ? _getDateFilterLabel() : null,
-                                      onTap: isAdmin ? _showDateFilterDialog : null,
-                                      tooltip: isAdmin ? 'Klik untuk filter tanggal' : null,
                                     ),
                                   ),
                                 ],
@@ -667,8 +661,6 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                           icon: Icons.receipt_long,
                                           color: Colors.blue,
                                           subtitle: isAdmin ? _getDateFilterLabel() : null,
-                                          onTap: isAdmin ? _showDateFilterDialog : null,
-                                          tooltip: isAdmin ? 'Klik untuk filter tanggal Transaksi' : null,
                                         ),
                                       ),
                                       const SizedBox(width: 8),
@@ -695,8 +687,6 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                           icon: Icons.cancel,
                                           color: Colors.red,
                                           subtitle: isAdmin ? _getDateFilterLabel() : null,
-                                          onTap: isAdmin ? _showDateFilterDialog : null,
-                                          tooltip: isAdmin ? 'Klik untuk filter tanggal' : null,
                                         ),
                                       ),
                                       const SizedBox(width: 8),
@@ -707,8 +697,6 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                           icon: Icons.percent,
                                           color: Colors.purple,
                                           subtitle: isAdmin ? _getDateFilterLabel() : null,
-                                          onTap: isAdmin ? _showDateFilterDialog : null,
-                                          tooltip: isAdmin ? 'Klik untuk filter tanggal' : null,
                                         ),
                                       ),
                                     ],
@@ -1108,108 +1096,6 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
       default:
         return 'Hari Ini';
     }
-  }
-
-  void _showDateFilterDialog() {
-    final isAdmin = ref.read(authNotifierProvider).currentUser?.role.toLowerCase() == 'admin';
-    if (!isAdmin) return;
-
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Filter Tanggal Riwayat Penjualan',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(ctx),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                ListTile(
-                  leading: const Icon(Icons.today, color: Colors.blue),
-                  title: const Text('Hari Ini'),
-                  selected: _selectedDateRangePreset == 'today',
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _applyDatePreset('today');
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.history, color: Colors.orange),
-                  title: const Text('Kemarin'),
-                  selected: _selectedDateRangePreset == 'yesterday',
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _applyDatePreset('yesterday');
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.date_range, color: Colors.green),
-                  title: const Text('7 Hari Terakhir'),
-                  selected: _selectedDateRangePreset == 'last7days',
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _applyDatePreset('last7days');
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.calendar_month, color: Colors.teal),
-                  title: const Text('1 Bulan Terakhir (30 Hari)'),
-                  selected: _selectedDateRangePreset == 'last30days',
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _applyDatePreset('last30days');
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.calendar_view_month, color: Colors.indigo),
-                  title: const Text('Bulan Ini'),
-                  selected: _selectedDateRangePreset == 'thismonth',
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _applyDatePreset('thismonth');
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.all_inclusive, color: Colors.purple),
-                  title: const Text('Semua Transaksi'),
-                  selected: _selectedDateRangePreset == 'all',
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _applyDatePreset('all');
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.edit_calendar, color: Colors.blueAccent),
-                  title: const Text('Pilih Rentang Tanggal Khusus...'),
-                  selected: _selectedDateRangePreset == 'custom',
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _pickCustomDateRange();
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
   }
 
   Widget _buildMetricCard({
