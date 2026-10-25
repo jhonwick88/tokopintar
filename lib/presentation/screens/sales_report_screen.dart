@@ -226,11 +226,15 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
       categoryLookup[cat.id] = cat;
     }
 
-    // Only count completed sales within the active date filter (exclude voided)
+    // Only count completed sales within the active date filter (exclude voided, refunded, cancelled)
     final completedSales = salesState.sales.where((s) {
-      if (s.status.toLowerCase() == 'voided') return false;
-      if (salesState.startDate != null && s.date.isBefore(salesState.startDate!)) return false;
-      if (salesState.endDate != null && s.date.isAfter(salesState.endDate!)) return false;
+      final statusLower = s.status.toLowerCase().trim();
+      if (statusLower == 'voided' || statusLower == 'refunded' || statusLower == 'cancelled') {
+        return false;
+      }
+      final saleDate = s.date.toLocal();
+      if (salesState.startDate != null && saleDate.isBefore(salesState.startDate!)) return false;
+      if (salesState.endDate != null && saleDate.isAfter(salesState.endDate!)) return false;
       return true;
     }).toList();
 

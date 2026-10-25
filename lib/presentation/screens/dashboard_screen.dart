@@ -20,6 +20,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   late final ScrollController _scrollController;
   int _leaderboardLimit = 10;
   int _totalTopItems = 0;
+  String _selectedPreset = 'today'; // 'all', 'today', 'yesterday', 'last7days', 'last30days', 'thismonth', 'custom'
+  DateTimeRange? _customDateRange;
 
   @override
   void initState() {
@@ -27,12 +29,88 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     _scrollController = ScrollController()..addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndPromptPermissions();
-      final now = DateTime.now();
-      ref.read(salesHistoryNotifierProvider.notifier).updateDateFilter(
-        DateTime(now.year, now.month, now.day),
-        DateTime(now.year, now.month, now.day, 23, 59, 59),
-      );
+      _applyDatePreset('today');
     });
+  }
+
+  void _applyDatePreset(String preset) {
+    setState(() {
+      _selectedPreset = preset;
+      _leaderboardLimit = 10;
+    });
+
+    final now = DateTime.now();
+    DateTime? start;
+    DateTime? end = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+
+    switch (preset) {
+      case 'all':
+        start = null;
+        end = null;
+        break;
+      case 'today':
+        start = DateTime(now.year, now.month, now.day, 0, 0, 0, 0);
+        break;
+      case 'yesterday':
+        final yesterday = now.subtract(const Duration(days: 1));
+        start = DateTime(yesterday.year, yesterday.month, yesterday.day, 0, 0, 0, 0);
+        end = DateTime(yesterday.year, yesterday.month, yesterday.day, 23, 59, 59, 999);
+        break;
+      case 'last7days':
+        final d7 = now.subtract(const Duration(days: 6));
+        start = DateTime(d7.year, d7.month, d7.day, 0, 0, 0, 0);
+        break;
+      case 'last30days':
+        final d30 = now.subtract(const Duration(days: 29));
+        start = DateTime(d30.year, d30.month, d30.day, 0, 0, 0, 0);
+        break;
+      case 'thismonth':
+        start = DateTime(now.year, now.month, 1, 0, 0, 0, 0);
+        break;
+      case 'custom':
+        if (_customDateRange != null) {
+          start = DateTime(_customDateRange!.start.year, _customDateRange!.start.month, _customDateRange!.start.day, 0, 0, 0, 0);
+          end = DateTime(_customDateRange!.end.year, _customDateRange!.end.month, _customDateRange!.end.day, 23, 59, 59, 999);
+        } else {
+          start = DateTime(now.year, now.month, now.day, 0, 0, 0, 0);
+        }
+        break;
+      default:
+        start = DateTime(now.year, now.month, now.day, 0, 0, 0, 0);
+    }
+
+    ref.read(salesHistoryNotifierProvider.notifier).updateDateFilter(start, end);
+  }
+
+  Future<void> _pickCustomDateRange() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(now.year + 2),
+      initialDateRange: _customDateRange ??
+          DateTimeRange(
+            start: DateTime(now.year, now.month, now.day).subtract(const Duration(days: 7)),
+            end: now,
+          ),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+                  primary: Theme.of(context).colorScheme.primary,
+                ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _customDateRange = picked;
+      });
+      _applyDatePreset('custom');
+    }
   }
 
   Future<void> _checkAndPromptPermissions() async {
@@ -75,9 +153,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final now = DateTime.now();
 
     final completedSales = salesState.sales.where((s) {
-      if (s.status != 'completed') return false;
-      if (salesState.startDate != null && s.date.isBefore(salesState.startDate!)) return false;
-      if (salesState.endDate != null && s.date.isAfter(salesState.endDate!)) return false;
+      final statusLower = s.status.toLowerCase().trim();
+      if (statusLower == 'voided' || statusLower == 'refunded' || statusLower == 'cancelled') {
+        return false;
+      }
+      final saleDate = s.date.toLocal();
+      if (salesState.startDate != null && saleDate.isBefore(salesState.startDate!)) return false;
+      if (salesState.endDate != null && saleDate.isAfter(salesState.endDate!)) return false;
       return true;
     }).toList();
 
@@ -97,12 +179,30 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       totalDiscounts += sale.discount;
       
       // Payment grouping
-      if (sale.paymentMethod == 'cash') {
-        cashTotal += sale.grandTotal;
-      } else if (sale.paymentMethod == 'qris') {
-        qrisTotal += sale.grandTotal;
-      } else if (sale.paymentMethod == 'bank') {
-        bankTotal += sale.grandTotal;
+      final pm = sale.paymentMethod.toLowerCase().trim();
+      if (sale.payments.isNotEmpty) {
+        for (var p in sale.payments) {
+          final subPm = p.paymentMethod.toLowerCase().trim();
+          if (subPm == 'cash' || subPm == 'tunai') {
+            cashTotal += p.amount;
+          } else if (subPm == 'qris') {
+            qrisTotal += p.amount;
+          } else if (subPm.contains('bank') || subPm.contains('transfer') || subPm.contains('card') || subPm.contains('edc') || subPm.contains('debit') || subPm.contains('credit')) {
+            bankTotal += p.amount;
+          } else {
+            cashTotal += p.amount;
+          }
+        }
+      } else {
+        if (pm == 'cash' || pm == 'tunai') {
+          cashTotal += sale.grandTotal;
+        } else if (pm == 'qris') {
+          qrisTotal += sale.grandTotal;
+        } else if (pm.contains('bank') || pm.contains('transfer') || pm.contains('card') || pm.contains('edc') || pm.contains('debit') || pm.contains('credit')) {
+          bankTotal += sale.grandTotal;
+        } else {
+          cashTotal += sale.grandTotal;
+        }
       }
 
       // Group items for leaderboard
@@ -133,71 +233,70 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     _totalTopItems = topItems.length;
 
     // 2. Generate dynamic line chart spots based on active range
-    final start = salesState.startDate ?? (completedSales.isEmpty ? now.subtract(const Duration(days: 30)) : completedSales.last.date);
+    final start = salesState.startDate ?? (completedSales.isEmpty ? now.subtract(const Duration(days: 30)) : completedSales.last.date.toLocal());
     final end = salesState.endDate ?? now;
     final diffDays = end.difference(start).inDays;
 
     final Map<String, double> chartData = {};
 
-    if (diffDays <= 1) {
+    if (_selectedPreset == 'today' || _selectedPreset == 'yesterday' || diffDays <= 1) {
       // Group by hours (e.g. 0-23 in steps of 2)
       for (int h = 0; h < 24; h += 2) {
         chartData['${h.toString().padLeft(2, '0')}:00'] = 0.0;
       }
       for (var sale in completedSales) {
-        final hour = (sale.date.hour ~/ 2) * 2;
+        final localDate = sale.date.toLocal();
+        final hour = (localDate.hour ~/ 2) * 2;
         final key = '${hour.toString().padLeft(2, '0')}:00';
         if (chartData.containsKey(key)) {
           chartData[key] = chartData[key]! + sale.grandTotal;
         }
       }
-    } else if (diffDays <= 7) {
-      // Group by date (DD/MM)
-      for (int i = diffDays; i >= 0; i--) {
-        final d = end.subtract(Duration(days: i));
-        final key = DateFormat('dd/MM').format(d);
+    } else if (diffDays <= 31 && _selectedPreset != 'all') {
+      // Group by exact date (dd/MM) for each day in range
+      final startDay = DateTime(start.year, start.month, start.day);
+      final endDay = DateTime(end.year, end.month, end.day);
+      DateTime current = startDay;
+      while (!current.isAfter(endDay)) {
+        final key = DateFormat('dd/MM').format(current);
         chartData[key] = 0.0;
+        current = current.add(const Duration(days: 1));
       }
       for (var sale in completedSales) {
-        final key = DateFormat('dd/MM').format(sale.date);
+        final key = DateFormat('dd/MM').format(sale.date.toLocal());
         if (chartData.containsKey(key)) {
           chartData[key] = chartData[key]! + sale.grandTotal;
         }
       }
-    } else if (diffDays <= 31) {
-      // Group by date (DD/MM) with step of 2 or 1
-      final step = diffDays > 15 ? 2 : 1;
-      for (int i = diffDays; i >= 0; i -= step) {
-        final d = end.subtract(Duration(days: i));
-        final key = DateFormat('dd/MM').format(d);
-        chartData[key] = 0.0;
-      }
-      for (var sale in completedSales) {
-        final key = DateFormat('dd/MM').format(sale.date);
-        String? closestKey;
-        int minDiff = 999999;
-        for (var k in chartData.keys) {
-          final parts = k.split('/');
-          final kDay = int.parse(parts[0]);
-          final diff = (sale.date.day - kDay).abs();
-          if (diff < minDiff) {
-            minDiff = diff;
-            closestKey = k;
-          }
-        }
-        if (closestKey != null) {
-          chartData[closestKey] = chartData[closestKey]! + sale.grandTotal;
-        }
-      }
     } else {
       // Group by month
-      for (int i = 5; i >= 0; i--) {
-        final d = DateTime(now.year, now.month - i, 1);
-        final key = DateFormat('MMM yy').format(d);
-        chartData[key] = 0.0;
+      DateTime startMonth;
+      DateTime endMonth;
+      if (completedSales.isNotEmpty) {
+        final firstDate = completedSales.map((s) => s.date.toLocal()).reduce((a, b) => a.isBefore(b) ? a : b);
+        final lastDate = completedSales.map((s) => s.date.toLocal()).reduce((a, b) => a.isAfter(b) ? a : b);
+        startMonth = DateTime(firstDate.year, firstDate.month, 1);
+        endMonth = DateTime(lastDate.year, lastDate.month, 1);
+      } else {
+        startMonth = DateTime(now.year, now.month - 5, 1);
+        endMonth = DateTime(now.year, now.month, 1);
       }
+
+      // Ensure at least 3 months for good chart visuals
+      int monthSpan = (endMonth.year - startMonth.year) * 12 + (endMonth.month - startMonth.month) + 1;
+      if (monthSpan < 3) {
+        startMonth = DateTime(endMonth.year, endMonth.month - 2, 1);
+      }
+
+      DateTime curM = startMonth;
+      while (!curM.isAfter(endMonth)) {
+        final key = DateFormat('MMM yy', 'id_ID').format(curM);
+        chartData[key] = 0.0;
+        curM = DateTime(curM.year, curM.month + 1, 1);
+      }
+
       for (var sale in completedSales) {
-        final key = DateFormat('MMM yy').format(sale.date);
+        final key = DateFormat('MMM yy', 'id_ID').format(sale.date.toLocal());
         if (chartData.containsKey(key)) {
           chartData[key] = chartData[key]! + sale.grandTotal;
         }
@@ -213,8 +312,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final double maxVal = chartData.values.fold(100000.0, (prev, val) => val > prev ? val : prev);
 
     String dateRangeStr = 'Semua Waktu';
-    if (salesState.startDate != null && salesState.endDate != null) {
-      dateRangeStr = '${DateFormat('dd MMM yyyy').format(salesState.startDate!)} - ${DateFormat('dd MMM yyyy').format(salesState.endDate!)}';
+    if (_selectedPreset == 'today') {
+      dateRangeStr = 'Hari Ini (${DateFormat('dd MMM yyyy', 'id_ID').format(now)})';
+    } else if (_selectedPreset == 'yesterday') {
+      final y = now.subtract(const Duration(days: 1));
+      dateRangeStr = 'Kemarin (${DateFormat('dd MMM yyyy', 'id_ID').format(y)})';
+    } else if (_selectedPreset == 'last7days') {
+      dateRangeStr = '7 Hari Terakhir';
+    } else if (_selectedPreset == 'last30days') {
+      dateRangeStr = '30 Hari Terakhir';
+    } else if (_selectedPreset == 'thismonth') {
+      dateRangeStr = 'Bulan Ini (${DateFormat('MMMM yyyy', 'id_ID').format(now)})';
+    } else if (salesState.startDate != null && salesState.endDate != null) {
+      dateRangeStr = '${DateFormat('dd MMM yyyy', 'id_ID').format(salesState.startDate!)} - ${DateFormat('dd MMM yyyy', 'id_ID').format(salesState.endDate!)}';
     }
 
     final width = MediaQuery.of(context).size.width;
@@ -238,7 +348,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           centerTitle: false,
           actions: [
             IconButton(
-              icon: const Icon(Icons.refresh),
+              icon: const Icon(Icons.date_range_rounded),
+              onPressed: _pickCustomDateRange,
+              tooltip: 'Pilih Rentang Tanggal',
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded),
               onPressed: () {
                 ref.read(salesHistoryNotifierProvider.notifier).fetchSales();
               },
@@ -495,39 +610,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  void _updateFilter(VoidCallback updateCallback) {
-    setState(() {
-      _leaderboardLimit = 10;
-    });
-    updateCallback();
-  }
-
   Widget _buildFilterChips(BuildContext context, SalesHistoryState salesState) {
-    final notifier = ref.read(salesHistoryNotifierProvider.notifier);
-    final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day);
-
-    String activeFilter = 'all';
-    if (salesState.startDate != null && salesState.endDate != null) {
-      final start = salesState.startDate!;
-      final end = salesState.endDate!;
-      final startZero = DateTime(start.year, start.month, start.day);
-      final endZero = DateTime(end.year, end.month, end.day);
-      final diffDays = endZero.difference(startZero).inDays;
-
-      if (startZero.year == todayStart.year && startZero.month == todayStart.month && startZero.day == todayStart.day) {
-        activeFilter = 'today';
-      } else if (diffDays == 6 && endZero.year == todayStart.year && endZero.month == todayStart.month && endZero.day == todayStart.day) {
-        activeFilter = '7days';
-      } else if (diffDays == 29 && endZero.year == todayStart.year && endZero.month == todayStart.month && endZero.day == todayStart.day) {
-        activeFilter = '30days';
-      } else if (startZero.year == now.year && startZero.month == now.month && startZero.day == 1) {
-        activeFilter = 'month';
-      } else {
-        activeFilter = 'custom';
-      }
-    }
-
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Container(
@@ -541,70 +624,48 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             _buildSegmentItem(
               context: context,
               label: 'Semua',
-              isSelected: activeFilter == 'all',
-              onTap: () => _updateFilter(() => notifier.updateDateFilter(null, null)),
+              isSelected: _selectedPreset == 'all',
+              onTap: () => _applyDatePreset('all'),
             ),
             _buildSegmentItem(
               context: context,
               label: 'Hari Ini',
-              isSelected: activeFilter == 'today',
-              onTap: () {
-                final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
-                _updateFilter(() => notifier.updateDateFilter(todayStart, end));
-              },
+              isSelected: _selectedPreset == 'today',
+              onTap: () => _applyDatePreset('today'),
+            ),
+            _buildSegmentItem(
+              context: context,
+              label: 'Kemarin',
+              isSelected: _selectedPreset == 'yesterday',
+              onTap: () => _applyDatePreset('yesterday'),
             ),
             _buildSegmentItem(
               context: context,
               label: '7 Hari',
-              isSelected: activeFilter == '7days',
-              onTap: () {
-                final start = todayStart.subtract(const Duration(days: 6));
-                final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
-                _updateFilter(() => notifier.updateDateFilter(start, end));
-              },
+              isSelected: _selectedPreset == 'last7days',
+              onTap: () => _applyDatePreset('last7days'),
             ),
             _buildSegmentItem(
               context: context,
               label: '30 Hari',
-              isSelected: activeFilter == '30days',
-              onTap: () {
-                final start = todayStart.subtract(const Duration(days: 29));
-                final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
-                _updateFilter(() => notifier.updateDateFilter(start, end));
-              },
+              isSelected: _selectedPreset == 'last30days',
+              onTap: () => _applyDatePreset('last30days'),
             ),
             _buildSegmentItem(
               context: context,
               label: 'Bulan Ini',
-              isSelected: activeFilter == 'month',
-              onTap: () {
-                final start = DateTime(now.year, now.month, 1);
-                final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
-                _updateFilter(() => notifier.updateDateFilter(start, end));
-              },
+              isSelected: _selectedPreset == 'thismonth',
+              onTap: () => _applyDatePreset('thismonth'),
             ),
             GestureDetector(
-              onTap: () async {
-                final picked = await showDateRangePicker(
-                  context: context,
-                  firstDate: DateTime(2025),
-                  lastDate: DateTime(2030),
-                  initialDateRange: salesState.startDate != null && salesState.endDate != null
-                      ? DateTimeRange(start: salesState.startDate!, end: salesState.endDate!)
-                      : null,
-                );
-                if (picked != null) {
-                  final end = DateTime(picked.end.year, picked.end.month, picked.end.day, 23, 59, 59);
-                  _updateFilter(() => notifier.updateDateFilter(picked.start, end));
-                }
-              },
+              onTap: _pickCustomDateRange,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: activeFilter == 'custom' ? Theme.of(context).colorScheme.surface : Colors.transparent,
+                  color: _selectedPreset == 'custom' ? Theme.of(context).colorScheme.surface : Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
-                  boxShadow: activeFilter == 'custom'
+                  boxShadow: _selectedPreset == 'custom'
                       ? [
                           BoxShadow(
                             color: Colors.black.withOpacity(0.05),
@@ -620,19 +681,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     Icon(
                       Icons.date_range_rounded,
                       size: 14,
-                      color: activeFilter == 'custom'
+                      color: _selectedPreset == 'custom'
                           ? Theme.of(context).colorScheme.primary
                           : Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      activeFilter == 'custom'
+                      _selectedPreset == 'custom' && salesState.startDate != null && salesState.endDate != null
                           ? '${DateFormat('dd/MM').format(salesState.startDate!)} - ${DateFormat('dd/MM').format(salesState.endDate!)}'
                           : 'Kustom',
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight: activeFilter == 'custom' ? FontWeight.bold : FontWeight.w500,
-                        color: activeFilter == 'custom'
+                        fontWeight: _selectedPreset == 'custom' ? FontWeight.bold : FontWeight.w500,
+                        color: _selectedPreset == 'custom'
                             ? Theme.of(context).colorScheme.primary
                             : Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -876,21 +937,32 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           bottomTitles: AxisTitles(
                             sideTitles: SideTitles(
                               showTitles: true,
+                              reservedSize: 28,
                               getTitlesWidget: (val, meta) {
                                 final idx = val.toInt();
-                                if (idx >= 0 && idx < entries.length) {
-                                  return Padding(
-                                    padding: const EdgeInsets.only(top: 8.0),
-                                    child: Text(
-                                      entries[idx].key,
-                                      style: TextStyle(
-                                        fontSize: 9,
-                                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                                      ),
-                                    ),
-                                  );
+                                if (idx < 0 || idx >= entries.length) {
+                                  return const SizedBox();
                                 }
-                                return const SizedBox();
+                                int interval = 1;
+                                if (entries.length > 20) {
+                                  interval = 4;
+                                } else if (entries.length > 10) {
+                                  interval = 2;
+                                }
+                                if (idx % interval != 0 && idx != entries.length - 1) {
+                                  return const SizedBox();
+                                }
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Text(
+                                    entries[idx].key,
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                );
                               },
                             ),
                           ),
