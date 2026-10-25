@@ -77,47 +77,84 @@ class ReconciliationState {
     }).toList();
   }
 
-  // --- STATS COMPUTATIONS ---
+  /// Map of latest reconciliation per day (key: 'yyyy-MM-dd')
+  /// Jika dalam 1 hari terdapat lebih dari 1 input rekonsiliasi kas (misal shift pagi & siang),
+  /// perhitungan total mengambil jam terakhir (closing final hari tersebut).
+  Map<String, CashReconciliationModel> get latestReconciliationsPerDay {
+    final Map<String, CashReconciliationModel> map = {};
+    for (final rec in filteredReconciliations) {
+      final d = rec.date.toLocal();
+      final dayKey = '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+      if (!map.containsKey(dayKey) || rec.date.isAfter(map[dayKey]!.date)) {
+        map[dayKey] = rec;
+      }
+    }
+    return map;
+  }
+
+  /// Cek apakah suatu rekonsiliasi merupakan input jam terakhir pada harinya
+  bool isLatestReconciliation(CashReconciliationModel rec) {
+    final d = rec.date.toLocal();
+    final dayKey = '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    return latestReconciliationsPerDay[dayKey]?.id == rec.id;
+  }
+
+  /// Map of latest cash out movement per day (key: 'yyyy-MM-dd')
+  /// Mengambil input kas keluar jam terakhir pada setiap hari jika ada lebih dari 1 input.
+  Map<String, CashMovementModel> get latestCashOutMovementsPerDay {
+    final Map<String, CashMovementModel> map = {};
+    for (final mov in filteredCashMovements.where((m) => m.type == 'OUT')) {
+      final d = mov.date.toLocal();
+      final dayKey = '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+      if (!map.containsKey(dayKey) || mov.date.isAfter(map[dayKey]!.date)) {
+        map[dayKey] = mov;
+      }
+    }
+    return map;
+  }
+
+  /// Cek apakah suatu kas keluar merupakan input jam terakhir pada harinya
+  bool isLatestCashOut(CashMovementModel mov) {
+    final d = mov.date.toLocal();
+    final dayKey = '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    return latestCashOutMovementsPerDay[dayKey]?.id == mov.id;
+  }
+
+  // --- STATS COMPUTATIONS (MENGAMBIL CLOSING TERAKHIR PER HARI) ---
   int get totalReconciliations => filteredReconciliations.length;
 
+  int get totalClosingDays => latestReconciliationsPerDay.length;
+
   int get totalDiscrepancyCount =>
-      filteredReconciliations.where((rec) => rec.difference != 0).length;
+      latestReconciliationsPerDay.values.where((rec) => rec.difference != 0).length;
 
   double get averageAccuracy {
-    if (filteredReconciliations.isEmpty) return 100.0;
-    final total = filteredReconciliations.fold(0.0, (sum, rec) => sum + rec.accuracyRate);
-    return total / filteredReconciliations.length;
+    final latestList = latestReconciliationsPerDay.values;
+    if (latestList.isEmpty) return 100.0;
+    final total = latestList.fold(0.0, (sum, rec) => sum + rec.accuracyRate);
+    return total / latestList.length;
   }
 
   double get totalDifference {
-    return filteredReconciliations.fold(0.0, (sum, rec) => sum + rec.difference);
+    return latestReconciliationsPerDay.values.fold(0.0, (sum, rec) => sum + rec.difference);
   }
 
   double get totalSystemRevenue {
-    return filteredReconciliations.fold(0.0, (sum, rec) => sum + rec.systemRevenue);
+    return latestReconciliationsPerDay.values.fold(0.0, (sum, rec) => sum + rec.systemRevenue);
   }
 
   double get totalActualDrawerCash {
-    return filteredReconciliations.fold(0.0, (sum, rec) => sum + rec.actualDrawerCash);
+    return latestReconciliationsPerDay.values.fold(0.0, (sum, rec) => sum + rec.actualDrawerCash);
   }
 
   double get totalCashOut {
-    return filteredCashMovements
-        .where((m) => m.type == 'OUT')
-        .fold(0.0, (sum, m) => sum + m.amount);
+    return latestCashOutMovementsPerDay.values.fold(0.0, (sum, m) => sum + m.amount);
   }
 
   double get todayCashOut {
     final now = DateTime.now();
-    return cashMovements
-        .where((m) {
-          final d = m.date.toLocal();
-          return m.type == 'OUT' &&
-              d.year == now.year &&
-              d.month == now.month &&
-              d.day == now.day;
-        })
-        .fold(0.0, (sum, m) => sum + m.amount);
+    final todayKey = '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    return latestCashOutMovementsPerDay[todayKey]?.amount ?? 0.0;
   }
 
   ReconciliationState copyWith({

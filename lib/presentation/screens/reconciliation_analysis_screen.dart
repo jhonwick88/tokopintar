@@ -116,7 +116,12 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
                                   final rec = paginatedList[index];
                                   return Padding(
                                     padding: const EdgeInsets.only(top: 8.0),
-                                    child: _buildMobileCard(rec, currencyFormatter, dateFormatter),
+                                    child: _buildMobileCard(
+                                      rec,
+                                      currencyFormatter,
+                                      dateFormatter,
+                                      isLatest: state.isLatestReconciliation(rec),
+                                    ),
                                   );
                                 },
                                 childCount: paginatedList.length,
@@ -197,7 +202,12 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
                                   final mov = paginatedList[index];
                                   return Padding(
                                     padding: const EdgeInsets.only(top: 8.0),
-                                    child: _buildCashMovementMobileCard(mov, currencyFormatter, dateFormatter),
+                                    child: _buildCashMovementMobileCard(
+                                      mov,
+                                      currencyFormatter,
+                                      dateFormatter,
+                                      isLatest: state.isLatestCashOut(mov),
+                                    ),
                                   );
                                 },
                                 childCount: paginatedList.length,
@@ -393,7 +403,7 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
                   context: context,
                   title: 'Total Kas Sistem',
                   value: currencyFormatter.format(state.totalSystemRevenue),
-                  subtitle: 'Kas masuk bersih sistem',
+                  subtitle: 'Closing jam terakhir (${state.totalClosingDays} hari)',
                   icon: Icons.computer_rounded,
                   gradientColors: systemCashGradient,
                 ),
@@ -404,7 +414,7 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
                   context: context,
                   title: 'Total Uang Fisik Laci',
                   value: currencyFormatter.format(state.totalActualDrawerCash),
-                  subtitle: 'Fisik terhitung tutup kasir',
+                  subtitle: 'Fisik laci jam terakhir',
                   icon: Icons.payments_rounded,
                   gradientColors: actualCashGradient,
                 ),
@@ -415,7 +425,7 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
                   context: context,
                   title: 'Total Kas Keluar',
                   value: currencyFormatter.format(state.totalCashOut),
-                  subtitle: 'Pengeluaran laci (petty cash)',
+                  subtitle: 'Kas keluar jam terakhir',
                   icon: Icons.output_rounded,
                   gradientColors: cashOutGradient,
                 ),
@@ -456,7 +466,7 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
                   context: context,
                   title: 'Frekuensi Selisih',
                   value: '${state.totalDiscrepancyCount} kali',
-                  subtitle: 'Dari ${state.totalReconciliations} kali tutup kasir',
+                  subtitle: 'Dari ${state.totalClosingDays} hari closing',
                   icon: Icons.difference_rounded,
                   gradientColors: discrepancyGradient,
                 ),
@@ -711,9 +721,36 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
                     DataColumn(label: Text('Catatan', style: TextStyle(fontWeight: FontWeight.bold))),
                   ],
                   rows: paginatedList.map((rec) {
+                    final isLatest = state.isLatestReconciliation(rec);
                     return DataRow(
                       cells: [
-                        DataCell(Text(dateFormatter.format(rec.date))),
+                        DataCell(
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(dateFormatter.format(rec.date)),
+                              if (isLatest) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.shade50,
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: Colors.blue.shade200),
+                                  ),
+                                  child: Text(
+                                    'Closing Akhir',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue.shade800,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
                         DataCell(Text(rec.cashierName)),
                         DataCell(Text(currencyFormatter.format(rec.systemRevenue))),
                         DataCell(Text(currencyFormatter.format(rec.actualDrawerCash))),
@@ -786,9 +823,36 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
                 DataColumn(label: Text('Aksi', style: TextStyle(fontWeight: FontWeight.bold))),
               ],
               rows: state.filteredCashMovements.map((mov) {
+                final isLatest = state.isLatestCashOut(mov);
                 return DataRow(
                   cells: [
-                    DataCell(Text(dateFormatter.format(mov.date))),
+                    DataCell(
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(dateFormatter.format(mov.date)),
+                          if (isLatest) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade50,
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: Colors.orange.shade200),
+                              ),
+                              child: Text(
+                                'Jam Terakhir',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.orange.shade900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                     DataCell(_buildCategoryBadge(mov.category)),
                     DataCell(
                       Text(
@@ -961,7 +1025,8 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
   }
 
   Widget _buildMobileCard(
-      CashReconciliationModel rec, NumberFormat currencyFormatter, DateFormat dateFormatter) {
+      CashReconciliationModel rec, NumberFormat currencyFormatter, DateFormat dateFormatter,
+      {bool isLatest = false}) {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -975,9 +1040,33 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
           title: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                rec.cashierName,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    rec.cashierName,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  if (isLatest) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: Text(
+                        'Closing Akhir',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
               _buildDifferenceBadge(rec.difference, currencyFormatter),
             ],
@@ -1032,7 +1121,8 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
   }
 
   Widget _buildCashMovementMobileCard(
-      CashMovementModel mov, NumberFormat currencyFormatter, DateFormat dateFormatter) {
+      CashMovementModel mov, NumberFormat currencyFormatter, DateFormat dateFormatter,
+      {bool isLatest = false}) {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -1048,7 +1138,31 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildCategoryBadge(mov.category),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildCategoryBadge(mov.category),
+                    if (isLatest) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.orange.shade200),
+                        ),
+                        child: Text(
+                          'Jam Terakhir',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange.shade900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
                 Text(
                   currencyFormatter.format(mov.amount),
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.deepOrange),
