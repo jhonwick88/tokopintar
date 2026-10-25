@@ -14,7 +14,7 @@ class MockItemsRepository implements ItemsRepository {
   }
 
   @override
-  Future<List<ItemModel>> getItems({required int page, int limit = 50}) async {
+  Future<List<ItemModel>> getItems({required int page, int limit = 50, String? barcodeStatus}) async {
     return db;
   }
 
@@ -28,12 +28,12 @@ class MockItemsRepository implements ItemsRepository {
   }
 
   @override
-  Future<List<ItemModel>> searchItems(String query, {required int page, int limit = 50}) async {
+  Future<List<ItemModel>> searchItems(String query, {required int page, int limit = 50, String? barcodeStatus}) async {
     return db.where((it) => it.itemName.toLowerCase().contains(query.toLowerCase())).toList();
   }
 
   @override
-  Future<List<ItemModel>> getItemsByCategory(int categoryId, {required int page, int limit = 50}) async {
+  Future<List<ItemModel>> getItemsByCategory(int categoryId, {required int page, int limit = 50, String? barcodeStatus}) async {
     return db.where((it) => it.categoryId == categoryId).toList();
   }
 
@@ -67,6 +67,28 @@ class MockItemsRepository implements ItemsRepository {
   Future<ItemModel> createItem(ItemModel item) async {
     db.add(item);
     return item;
+  }
+
+  @override
+  Future<Map<String, int>> getBarcodeStats() async {
+    return {
+      'total': db.length,
+      'recorded': db.where((i) => i.itemUPC.isNotEmpty).length,
+      'unrecorded': db.where((i) => i.itemUPC.isEmpty).length,
+    };
+  }
+
+  @override
+  Future<void> updateItemBarcode(String itemNo, String barcode, {String? userId, String? username}) async {
+    final idx = db.indexWhere((it) => it.itemNo == itemNo);
+    if (idx >= 0) {
+      db[idx] = db[idx].copyWith(itemUPC: barcode);
+    }
+  }
+
+  @override
+  Future<List<ItemModel>> getAllItems({String? barcodeStatus}) async {
+    return db;
   }
 }
 
