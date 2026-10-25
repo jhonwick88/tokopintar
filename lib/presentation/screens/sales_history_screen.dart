@@ -510,6 +510,8 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final historyState = ref.watch(salesHistoryNotifierProvider);
+    final authState = ref.watch(authNotifierProvider);
+    final isAdmin = authState.currentUser?.role.toLowerCase() == 'admin';
     final width = MediaQuery.of(context).size.width;
     final isLarge = width >= 900;
     final currencyFormatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
@@ -559,43 +561,26 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
               tooltip: 'Rekonsiliasi Kas Laci (Hari Ini)',
               onPressed: () => _showCashReconciliationDialog(todayRevenue, todayCashRevenue),
             ),
-            IconButton(
-              icon: const Icon(Icons.date_range),
-              tooltip: 'Pilih Rentang Tanggal',
-              onPressed: () async {
-                final picked = await showDateRangePicker(
-                  context: context,
-                  firstDate: DateTime(2025),
-                  lastDate: DateTime(2030),
-                  initialDateRange: historyState.startDate != null && historyState.endDate != null
-                      ? DateTimeRange(start: historyState.startDate!, end: historyState.endDate!)
-                      : null,
-                );
-                if (picked != null) {
-                  setState(() {
-                    _selectedDateRangePreset = 'custom';
-                    _customDateRange = picked;
-                    _currentPage = 1;
-                  });
-                  ref
-                      .read(salesHistoryNotifierProvider.notifier)
-                      .updateDateFilter(picked.start, picked.end);
-                }
-              },
-            ),
-            if (historyState.startDate != null)
+            if (isAdmin) ...[
               IconButton(
-                icon: const Icon(Icons.clear),
-                onPressed: () {
-                  setState(() {
-                    _selectedDateRangePreset = 'all';
-                    _customDateRange = null;
-                    _currentPage = 1;
-                  });
-                  ref.read(salesHistoryNotifierProvider.notifier).updateDateFilter(null, null);
-                },
-                tooltip: 'Reset Filter Tanggal (Tampilkan Semua)',
+                icon: const Icon(Icons.date_range),
+                tooltip: 'Pilih Rentang Tanggal',
+                onPressed: _pickCustomDateRange,
               ),
+              if (historyState.startDate != null)
+                IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    setState(() {
+                      _selectedDateRangePreset = 'all';
+                      _customDateRange = null;
+                      _currentPage = 1;
+                    });
+                    ref.read(salesHistoryNotifierProvider.notifier).updateDateFilter(null, null);
+                  },
+                  tooltip: 'Reset Filter Tanggal (Tampilkan Semua)',
+                ),
+            ],
           ],
         ),
         body: Row(
@@ -628,9 +613,9 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                       value: '${historyState.filteredSales.length}',
                                       icon: Icons.receipt_long,
                                       color: Colors.blue,
-                                      subtitle: _getDateFilterLabel(),
-                                      onTap: _showDateFilterDialog,
-                                      tooltip: 'Klik untuk filter tanggal Transaksi',
+                                      subtitle: isAdmin ? _getDateFilterLabel() : null,
+                                      onTap: isAdmin ? _showDateFilterDialog : null,
+                                      tooltip: isAdmin ? 'Klik untuk filter tanggal Transaksi' : null,
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -640,9 +625,9 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                       value: currencyFormatter.format(activeRevenue),
                                       icon: Icons.monetization_on,
                                       color: Colors.green,
-                                      subtitle: _getDateFilterLabel(),
-                                      onTap: _showDateFilterDialog,
-                                      tooltip: 'Klik untuk filter tanggal Total Omset',
+                                      subtitle: isAdmin ? _getDateFilterLabel() : 'Kas Laci',
+                                      onTap: () => _showCashReconciliationDialog(todayRevenue, todayCashRevenue),
+                                      tooltip: 'Klik untuk Rekonsiliasi Kas Laci',
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -652,9 +637,9 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                       value: '$voidedCount',
                                       icon: Icons.cancel,
                                       color: Colors.red,
-                                      subtitle: _getDateFilterLabel(),
-                                      onTap: _showDateFilterDialog,
-                                      tooltip: 'Klik untuk filter tanggal',
+                                      subtitle: isAdmin ? _getDateFilterLabel() : null,
+                                      onTap: isAdmin ? _showDateFilterDialog : null,
+                                      tooltip: isAdmin ? 'Klik untuk filter tanggal' : null,
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -664,9 +649,9 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                       value: currencyFormatter.format(totalDiscounts),
                                       icon: Icons.percent,
                                       color: Colors.purple,
-                                      subtitle: _getDateFilterLabel(),
-                                      onTap: _showDateFilterDialog,
-                                      tooltip: 'Klik untuk filter tanggal',
+                                      subtitle: isAdmin ? _getDateFilterLabel() : null,
+                                      onTap: isAdmin ? _showDateFilterDialog : null,
+                                      tooltip: isAdmin ? 'Klik untuk filter tanggal' : null,
                                     ),
                                   ),
                                 ],
@@ -681,9 +666,9 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                           value: '${historyState.filteredSales.length}',
                                           icon: Icons.receipt_long,
                                           color: Colors.blue,
-                                          subtitle: _getDateFilterLabel(),
-                                          onTap: _showDateFilterDialog,
-                                          tooltip: 'Klik untuk filter tanggal Transaksi',
+                                          subtitle: isAdmin ? _getDateFilterLabel() : null,
+                                          onTap: isAdmin ? _showDateFilterDialog : null,
+                                          tooltip: isAdmin ? 'Klik untuk filter tanggal Transaksi' : null,
                                         ),
                                       ),
                                       const SizedBox(width: 8),
@@ -693,9 +678,9 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                           value: currencyFormatter.format(activeRevenue),
                                           icon: Icons.monetization_on,
                                           color: Colors.green,
-                                          subtitle: _getDateFilterLabel(),
-                                          onTap: _showDateFilterDialog,
-                                          tooltip: 'Klik untuk filter tanggal Total Omset',
+                                          subtitle: isAdmin ? _getDateFilterLabel() : 'Kas Laci',
+                                          onTap: () => _showCashReconciliationDialog(todayRevenue, todayCashRevenue),
+                                          tooltip: 'Klik untuk Rekonsiliasi Kas Laci',
                                         ),
                                       ),
                                     ],
@@ -709,9 +694,9 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                           value: '$voidedCount',
                                           icon: Icons.cancel,
                                           color: Colors.red,
-                                          subtitle: _getDateFilterLabel(),
-                                          onTap: _showDateFilterDialog,
-                                          tooltip: 'Klik untuk filter tanggal',
+                                          subtitle: isAdmin ? _getDateFilterLabel() : null,
+                                          onTap: isAdmin ? _showDateFilterDialog : null,
+                                          tooltip: isAdmin ? 'Klik untuk filter tanggal' : null,
                                         ),
                                       ),
                                       const SizedBox(width: 8),
@@ -721,9 +706,9 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                           value: currencyFormatter.format(totalDiscounts),
                                           icon: Icons.percent,
                                           color: Colors.purple,
-                                          subtitle: _getDateFilterLabel(),
-                                          onTap: _showDateFilterDialog,
-                                          tooltip: 'Klik untuk filter tanggal',
+                                          subtitle: isAdmin ? _getDateFilterLabel() : null,
+                                          onTap: isAdmin ? _showDateFilterDialog : null,
+                                          tooltip: isAdmin ? 'Klik untuk filter tanggal' : null,
                                         ),
                                       ),
                                     ],
@@ -737,32 +722,36 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                     SliverPersistentHeader(
                       pinned: true,
                       delegate: _SearchAndFilterHeaderDelegate(
-                        height: isLarge ? 175.0 : 225.0,
+                        height: isLarge
+                            ? (isAdmin ? 175.0 : 125.0)
+                            : (isAdmin ? 225.0 : 175.0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Date Presets Row
-                            SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: [
-                                  _buildDateChip('Hari Ini', 'today'),
-                                  _buildDateChip('Kemarin', 'yesterday'),
-                                  _buildDateChip('7 Hari', 'last7days'),
-                                  _buildDateChip('1 Bulan', 'last30days'),
-                                  _buildDateChip('Bulan Ini', 'thismonth'),
-                                  _buildDateChip('Semua', 'all'),
-                                  _buildDateChip(
-                                    _selectedDateRangePreset == 'custom' && _customDateRange != null
-                                        ? '${DateFormat('dd/MM').format(_customDateRange!.start)} - ${DateFormat('dd/MM').format(_customDateRange!.end)}'
-                                        : 'Pilih Rentang...',
-                                    'custom',
-                                    icon: Icons.calendar_today_rounded,
-                                  ),
-                                ],
+                            // Date Presets Row (Only visible for admin)
+                            if (isAdmin) ...[
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    _buildDateChip('Hari Ini', 'today'),
+                                    _buildDateChip('Kemarin', 'yesterday'),
+                                    _buildDateChip('7 Hari', 'last7days'),
+                                    _buildDateChip('1 Bulan', 'last30days'),
+                                    _buildDateChip('Bulan Ini', 'thismonth'),
+                                    _buildDateChip('Semua', 'all'),
+                                    _buildDateChip(
+                                      _selectedDateRangePreset == 'custom' && _customDateRange != null
+                                          ? '${DateFormat('dd/MM').format(_customDateRange!.start)} - ${DateFormat('dd/MM').format(_customDateRange!.end)}'
+                                          : 'Pilih Rentang...',
+                                      'custom',
+                                      icon: Icons.calendar_today_rounded,
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 8),
+                              const SizedBox(height: 8),
+                            ],
                             // Search Bar
                             TextField(
                               controller: _searchController,
@@ -1122,6 +1111,9 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
   }
 
   void _showDateFilterDialog() {
+    final isAdmin = ref.read(authNotifierProvider).currentUser?.role.toLowerCase() == 'admin';
+    if (!isAdmin) return;
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -1139,7 +1131,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'Filter Tanggal Riwayat & Total Omset',
+                      'Filter Tanggal Riwayat Penjualan',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     IconButton(
