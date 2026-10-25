@@ -40,10 +40,11 @@ class SalesHistoryState {
     final hasQuery = query.isNotEmpty;
 
     final list = sales.where((s) {
-      if (startDate != null && s.date.isBefore(startDate!)) {
+      final sDate = s.date.toLocal();
+      if (startDate != null && sDate.isBefore(startDate!)) {
         return false;
       }
-      if (endDate != null && s.date.isAfter(endDate!)) {
+      if (endDate != null && sDate.isAfter(endDate!)) {
         return false;
       }
       if (!isAllPayment && s.paymentMethod.toLowerCase() != paymentFilter) {
@@ -109,7 +110,7 @@ class SalesHistoryNotifier extends StateNotifier<SalesHistoryState> {
   SalesHistoryNotifier(this._salesRepository, this._ref) : super(
     SalesHistoryState(
       startDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
-      endDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day, 23, 59, 59),
+      endDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day, 23, 59, 59, 999),
     ),
   ) {
     fetchSales();

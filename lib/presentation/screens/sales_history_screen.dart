@@ -555,7 +555,13 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
               onPressed: () => _exportToCSV(historyState.filteredSales),
             ),
             IconButton(
+              icon: const Icon(Icons.point_of_sale),
+              tooltip: 'Rekonsiliasi Kas Laci (Hari Ini)',
+              onPressed: () => _showCashReconciliationDialog(todayRevenue, todayCashRevenue),
+            ),
+            IconButton(
               icon: const Icon(Icons.date_range),
+              tooltip: 'Pilih Rentang Tanggal',
               onPressed: () async {
                 final picked = await showDateRangePicker(
                   context: context,
@@ -566,6 +572,11 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                       : null,
                 );
                 if (picked != null) {
+                  setState(() {
+                    _selectedDateRangePreset = 'custom';
+                    _customDateRange = picked;
+                    _currentPage = 1;
+                  });
                   ref
                       .read(salesHistoryNotifierProvider.notifier)
                       .updateDateFilter(picked.start, picked.end);
@@ -576,9 +587,14 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
               IconButton(
                 icon: const Icon(Icons.clear),
                 onPressed: () {
+                  setState(() {
+                    _selectedDateRangePreset = 'all';
+                    _customDateRange = null;
+                    _currentPage = 1;
+                  });
                   ref.read(salesHistoryNotifierProvider.notifier).updateDateFilter(null, null);
                 },
-                tooltip: 'Reset Filter Tanggal',
+                tooltip: 'Reset Filter Tanggal (Tampilkan Semua)',
               ),
           ],
         ),
@@ -612,34 +628,45 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                       value: '${historyState.filteredSales.length}',
                                       icon: Icons.receipt_long,
                                       color: Colors.blue,
+                                      subtitle: _getDateFilterLabel(),
+                                      onTap: _showDateFilterDialog,
+                                      tooltip: 'Klik untuk filter tanggal Transaksi',
                                     ),
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: _buildMetricCard(
-                                      title: 'Omzet',
+                                      title: 'Total Omset',
                                       value: currencyFormatter.format(activeRevenue),
                                       icon: Icons.monetization_on,
-                                       color: Colors.green,
-                                       onTap: () => _showCashReconciliationDialog(todayRevenue, todayCashRevenue),
-                                     ),
+                                      color: Colors.green,
+                                      subtitle: _getDateFilterLabel(),
+                                      onTap: _showDateFilterDialog,
+                                      tooltip: 'Klik untuk filter tanggal Total Omset',
+                                    ),
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: _buildMetricCard(
-                                      title: 'Void/Refund',
+                                      title: 'Void / Refund',
                                       value: '$voidedCount',
                                       icon: Icons.cancel,
                                       color: Colors.red,
+                                      subtitle: _getDateFilterLabel(),
+                                      onTap: _showDateFilterDialog,
+                                      tooltip: 'Klik untuk filter tanggal',
                                     ),
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: _buildMetricCard(
-                                      title: 'Diskon',
+                                      title: 'Total Diskon',
                                       value: currencyFormatter.format(totalDiscounts),
                                       icon: Icons.percent,
                                       color: Colors.purple,
+                                      subtitle: _getDateFilterLabel(),
+                                      onTap: _showDateFilterDialog,
+                                      tooltip: 'Klik untuk filter tanggal',
                                     ),
                                   ),
                                 ],
@@ -654,17 +681,22 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                           value: '${historyState.filteredSales.length}',
                                           icon: Icons.receipt_long,
                                           color: Colors.blue,
+                                          subtitle: _getDateFilterLabel(),
+                                          onTap: _showDateFilterDialog,
+                                          tooltip: 'Klik untuk filter tanggal Transaksi',
                                         ),
                                       ),
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: _buildMetricCard(
-                                          title: 'Omzet',
+                                          title: 'Total Omset',
                                           value: currencyFormatter.format(activeRevenue),
                                           icon: Icons.monetization_on,
-                                           color: Colors.green,
-                                           onTap: () => _showCashReconciliationDialog(todayRevenue, todayCashRevenue),
-                                         ),
+                                          color: Colors.green,
+                                          subtitle: _getDateFilterLabel(),
+                                          onTap: _showDateFilterDialog,
+                                          tooltip: 'Klik untuk filter tanggal Total Omset',
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -673,19 +705,25 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                     children: [
                                       Expanded(
                                         child: _buildMetricCard(
-                                          title: 'Void/Refund',
+                                          title: 'Void / Refund',
                                           value: '$voidedCount',
                                           icon: Icons.cancel,
                                           color: Colors.red,
+                                          subtitle: _getDateFilterLabel(),
+                                          onTap: _showDateFilterDialog,
+                                          tooltip: 'Klik untuk filter tanggal',
                                         ),
                                       ),
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: _buildMetricCard(
-                                          title: 'Diskon',
+                                          title: 'Total Diskon',
                                           value: currencyFormatter.format(totalDiscounts),
                                           icon: Icons.percent,
                                           color: Colors.purple,
+                                          subtitle: _getDateFilterLabel(),
+                                          onTap: _showDateFilterDialog,
+                                          tooltip: 'Klik untuk filter tanggal',
                                         ),
                                       ),
                                     ],
@@ -1059,12 +1097,137 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
   );
 }
 
+  String _getDateFilterLabel() {
+    switch (_selectedDateRangePreset) {
+      case 'today':
+        return 'Hari Ini';
+      case 'yesterday':
+        return 'Kemarin';
+      case 'last7days':
+        return '7 Hari Terakhir';
+      case 'last30days':
+        return '1 Bulan Terakhir';
+      case 'thismonth':
+        return 'Bulan Ini';
+      case 'all':
+        return 'Semua Transaksi';
+      case 'custom':
+        if (_customDateRange != null) {
+          return '${DateFormat('dd/MM/yy').format(_customDateRange!.start)} - ${DateFormat('dd/MM/yy').format(_customDateRange!.end)}';
+        }
+        return 'Rentang Khusus';
+      default:
+        return 'Hari Ini';
+    }
+  }
+
+  void _showDateFilterDialog() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Filter Tanggal Riwayat & Total Omset',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  leading: const Icon(Icons.today, color: Colors.blue),
+                  title: const Text('Hari Ini'),
+                  selected: _selectedDateRangePreset == 'today',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _applyDatePreset('today');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.history, color: Colors.orange),
+                  title: const Text('Kemarin'),
+                  selected: _selectedDateRangePreset == 'yesterday',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _applyDatePreset('yesterday');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.date_range, color: Colors.green),
+                  title: const Text('7 Hari Terakhir'),
+                  selected: _selectedDateRangePreset == 'last7days',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _applyDatePreset('last7days');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.calendar_month, color: Colors.teal),
+                  title: const Text('1 Bulan Terakhir (30 Hari)'),
+                  selected: _selectedDateRangePreset == 'last30days',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _applyDatePreset('last30days');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.calendar_view_month, color: Colors.indigo),
+                  title: const Text('Bulan Ini'),
+                  selected: _selectedDateRangePreset == 'thismonth',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _applyDatePreset('thismonth');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.all_inclusive, color: Colors.purple),
+                  title: const Text('Semua Transaksi'),
+                  selected: _selectedDateRangePreset == 'all',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _applyDatePreset('all');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.edit_calendar, color: Colors.blueAccent),
+                  title: const Text('Pilih Rentang Tanggal Khusus...'),
+                  selected: _selectedDateRangePreset == 'custom',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickCustomDateRange();
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildMetricCard({
     required String title,
     required String value,
     required IconData icon,
     required Color color,
     VoidCallback? onTap,
+    String? subtitle,
+    String? tooltip,
   }) {
     final cardContent = Card(
       elevation: 2,
@@ -1076,7 +1239,13 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(title, style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
                 Icon(icon, size: 14, color: color),
               ],
             ),
@@ -1087,16 +1256,35 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
               overflow: TextOverflow.ellipsis,
               maxLines: 1,
             ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(Icons.calendar_today, size: 10, color: color.withOpacity(0.8)),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      subtitle,
+                      style: TextStyle(fontSize: 9.5, color: color, fontWeight: FontWeight.w500),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
     );
 
     if (onTap != null) {
-      return InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8.0),
-        child: cardContent,
+      return Tooltip(
+        message: tooltip ?? 'Filter Tanggal',
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8.0),
+          child: cardContent,
+        ),
       );
     }
     return cardContent;
