@@ -8,6 +8,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../data/models/sale_model.dart';
 import '../../data/models/settings_model.dart';
+import '../../core/utils/windows_raw_printer.dart';
 
 class PrinterService {
   static final PrinterService instance = PrinterService._internal();
@@ -160,6 +161,27 @@ class PrinterService {
 
   /// Sends print job to Windows USB/Spooler printer
   Future<bool> printToWindows(String printerName, SaleModel sale, SettingsModel settings) async {
+    // 1. Prioritize Direct RAW ESC/POS printing via Windows Spooler.
+    // This sends raw ESC/POS byte commands directly to the thermal printer hardware,
+    // exactly matching the Android output and completely eliminating the 4cm blank bottom space
+    // caused by Windows GDI page rasterization.
+    try {
+      final rawBytes = generateReceiptBytes(sale, settings);
+      final rawSuccess = WindowsRawPrinter.printRawBytes(
+        printerName,
+        rawBytes,
+        docName: 'Nota ${sale.invoiceNo}',
+        copies: settings.printReceiptCopies,
+      );
+      if (rawSuccess) {
+        dev.log('Windows RAW print successful for: $printerName');
+        return true;
+      }
+    } catch (e) {
+      dev.log('Windows RAW print failed, falling back to PDF: $e');
+    }
+
+    // 2. Fallback to PDF raster printing if RAW fails
     try {
       final doc = pw.Document();
       
@@ -265,7 +287,9 @@ class PrinterService {
       for (int i = 0; i < settings.printReceiptCopies; i++) {
         await Printing.directPrintPdf(
           printer: printer,
-          onLayout: (PdfPageFormat format) async => doc.save(),
+          format: format,
+          usePrinterSettings: true,
+          onLayout: (PdfPageFormat _) async => doc.save(),
         );
       }
       return true;
@@ -277,6 +301,39 @@ class PrinterService {
 
   /// Sends test print to Windows USB/Spooler printer
   Future<bool> printTestToWindows(String printerName, SettingsModel settings) async {
+    // 1. Prioritize Direct RAW ESC/POS test print
+    try {
+      final builder = EscPosBuilder(paperSize: settings.printerPaperSize);
+      builder.initialize();
+      builder.alignCenter();
+      builder.boldOn();
+      builder.text('TEST PRINT');
+      builder.boldOff();
+      builder.line();
+      builder.alignLeft();
+      builder.text('Printer : $printerName');
+      builder.text('Koneksi : USB (Windows RAW)');
+      builder.text('Waktu   : ${_formatDateTime(DateTime.now())}');
+      builder.line();
+      builder.alignCenter();
+      builder.text('PRINTER BERHASIL TERHUBUNG');
+      builder.feed(1);
+      builder.cut();
+
+      final rawSuccess = WindowsRawPrinter.printRawBytes(
+        printerName,
+        builder.bytes,
+        docName: 'Test Print',
+      );
+      if (rawSuccess) {
+        dev.log('Windows test RAW print successful for: $printerName');
+        return true;
+      }
+    } catch (e) {
+      dev.log('Windows test RAW print failed: $e');
+    }
+
+    // 2. Fallback to PDF test print
     try {
       final doc = pw.Document();
       final double width = settings.printerPaperSize == 80 ? 72 * PdfPageFormat.mm : 48 * PdfPageFormat.mm;
@@ -317,7 +374,9 @@ class PrinterService {
       final printer = Printer(url: printerName, name: printerName);
       return await Printing.directPrintPdf(
         printer: printer,
-        onLayout: (PdfPageFormat format) async => doc.save(),
+        format: format,
+        usePrinterSettings: true,
+        onLayout: (PdfPageFormat _) async => doc.save(),
       );
     } catch (e) {
       dev.log('Windows test print failed: $e');

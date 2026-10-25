@@ -64,8 +64,8 @@ class ItemsRepositoryImpl implements ItemsRepository {
   }
 
   @override
-  Future<void> updateItemBarcode(String itemNo, String barcode) {
-    return _apiClient.updateItemBarcode(itemNo, barcode);
+  Future<void> updateItemBarcode(String itemNo, String barcode, {String? userId, String? username}) {
+    return _apiClient.updateItemBarcode(itemNo, barcode, userId: userId, username: username);
   }
 
   @override

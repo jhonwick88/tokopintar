@@ -28,13 +28,24 @@ class ReconciliationState {
   DateTimeRange get _activeRange {
     final now = DateTime.now();
     DateTime start;
-    DateTime end = DateTime(now.year, now.month, now.day, 23, 59, 59);
+    DateTime end = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
 
-    if (filterType == 'today') {
+    if (filterType == 'all') {
+      start = DateTime(2000);
+      end = DateTime(now.year + 10);
+    } else if (filterType == 'today') {
       start = DateTime(now.year, now.month, now.day);
+    } else if (filterType == 'yesterday') {
+      final yesterday = now.subtract(const Duration(days: 1));
+      start = DateTime(yesterday.year, yesterday.month, yesterday.day);
+      end = DateTime(yesterday.year, yesterday.month, yesterday.day, 23, 59, 59, 999);
     } else if (filterType == 'weekly') {
       start = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 6));
     } else if (filterType == 'monthly') {
+      // 1 Bulan Terakhir (30 Hari)
+      start = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 29));
+    } else if (filterType == 'thismonth') {
+      // Bulan Kalender Ini
       start = DateTime(now.year, now.month, 1);
     } else {
       // custom
@@ -42,7 +53,7 @@ class ReconciliationState {
         start = DateTime(2000);
       } else {
         start = DateTime(customStartDate!.year, customStartDate!.month, customStartDate!.day);
-        end = DateTime(customEndDate!.year, customEndDate!.month, customEndDate!.day, 23, 59, 59);
+        end = DateTime(customEndDate!.year, customEndDate!.month, customEndDate!.day, 23, 59, 59, 999);
       }
     }
     return DateTimeRange(start: start, end: end);
@@ -80,6 +91,14 @@ class ReconciliationState {
 
   double get totalDifference {
     return filteredReconciliations.fold(0.0, (sum, rec) => sum + rec.difference);
+  }
+
+  double get totalSystemRevenue {
+    return filteredReconciliations.fold(0.0, (sum, rec) => sum + rec.systemRevenue);
+  }
+
+  double get totalActualDrawerCash {
+    return filteredReconciliations.fold(0.0, (sum, rec) => sum + rec.actualDrawerCash);
   }
 
   double get totalCashOut {

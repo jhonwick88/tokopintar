@@ -74,7 +74,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final salesState = ref.watch(salesHistoryNotifierProvider);
     final now = DateTime.now();
 
-    final completedSales = salesState.sales.where((s) => s.status == 'completed').toList();
+    final completedSales = salesState.sales.where((s) {
+      if (s.status != 'completed') return false;
+      if (salesState.startDate != null && s.date.isBefore(salesState.startDate!)) return false;
+      if (salesState.endDate != null && s.date.isAfter(salesState.endDate!)) return false;
+      return true;
+    }).toList();
 
     // 1. Calculate stats based on currently loaded sales (which respect active date filters)
     double totalRevenue = 0.0;

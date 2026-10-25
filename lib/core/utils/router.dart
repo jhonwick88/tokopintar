@@ -19,6 +19,7 @@ import '../../presentation/screens/inventory_dashboard_screen.dart';
 import '../../presentation/screens/suppliers_screen.dart';
 import '../../presentation/screens/developer_contact_screen.dart';
 import '../../presentation/screens/sales_report_screen.dart';
+import '../../presentation/screens/barcode_report_screen.dart';
 import '../../presentation/screens/users_screen.dart';
 import '../../data/models/category_model.dart';
 
@@ -77,6 +78,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         '/units',
         '/suppliers',
         '/sales-report',
+        '/barcode-report',
         '/users',
       ];
       if (adminRoutes.contains(state.matchedLocation) && !isAdmin) {
@@ -92,6 +94,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/sales-report',
         builder: (context, state) => const SalesReportScreen(),
+      ),
+      GoRoute(
+        path: '/barcode-report',
+        builder: (context, state) => const BarcodeReportScreen(),
       ),
       GoRoute(
         path: '/users',

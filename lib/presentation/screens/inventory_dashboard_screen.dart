@@ -74,6 +74,15 @@ class InventoryDashboardScreen extends ConsumerWidget {
                         route: '/sales-report',
                         isDesktop: isDesktop,
                       ),
+                    _buildInventoryCard(
+                      context: context,
+                      title: 'Laporan Rekam Barcode',
+                      description: 'Pantau histori perekaman barcode produk dan kinerja progres staf/kasir',
+                      icon: Icons.qr_code_scanner,
+                      color: Colors.deepPurple,
+                      route: '/barcode-report',
+                      isDesktop: isDesktop,
+                    ),
                     if (hasMultiUser)
                       _buildInventoryCard(
                         context: context,

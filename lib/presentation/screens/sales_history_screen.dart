@@ -165,20 +165,92 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _keyboardFocusNode = FocusNode();
 
+  String _selectedDateRangePreset = 'today';
+  DateTimeRange? _customDateRange;
+  int _currentPage = 1;
+  int _itemsPerPage = 20;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _refreshToday();
+      _applyDatePreset('today');
+      ref.read(reconciliationProvider.notifier).fetchData();
     });
   }
 
-  void _refreshToday() {
+  void _applyDatePreset(String preset) {
+    setState(() {
+      _selectedDateRangePreset = preset;
+      _currentPage = 1;
+    });
+
     final now = DateTime.now();
-    ref.read(salesHistoryNotifierProvider.notifier).updateDateFilter(
-      DateTime(now.year, now.month, now.day),
-      DateTime(now.year, now.month, now.day, 23, 59, 59),
+    DateTime? start;
+    DateTime? end = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+
+    switch (preset) {
+      case 'all':
+        start = null;
+        end = null;
+        break;
+      case 'today':
+        start = DateTime(now.year, now.month, now.day, 0, 0, 0);
+        break;
+      case 'yesterday':
+        final yesterday = now.subtract(const Duration(days: 1));
+        start = DateTime(yesterday.year, yesterday.month, yesterday.day, 0, 0, 0);
+        end = DateTime(yesterday.year, yesterday.month, yesterday.day, 23, 59, 59, 999);
+        break;
+      case 'last7days':
+        final d7 = now.subtract(const Duration(days: 6));
+        start = DateTime(d7.year, d7.month, d7.day, 0, 0, 0);
+        break;
+      case 'last30days':
+        final d30 = now.subtract(const Duration(days: 29));
+        start = DateTime(d30.year, d30.month, d30.day, 0, 0, 0);
+        break;
+      case 'thismonth':
+        start = DateTime(now.year, now.month, 1, 0, 0, 0);
+        break;
+      case 'custom':
+        if (_customDateRange != null) {
+          start = DateTime(_customDateRange!.start.year, _customDateRange!.start.month, _customDateRange!.start.day, 0, 0, 0);
+          end = DateTime(_customDateRange!.end.year, _customDateRange!.end.month, _customDateRange!.end.day, 23, 59, 59, 999);
+        } else {
+          start = DateTime(now.year, now.month, now.day, 0, 0, 0);
+        }
+        break;
+      default:
+        start = DateTime(now.year, now.month, now.day, 0, 0, 0);
+    }
+
+    ref.read(salesHistoryNotifierProvider.notifier).updateDateFilter(start, end);
+  }
+
+  Future<void> _pickCustomDateRange() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(now.year + 2),
+      initialDateRange: _customDateRange ??
+          DateTimeRange(
+            start: DateTime(now.year, now.month, now.day).subtract(const Duration(days: 7)),
+            end: now,
+          ),
     );
+
+    if (picked != null) {
+      setState(() {
+        _customDateRange = picked;
+      });
+      _applyDatePreset('custom');
+    }
+  }
+
+  void _refreshToday() {
+    _applyDatePreset('today');
     ref.read(reconciliationProvider.notifier).fetchData();
   }
 
@@ -627,22 +699,49 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                     SliverPersistentHeader(
                       pinned: true,
                       delegate: _SearchAndFilterHeaderDelegate(
-                        height: isLarge ? 140.0 : 210.0,
+                        height: isLarge ? 175.0 : 225.0,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Date Presets Row
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  _buildDateChip('Hari Ini', 'today'),
+                                  _buildDateChip('Kemarin', 'yesterday'),
+                                  _buildDateChip('7 Hari', 'last7days'),
+                                  _buildDateChip('1 Bulan', 'last30days'),
+                                  _buildDateChip('Bulan Ini', 'thismonth'),
+                                  _buildDateChip('Semua', 'all'),
+                                  _buildDateChip(
+                                    _selectedDateRangePreset == 'custom' && _customDateRange != null
+                                        ? '${DateFormat('dd/MM').format(_customDateRange!.start)} - ${DateFormat('dd/MM').format(_customDateRange!.end)}'
+                                        : 'Pilih Rentang...',
+                                    'custom',
+                                    icon: Icons.calendar_today_rounded,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
                             // Search Bar
                             TextField(
                               controller: _searchController,
                               decoration: const InputDecoration(
-                                prefixIcon: Icon(Icons.search),
-                                hintText: 'Cari No. Invoice / Nama Produk...',
+                                isDense: true,
+                                prefixIcon: Icon(Icons.search, size: 20),
+                                hintText: 'Cari No. Invoice / Nama Produk / Kasir...',
+                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                               ),
                               onChanged: (val) {
+                                setState(() {
+                                  _currentPage = 1;
+                                });
                                 ref.read(salesHistoryNotifierProvider.notifier).setSearchQuery(val.trim());
                               },
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 8),
                             // Filters dropdowns
                             if (isLarge) ...[
                               Row(
@@ -652,6 +751,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                       value: historyState.selectedPaymentMethod,
                                       isExpanded: true,
                                       decoration: const InputDecoration(
+                                        isDense: true,
                                         labelText: 'Metode Bayar',
                                         contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                       ),
@@ -664,6 +764,9 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                       ],
                                       onChanged: (val) {
                                         if (val != null) {
+                                          setState(() {
+                                            _currentPage = 1;
+                                          });
                                           ref.read(salesHistoryNotifierProvider.notifier).setPaymentMethodFilter(val);
                                         }
                                       },
@@ -675,6 +778,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                       value: historyState.selectedStatus,
                                       isExpanded: true,
                                       decoration: const InputDecoration(
+                                        isDense: true,
                                         labelText: 'Status',
                                         contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                       ),
@@ -686,6 +790,9 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                       ],
                                       onChanged: (val) {
                                         if (val != null) {
+                                          setState(() {
+                                            _currentPage = 1;
+                                          });
                                           ref.read(salesHistoryNotifierProvider.notifier).setStatusFilter(val);
                                         }
                                       },
@@ -694,45 +801,61 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                 ],
                               ),
                             ] else ...[
-                              DropdownButtonFormField<String>(
-                                value: historyState.selectedPaymentMethod,
-                                isExpanded: true,
-                                decoration: const InputDecoration(
-                                  labelText: 'Metode Bayar',
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                ),
-                                items: const [
-                                  DropdownMenuItem(value: 'all', child: Text('Semua Metode', overflow: TextOverflow.ellipsis, maxLines: 1)),
-                                  DropdownMenuItem(value: 'cash', child: Text('Tunai', overflow: TextOverflow.ellipsis, maxLines: 1)),
-                                  DropdownMenuItem(value: 'qris', child: Text('QRIS', overflow: TextOverflow.ellipsis, maxLines: 1)),
-                                  DropdownMenuItem(value: 'bank', child: Text('Bank/Card', overflow: TextOverflow.ellipsis, maxLines: 1)),
-                                  DropdownMenuItem(value: 'ewallet', child: Text('E-Wallet', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      value: historyState.selectedPaymentMethod,
+                                      isExpanded: true,
+                                      decoration: const InputDecoration(
+                                        isDense: true,
+                                        labelText: 'Metode Bayar',
+                                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      ),
+                                      items: const [
+                                        DropdownMenuItem(value: 'all', child: Text('Semua', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                        DropdownMenuItem(value: 'cash', child: Text('Tunai', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                        DropdownMenuItem(value: 'qris', child: Text('QRIS', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                        DropdownMenuItem(value: 'bank', child: Text('Bank', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                        DropdownMenuItem(value: 'ewallet', child: Text('E-Wallet', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                      ],
+                                      onChanged: (val) {
+                                        if (val != null) {
+                                          setState(() {
+                                            _currentPage = 1;
+                                          });
+                                          ref.read(salesHistoryNotifierProvider.notifier).setPaymentMethodFilter(val);
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      value: historyState.selectedStatus,
+                                      isExpanded: true,
+                                      decoration: const InputDecoration(
+                                        isDense: true,
+                                        labelText: 'Status',
+                                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      ),
+                                      items: const [
+                                        DropdownMenuItem(value: 'all', child: Text('Semua', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                        DropdownMenuItem(value: 'completed', child: Text('Completed', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                        DropdownMenuItem(value: 'voided', child: Text('Voided', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                        DropdownMenuItem(value: 'refunded', child: Text('Refunded', overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                      ],
+                                      onChanged: (val) {
+                                        if (val != null) {
+                                          setState(() {
+                                            _currentPage = 1;
+                                          });
+                                          ref.read(salesHistoryNotifierProvider.notifier).setStatusFilter(val);
+                                        }
+                                      },
+                                    ),
+                                  ),
                                 ],
-                                onChanged: (val) {
-                                  if (val != null) {
-                                    ref.read(salesHistoryNotifierProvider.notifier).setPaymentMethodFilter(val);
-                                  }
-                                },
-                              ),
-                              const SizedBox(height: 8),
-                              DropdownButtonFormField<String>(
-                                value: historyState.selectedStatus,
-                                isExpanded: true,
-                                decoration: const InputDecoration(
-                                  labelText: 'Status',
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                ),
-                                items: const [
-                                  DropdownMenuItem(value: 'all', child: Text('Semua Status', overflow: TextOverflow.ellipsis, maxLines: 1)),
-                                  DropdownMenuItem(value: 'completed', child: Text('Completed', overflow: TextOverflow.ellipsis, maxLines: 1)),
-                                  DropdownMenuItem(value: 'voided', child: Text('Voided', overflow: TextOverflow.ellipsis, maxLines: 1)),
-                                  DropdownMenuItem(value: 'refunded', child: Text('Refunded', overflow: TextOverflow.ellipsis, maxLines: 1)),
-                                ],
-                                onChanged: (val) {
-                                  if (val != null) {
-                                    ref.read(salesHistoryNotifierProvider.notifier).setStatusFilter(val);
-                                  }
-                                },
                               ),
                             ],
                           ],
@@ -740,7 +863,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                       ),
                     ),
                     
-                    // Invoices List Content
+                    // Invoices List Content with Pagination
                     if (historyState.isLoading)
                       const SliverFillRemaining(
                         hasScrollBody: false,
@@ -751,72 +874,107 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                         hasScrollBody: false,
                         child: Center(child: Text('Tidak ada riwayat transaksi')),
                       )
-                    else
-                      SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final sale = historyState.filteredSales[index];
-                            final isSelected = _selectedSale?.invoiceNo == sale.invoiceNo;
-                            
-                            Color statusColor = Colors.green;
-                            if (sale.status == 'voided') {
-                              statusColor = Colors.red;
-                            } else if (sale.status == 'refunded') {
-                              statusColor = Colors.orange;
-                            }
+                    else ...[
+                      Builder(
+                        builder: (context) {
+                          final allItems = historyState.filteredSales;
+                          final totalItems = allItems.length;
+                          final totalPages = (totalItems / _itemsPerPage).ceil().clamp(1, 999999);
+                          final safeCurrentPage = _currentPage.clamp(1, totalPages);
+                          final startIndex = (safeCurrentPage - 1) * _itemsPerPage;
+                          final paginatedSales = allItems.skip(startIndex).take(_itemsPerPage).toList();
 
-                            return Column(
-                              children: [
-                                ListTile(
-                                  selected: isSelected,
-                                  selectedTileColor: Theme.of(context).colorScheme.primary.withOpacity(0.05),
-                                  title: Text(
-                                    sale.invoiceNo,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                  ),
-                                  subtitle: Text(
-                                    '${DateFormat('dd/MM/yyyy HH:mm').format(sale.date)} | ${sale.cashier}',
-                                    style: const TextStyle(fontSize: 11),
-                                  ),
-                                  trailing: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text(
-                                        currencyFormatter.format(sale.grandTotal),
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          return SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                final sale = paginatedSales[index];
+                                final isSelected = _selectedSale?.invoiceNo == sale.invoiceNo;
+                                
+                                Color statusColor = Colors.green;
+                                if (sale.status == 'voided') {
+                                  statusColor = Colors.red;
+                                } else if (sale.status == 'refunded') {
+                                  statusColor = Colors.orange;
+                                }
+
+                                return Column(
+                                  children: [
+                                    ListTile(
+                                      selected: isSelected,
+                                      selectedTileColor: Theme.of(context).colorScheme.primary.withOpacity(0.05),
+                                      title: Text(
+                                        sale.invoiceNo,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                                       ),
-                                      const SizedBox(height: 2),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: statusColor.withOpacity(0.12),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          sale.status.toUpperCase(),
-                                          style: TextStyle(color: statusColor, fontSize: 8, fontWeight: FontWeight.bold),
-                                        ),
+                                      subtitle: Text(
+                                        '${DateFormat('dd/MM/yyyy HH:mm').format(sale.date)} | ${sale.cashier}',
+                                        style: const TextStyle(fontSize: 11),
                                       ),
-                                    ],
-                                  ),
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedSale = sale;
-                                    });
-                                    if (!isLarge) {
-                                      _showReceiptPreviewModal(context, sale);
-                                    }
-                                  },
-                                ),
-                                if (index < historyState.filteredSales.length - 1)
-                                  const Divider(height: 1),
-                              ],
-                            );
-                          },
-                          childCount: historyState.filteredSales.length,
-                        ),
+                                      trailing: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            currencyFormatter.format(sale.grandTotal),
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: statusColor.withOpacity(0.12),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              sale.status.toUpperCase(),
+                                              style: TextStyle(color: statusColor, fontSize: 8, fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      onTap: () {
+                                        setState(() {
+                                          _selectedSale = sale;
+                                        });
+                                        if (!isLarge) {
+                                          _showReceiptPreviewModal(context, sale);
+                                        }
+                                      },
+                                    ),
+                                    if (index < paginatedSales.length - 1)
+                                      const Divider(height: 1),
+                                  ],
+                                );
+                              },
+                              childCount: paginatedSales.length,
+                            ),
+                          );
+                        },
                       ),
+                      Builder(
+                        builder: (context) {
+                          final totalItems = historyState.filteredSales.length;
+                          final totalPages = (totalItems / _itemsPerPage).ceil().clamp(1, 999999);
+                          final safeCurrentPage = _currentPage.clamp(1, totalPages);
+                          final startIndex = (safeCurrentPage - 1) * _itemsPerPage;
+
+                          return SliverToBoxAdapter(
+                            child: _buildPaginationBar(
+                              currentPage: safeCurrentPage,
+                              totalPages: totalPages,
+                              totalItems: totalItems,
+                              itemsPerPage: _itemsPerPage,
+                              startIndex: startIndex,
+                              onPageChanged: (p) => setState(() => _currentPage = p),
+                              onItemsPerPageChanged: (n) => setState(() {
+                                _itemsPerPage = n;
+                                _currentPage = 1;
+                              }),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ],
                 ),
                 ),
@@ -1252,6 +1410,138 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
         ),
       );
     }
+  }
+
+  Widget _buildDateChip(String label, String preset, {IconData? icon}) {
+    final isSelected = _selectedDateRangePreset == preset;
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(right: 6.0),
+      child: ChoiceChip(
+        avatar: icon != null
+            ? Icon(icon, size: 14, color: isSelected ? Colors.white : theme.colorScheme.primary)
+            : null,
+        label: Text(label),
+        labelStyle: TextStyle(
+          fontSize: 11,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          color: isSelected ? Colors.white : Colors.grey.shade800,
+        ),
+        selected: isSelected,
+        selectedColor: theme.colorScheme.primary,
+        backgroundColor: theme.cardColor,
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+        onSelected: (_) {
+          if (preset == 'custom') {
+            _pickCustomDateRange();
+          } else {
+            _applyDatePreset(preset);
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildPaginationBar({
+    required int currentPage,
+    required int totalPages,
+    required int totalItems,
+    required int itemsPerPage,
+    required int startIndex,
+    required ValueChanged<int> onPageChanged,
+    required ValueChanged<int> onItemsPerPageChanged,
+  }) {
+    final theme = Theme.of(context);
+    final endItem = (startIndex + itemsPerPage).clamp(1, totalItems);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        border: Border(top: BorderSide(color: Colors.grey.withOpacity(0.15))),
+      ),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12,
+        runSpacing: 8,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Data ${startIndex + 1} - $endItem dari $totalItems',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(width: 12),
+              DropdownButton<int>(
+                value: itemsPerPage,
+                isDense: true,
+                underline: const SizedBox(),
+                items: const [
+                  DropdownMenuItem(value: 10, child: Text('10 / hal', style: TextStyle(fontSize: 12))),
+                  DropdownMenuItem(value: 20, child: Text('20 / hal', style: TextStyle(fontSize: 12))),
+                  DropdownMenuItem(value: 50, child: Text('50 / hal', style: TextStyle(fontSize: 12))),
+                  DropdownMenuItem(value: 100, child: Text('100 / hal', style: TextStyle(fontSize: 12))),
+                ],
+                onChanged: (val) {
+                  if (val != null) onItemsPerPageChanged(val);
+                },
+              ),
+            ],
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.first_page, size: 18),
+                tooltip: 'Halaman Pertama',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                onPressed: currentPage > 1 ? () => onPageChanged(1) : null,
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_left, size: 20),
+                tooltip: 'Sebelumnya',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                onPressed: currentPage > 1 ? () => onPageChanged(currentPage - 1) : null,
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '$currentPage / $totalPages',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right, size: 20),
+                tooltip: 'Berikutnya',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                onPressed: currentPage < totalPages ? () => onPageChanged(currentPage + 1) : null,
+              ),
+              IconButton(
+                icon: const Icon(Icons.last_page, size: 18),
+                tooltip: 'Halaman Terakhir',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                onPressed: currentPage < totalPages ? () => onPageChanged(totalPages) : null,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 

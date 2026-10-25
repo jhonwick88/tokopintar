@@ -119,10 +119,12 @@ class ApiClient {
     }
   }
 
-  Future<void> updateItemBarcode(String itemNo, String barcode) async {
+  Future<void> updateItemBarcode(String itemNo, String barcode, {String? userId, String? username}) async {
     try {
       final response = await _dio.patch('/api/items/$itemNo/barcode', data: {
         'barcode': barcode,
+        if (userId != null) 'user_id': userId,
+        if (username != null) 'username': username,
       });
       if (response.statusCode != 200) {
         throw Exception('Gagal memperbarui barcode');
@@ -621,6 +623,68 @@ class ApiClient {
       }
     } catch (e) {
       dev.log('Error in saveQuickItem: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteQuickItem(String id) async {
+    try {
+      final response = await _dio.delete('/api/quick-items/$id');
+      if (response.statusCode != 200) {
+        throw Exception(response.data?['message'] ?? 'Gagal menghapus quick item');
+      }
+    } catch (e) {
+      dev.log('Error in deleteQuickItem: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> saveQuickItemsBatch(List<QuickItemModel> items) async {
+    try {
+      final response = await _dio.post('/api/quick-items/batch', data: items.map((e) => e.toJson()).toList());
+      if (response.statusCode != 200) {
+        throw Exception(response.data?['message'] ?? 'Gagal menyimpan batch quick item');
+      }
+    } catch (e) {
+      dev.log('Error in saveQuickItemsBatch: $e');
+      rethrow;
+    }
+  }
+
+  // --- Barcode Logs ---
+
+  Future<Map<String, dynamic>> getBarcodeLogs({
+    DateTime? startDate,
+    DateTime? endDate,
+    String? username,
+    String? search,
+    int limit = 200,
+    int offset = 0,
+  }) async {
+    try {
+      final queryParams = <String, dynamic>{
+        'limit': limit.toString(),
+        'offset': offset.toString(),
+      };
+      if (startDate != null) queryParams['start_date'] = startDate.toIso8601String();
+      if (endDate != null) queryParams['end_date'] = endDate.toIso8601String();
+      if (username != null && username.isNotEmpty && username != 'all') {
+        queryParams['user'] = username;
+      }
+      if (search != null && search.isNotEmpty) {
+        queryParams['q'] = search;
+      }
+
+      final response = await _dio.get('/api/barcode-logs', queryParameters: queryParams);
+      if (response.statusCode == 200 && response.data != null) {
+        final success = response.data['success'] as bool? ?? false;
+        if (success && response.data['data'] != null) {
+          return response.data['data'] as Map<String, dynamic>;
+        }
+      }
+      return {};
+    } catch (e) {
+      dev.log('Error in getBarcodeLogs: $e');
       rethrow;
     }
   }

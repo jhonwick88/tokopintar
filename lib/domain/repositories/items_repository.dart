@@ -13,6 +13,6 @@ abstract class ItemsRepository {
   Future<void> updateStock(String itemNo, double obQuantity, {String? notes});
   Future<List<ItemModel>> getItemsByBarcode(String barcode);
   Future<Map<String, int>> getBarcodeStats();
-  Future<void> updateItemBarcode(String itemNo, String barcode);
+  Future<void> updateItemBarcode(String itemNo, String barcode, {String? userId, String? username});
   Future<List<ItemModel>> getAllItems({String? barcodeStatus});
 }

@@ -20,14 +20,24 @@ class QuickItemsRepositoryImpl implements QuickItemsRepository {
 
   @override
   Future<void> deleteQuickItem(String id) async {
-    // Requires backend DELETE endpoint
-    dev.log('deleteQuickItem called but not supported by backend yet: $id');
+    try {
+      await _apiClient.deleteQuickItem(id);
+    } catch (e) {
+      dev.log('Error deleting quick item from backend: $e');
+    }
   }
 
   @override
   Future<void> saveQuickItemsBatch(List<QuickItemModel> items) async {
-    for (var item in items) {
-      await _apiClient.saveQuickItem(item);
+    try {
+      await _apiClient.saveQuickItemsBatch(items);
+    } catch (e) {
+      // Fallback one-by-one if batch route not supported
+      for (var item in items) {
+        try {
+          await _apiClient.saveQuickItem(item);
+        } catch (_) {}
+      }
     }
   }
 }

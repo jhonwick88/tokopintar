@@ -25,6 +25,8 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
   String _selectedDateRangePreset = 'today'; // 'today', 'yesterday', 'last7days', 'thismonth', 'custom'
   DateTimeRange? _customDateRange;
   String _sortBy = 'omset_desc'; // 'omset_desc', 'omset_asc', 'qty_desc', 'qty_asc', 'name_asc'
+  int _productPage = 1;
+  int _productsPerPage = 20;
 
   final NumberFormat _currencyFormatter = NumberFormat.currency(
     locale: 'id_ID',
@@ -51,37 +53,47 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
   void _applyDatePreset(String preset) {
     setState(() {
       _selectedDateRangePreset = preset;
+      _productPage = 1;
     });
 
     final now = DateTime.now();
-    DateTime start;
-    DateTime end = DateTime(now.year, now.month, now.day, 23, 59, 59);
+    DateTime? start;
+    DateTime? end = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
 
     switch (preset) {
+      case 'all':
+        start = null;
+        end = null;
+        break;
       case 'today':
-        start = DateTime(now.year, now.month, now.day);
+        start = DateTime(now.year, now.month, now.day, 0, 0, 0);
         break;
       case 'yesterday':
         final yesterday = now.subtract(const Duration(days: 1));
-        start = DateTime(yesterday.year, yesterday.month, yesterday.day);
-        end = DateTime(yesterday.year, yesterday.month, yesterday.day, 23, 59, 59);
+        start = DateTime(yesterday.year, yesterday.month, yesterday.day, 0, 0, 0);
+        end = DateTime(yesterday.year, yesterday.month, yesterday.day, 23, 59, 59, 999);
         break;
       case 'last7days':
-        start = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 6));
+        final d7 = now.subtract(const Duration(days: 6));
+        start = DateTime(d7.year, d7.month, d7.day, 0, 0, 0);
+        break;
+      case 'last30days':
+        final d30 = now.subtract(const Duration(days: 29));
+        start = DateTime(d30.year, d30.month, d30.day, 0, 0, 0);
         break;
       case 'thismonth':
-        start = DateTime(now.year, now.month, 1);
+        start = DateTime(now.year, now.month, 1, 0, 0, 0);
         break;
       case 'custom':
         if (_customDateRange != null) {
-          start = DateTime(_customDateRange!.start.year, _customDateRange!.start.month, _customDateRange!.start.day);
-          end = DateTime(_customDateRange!.end.year, _customDateRange!.end.month, _customDateRange!.end.day, 23, 59, 59);
+          start = DateTime(_customDateRange!.start.year, _customDateRange!.start.month, _customDateRange!.start.day, 0, 0, 0);
+          end = DateTime(_customDateRange!.end.year, _customDateRange!.end.month, _customDateRange!.end.day, 23, 59, 59, 999);
         } else {
-          start = DateTime(now.year, now.month, now.day);
+          start = DateTime(now.year, now.month, now.day, 0, 0, 0);
         }
         break;
       default:
-        start = DateTime(now.year, now.month, now.day);
+        start = DateTime(now.year, now.month, now.day, 0, 0, 0);
     }
 
     ref.read(salesHistoryNotifierProvider.notifier).updateDateFilter(start, end);
@@ -214,8 +226,13 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
       categoryLookup[cat.id] = cat;
     }
 
-    // Only count completed sales (exclude voided)
-    final completedSales = salesState.sales.where((s) => s.status.toLowerCase() != 'voided').toList();
+    // Only count completed sales within the active date filter (exclude voided)
+    final completedSales = salesState.sales.where((s) {
+      if (s.status.toLowerCase() == 'voided') return false;
+      if (salesState.startDate != null && s.date.isBefore(salesState.startDate!)) return false;
+      if (salesState.endDate != null && s.date.isAfter(salesState.endDate!)) return false;
+      return true;
+    }).toList();
 
     // 1. Calculate Product Sales & map to Category
     final Map<String, _ProductSalesSummary> productSalesMap = {};
@@ -378,49 +395,56 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
             const SizedBox(width: 8),
           ],
         ),
-        body: RefreshIndicator(
-          onRefresh: () async {
-            await ref.read(salesHistoryNotifierProvider.notifier).fetchSales();
-            await ref.read(categoriesProvider.notifier).loadCategories();
-          },
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(20.0),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1200),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Filter Section
-                  Card(
-                    elevation: 0,
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.4),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(color: Colors.grey.withOpacity(0.15)),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
+        body: Column(
+          children: [
+            if (salesState.isLoading)
+              const LinearProgressIndicator(minHeight: 3),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  await ref.read(salesHistoryNotifierProvider.notifier).fetchSales();
+                  await ref.read(categoriesProvider.notifier).loadCategories();
+                },
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(20.0),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1200),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Date Preset Chips
-                          Row(
-                            children: [
-                              const Icon(Icons.calendar_today_outlined, size: 18),
-                              const SizedBox(width: 8),
-                              const Text('Periode: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: Row(
+                          // Filter Section
+                          Card(
+                            elevation: 0,
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.4),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: BorderSide(color: Colors.grey.withOpacity(0.15)),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Date Preset Chips
+                                  Row(
                                     children: [
-                                      _buildDateChip('Hari Ini', 'today'),
-                                      _buildDateChip('Kemarin', 'yesterday'),
-                                      _buildDateChip('7 Hari Terakhir', 'last7days'),
-                                      _buildDateChip('Bulan Ini', 'thismonth'),
+                                      const Icon(Icons.calendar_today_outlined, size: 18),
+                                      const SizedBox(width: 8),
+                                      const Text('Periode: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: SingleChildScrollView(
+                                          scrollDirection: Axis.horizontal,
+                                          child: Row(
+                                            children: [
+                                              _buildDateChip('Hari Ini', 'today'),
+                                              _buildDateChip('Kemarin', 'yesterday'),
+                                              _buildDateChip('7 Hari', 'last7days'),
+                                              _buildDateChip('1 Bulan', 'last30days'),
+                                              _buildDateChip('Bulan Ini', 'thismonth'),
+                                              _buildDateChip('Semua', 'all'),
                                       ActionChip(
                                         avatar: const Icon(Icons.date_range, size: 16),
                                         label: Text(
@@ -471,7 +495,10 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
                                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                                     isDense: true,
                                   ),
-                                  onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                                  onChanged: (val) => setState(() {
+                                    _searchQuery = val.trim();
+                                    _productPage = 1;
+                                  }),
                                 ),
                               ),
                               // Category Filter Dropdown
@@ -504,6 +531,7 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
                                   onChanged: (val) {
                                     setState(() {
                                       _selectedCategoryId = val;
+                                      _productPage = 1;
                                     });
                                   },
                                 ),
@@ -529,7 +557,12 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
                                     DropdownMenuItem(value: 'name_asc', child: Text('Nama Produk (A-Z)', overflow: TextOverflow.ellipsis)),
                                   ],
                                   onChanged: (val) {
-                                    if (val != null) setState(() => _sortBy = val);
+                                    if (val != null) {
+                                      setState(() {
+                                        _sortBy = val;
+                                        _productPage = 1;
+                                      });
+                                    }
                                   },
                                 ),
                               ),
@@ -556,7 +589,11 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
                             icon: Icons.payments_outlined,
                             color: Colors.green,
                             isDesktop: isDesktop,
-                            subtitle: _selectedCategoryId != null ? 'Omset Kategori Terpilih' : 'Semua Penjualan Selesai',
+                            subtitle: _selectedCategoryId != null
+                                ? 'Omset Kategori Terpilih'
+                                : (salesState.startDate != null && salesState.endDate != null
+                                    ? 'Periode: ${DateFormat('dd/MM/yy').format(salesState.startDate!)} - ${DateFormat('dd/MM/yy').format(salesState.endDate!)}'
+                                    : 'Semua Penjualan Selesai'),
                           ),
                           _buildKpiCard(
                             context: context,
@@ -773,71 +810,98 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
                       elevation: 1,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       clipBehavior: Clip.antiAlias,
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: productList.length,
-                        separatorBuilder: (context, index) => const Divider(height: 1),
-                        itemBuilder: (context, index) {
-                          final prod = productList[index];
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                            leading: CircleAvatar(
-                              backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                              child: Text(
-                                '${index + 1}',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Theme.of(context).colorScheme.primary,
-                                  fontSize: 13,
-                                ),
+                      child: Builder(
+                        builder: (context) {
+                          final totalProdItems = productList.length;
+                          final totalProdPages = (totalProdItems / _productsPerPage).ceil().clamp(1, 999999);
+                          final safeProdPage = _productPage.clamp(1, totalProdPages);
+                          final startProdIndex = (safeProdPage - 1) * _productsPerPage;
+                          final paginatedProducts = productList.skip(startProdIndex).take(_productsPerPage).toList();
+
+                          return Column(
+                            children: [
+                              ListView.separated(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: paginatedProducts.length,
+                                separatorBuilder: (context, index) => const Divider(height: 1),
+                                itemBuilder: (context, index) {
+                                  final prod = paginatedProducts[index];
+                                  final rank = startProdIndex + index + 1;
+                                  return ListTile(
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                    leading: CircleAvatar(
+                                      backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                                      child: Text(
+                                        '$rank',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Theme.of(context).colorScheme.primary,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                    title: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            prod.itemName,
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                          ),
+                                        ),
+                                        Text(
+                                          _currencyFormatter.format(prod.totalOmset),
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.green),
+                                        ),
+                                      ],
+                                    ),
+                                    subtitle: Padding(
+                                      padding: const EdgeInsets.only(top: 4.0),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: Colors.blue.shade50,
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              prod.categoryName,
+                                              style: TextStyle(fontSize: 11, color: Colors.blue.shade800, fontWeight: FontWeight.w500),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          if (prod.barcode.isNotEmpty) ...[
+                                            Text(
+                                              'Barcode: ${prod.barcode}',
+                                              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                            ),
+                                            const SizedBox(width: 8),
+                                          ],
+                                          const Spacer(),
+                                          Text(
+                                            '${prod.totalQty} Terjual (Rata2: ${_currencyFormatter.format(prod.avgPrice)})',
+                                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
-                            ),
-                            title: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    prod.itemName,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                  ),
-                                ),
-                                Text(
-                                  _currencyFormatter.format(prod.totalOmset),
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.green),
-                                ),
-                              ],
-                            ),
-                            subtitle: Padding(
-                              padding: const EdgeInsets.only(top: 4.0),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.blue.shade50,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      prod.categoryName,
-                                      style: TextStyle(fontSize: 11, color: Colors.blue.shade800, fontWeight: FontWeight.w500),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  if (prod.barcode.isNotEmpty) ...[
-                                    Text(
-                                      'Barcode: ${prod.barcode}',
-                                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                                    ),
-                                    const SizedBox(width: 8),
-                                  ],
-                                  const Spacer(),
-                                  Text(
-                                    '${prod.totalQty} Terjual (Rata2: ${_currencyFormatter.format(prod.avgPrice)})',
-                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
-                                  ),
-                                ],
+                              _buildProductPaginationBar(
+                                currentPage: safeProdPage,
+                                totalPages: totalProdPages,
+                                totalItems: totalProdItems,
+                                itemsPerPage: _productsPerPage,
+                                startIndex: startProdIndex,
+                                onPageChanged: (p) => setState(() => _productPage = p),
+                                onItemsPerPageChanged: (n) => setState(() {
+                                  _productsPerPage = n;
+                                  _productPage = 1;
+                                }),
                               ),
-                            ),
+                            ],
                           );
                         },
                       ),
@@ -847,8 +911,112 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
               ),
             ),
           ),
-        ),
-        ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+  Widget _buildProductPaginationBar({
+    required int currentPage,
+    required int totalPages,
+    required int totalItems,
+    required int itemsPerPage,
+    required int startIndex,
+    required ValueChanged<int> onPageChanged,
+    required ValueChanged<int> onItemsPerPageChanged,
+  }) {
+    final theme = Theme.of(context);
+    final endItem = (startIndex + itemsPerPage).clamp(1, totalItems);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        border: Border(top: BorderSide(color: Colors.grey.withOpacity(0.15))),
+      ),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12,
+        runSpacing: 8,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Data ${startIndex + 1} - $endItem dari $totalItems produk',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(width: 12),
+              DropdownButton<int>(
+                value: itemsPerPage,
+                isDense: true,
+                underline: const SizedBox(),
+                items: const [
+                  DropdownMenuItem(value: 10, child: Text('10 / hal', style: TextStyle(fontSize: 12))),
+                  DropdownMenuItem(value: 20, child: Text('20 / hal', style: TextStyle(fontSize: 12))),
+                  DropdownMenuItem(value: 50, child: Text('50 / hal', style: TextStyle(fontSize: 12))),
+                  DropdownMenuItem(value: 100, child: Text('100 / hal', style: TextStyle(fontSize: 12))),
+                ],
+                onChanged: (val) {
+                  if (val != null) onItemsPerPageChanged(val);
+                },
+              ),
+            ],
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.first_page, size: 18),
+                tooltip: 'Halaman Pertama',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                onPressed: currentPage > 1 ? () => onPageChanged(1) : null,
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_left, size: 20),
+                tooltip: 'Sebelumnya',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                onPressed: currentPage > 1 ? () => onPageChanged(currentPage - 1) : null,
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '$currentPage / $totalPages',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right, size: 20),
+                tooltip: 'Berikutnya',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                onPressed: currentPage < totalPages ? () => onPageChanged(currentPage + 1) : null,
+              ),
+              IconButton(
+                icon: const Icon(Icons.last_page, size: 18),
+                tooltip: 'Halaman Terakhir',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                onPressed: currentPage < totalPages ? () => onPageChanged(totalPages) : null,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

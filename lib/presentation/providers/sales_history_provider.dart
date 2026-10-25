@@ -40,6 +40,12 @@ class SalesHistoryState {
     final hasQuery = query.isNotEmpty;
 
     final list = sales.where((s) {
+      if (startDate != null && s.date.isBefore(startDate!)) {
+        return false;
+      }
+      if (endDate != null && s.date.isAfter(endDate!)) {
+        return false;
+      }
       if (!isAllPayment && s.paymentMethod.toLowerCase() != paymentFilter) {
         return false;
       }
@@ -129,7 +135,9 @@ class SalesHistoryNotifier extends StateNotifier<SalesHistoryState> {
     if (start == null || end == null) {
       state = state.copyWith(clearDates: true);
     } else {
-      state = state.copyWith(startDate: start, endDate: end);
+      final adjustedStart = DateTime(start.year, start.month, start.day, 0, 0, 0, 0);
+      final adjustedEnd = DateTime(end.year, end.month, end.day, 23, 59, 59, 999);
+      state = state.copyWith(startDate: adjustedStart, endDate: adjustedEnd);
     }
     fetchSales();
   }

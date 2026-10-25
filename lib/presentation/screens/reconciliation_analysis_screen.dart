@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../providers/reconciliation_provider.dart' hide DateTimeRange;
+import '../providers/reconciliation_provider.dart';
 import '../../data/models/cash_reconciliation_model.dart';
 import '../../data/models/cash_movement_model.dart';
 import '../widgets/main_layout.dart';
@@ -16,6 +16,10 @@ class ReconciliationAnalysisScreen extends ConsumerStatefulWidget {
 
 class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAnalysisScreen> {
   int _selectedTab = 0; // 0: Rekonsiliasi Kas, 1: Kas Keluar
+  int _recPage = 1;
+  int _recPerPage = 15;
+  int _movPage = 1;
+  int _movPerPage = 15;
 
   @override
   Widget build(BuildContext context) {
@@ -97,19 +101,54 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
                         SliverToBoxAdapter(
                           child: _buildDesktopTable(state, currencyFormatter, dateFormatter),
                         )
-                      else
-                        SliverList(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) {
-                              final rec = state.filteredReconciliations[index];
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 8.0),
-                                child: _buildMobileCard(rec, currencyFormatter, dateFormatter),
+                      else ...[
+                        Builder(
+                          builder: (context) {
+                            final totalItems = state.filteredReconciliations.length;
+                            final totalPages = (totalItems / _recPerPage).ceil().clamp(1, 999999);
+                            final safePage = _recPage.clamp(1, totalPages);
+                            final startIndex = (safePage - 1) * _recPerPage;
+                            final paginatedList = state.filteredReconciliations.skip(startIndex).take(_recPerPage).toList();
+
+                            return SliverList(
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) {
+                                  final rec = paginatedList[index];
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: 8.0),
+                                    child: _buildMobileCard(rec, currencyFormatter, dateFormatter),
+                                  );
+                                },
+                                childCount: paginatedList.length,
+                              ),
+                            );
+                          },
+                        ),
+                        SliverToBoxAdapter(
+                          child: Builder(
+                            builder: (context) {
+                              final totalItems = state.filteredReconciliations.length;
+                              final totalPages = (totalItems / _recPerPage).ceil().clamp(1, 999999);
+                              final safePage = _recPage.clamp(1, totalPages);
+                              final startIndex = (safePage - 1) * _recPerPage;
+
+                              return _buildGenericPaginationBar(
+                                currentPage: safePage,
+                                totalPages: totalPages,
+                                totalItems: totalItems,
+                                itemsPerPage: _recPerPage,
+                                startIndex: startIndex,
+                                itemTypeLabel: 'tutup kasir',
+                                onPageChanged: (p) => setState(() => _recPage = p),
+                                onItemsPerPageChanged: (n) => setState(() {
+                                  _recPerPage = n;
+                                  _recPage = 1;
+                                }),
                               );
                             },
-                            childCount: state.filteredReconciliations.length,
                           ),
                         ),
+                      ]
                     ]
                     // TAB 1: KAS KELUAR (PETTY CASH)
                     else ...[
@@ -143,23 +182,160 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
                         SliverToBoxAdapter(
                           child: _buildCashMovementsDesktopTable(state, currencyFormatter, dateFormatter),
                         )
-                      else
-                        SliverList(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) {
-                              final mov = state.filteredCashMovements[index];
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 8.0),
-                                child: _buildCashMovementMobileCard(mov, currencyFormatter, dateFormatter),
+                      else ...[
+                        Builder(
+                          builder: (context) {
+                            final totalItems = state.filteredCashMovements.length;
+                            final totalPages = (totalItems / _movPerPage).ceil().clamp(1, 999999);
+                            final safePage = _movPage.clamp(1, totalPages);
+                            final startIndex = (safePage - 1) * _movPerPage;
+                            final paginatedList = state.filteredCashMovements.skip(startIndex).take(_movPerPage).toList();
+
+                            return SliverList(
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) {
+                                  final mov = paginatedList[index];
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: 8.0),
+                                    child: _buildCashMovementMobileCard(mov, currencyFormatter, dateFormatter),
+                                  );
+                                },
+                                childCount: paginatedList.length,
+                              ),
+                            );
+                          },
+                        ),
+                        SliverToBoxAdapter(
+                          child: Builder(
+                            builder: (context) {
+                              final totalItems = state.filteredCashMovements.length;
+                              final totalPages = (totalItems / _movPerPage).ceil().clamp(1, 999999);
+                              final safePage = _movPage.clamp(1, totalPages);
+                              final startIndex = (safePage - 1) * _movPerPage;
+
+                              return _buildGenericPaginationBar(
+                                currentPage: safePage,
+                                totalPages: totalPages,
+                                totalItems: totalItems,
+                                itemsPerPage: _movPerPage,
+                                startIndex: startIndex,
+                                itemTypeLabel: 'kas keluar',
+                                onPageChanged: (p) => setState(() => _movPage = p),
+                                onItemsPerPageChanged: (n) => setState(() {
+                                  _movPerPage = n;
+                                  _movPage = 1;
+                                }),
                               );
                             },
-                            childCount: state.filteredCashMovements.length,
                           ),
                         ),
+                      ]
                     ],
                   ],
                 ),
               ),
+      ),
+    );
+  }
+
+  Widget _buildGenericPaginationBar({
+    required int currentPage,
+    required int totalPages,
+    required int totalItems,
+    required int itemsPerPage,
+    required int startIndex,
+    required String itemTypeLabel,
+    required ValueChanged<int> onPageChanged,
+    required ValueChanged<int> onItemsPerPageChanged,
+  }) {
+    final theme = Theme.of(context);
+    final endItem = (startIndex + itemsPerPage).clamp(1, totalItems);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        border: Border(top: BorderSide(color: Colors.grey.withOpacity(0.15))),
+      ),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12,
+        runSpacing: 8,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Data ${startIndex + 1} - $endItem dari $totalItems $itemTypeLabel',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(width: 12),
+              DropdownButton<int>(
+                value: itemsPerPage,
+                isDense: true,
+                underline: const SizedBox(),
+                items: const [
+                  DropdownMenuItem(value: 10, child: Text('10 / hal', style: TextStyle(fontSize: 12))),
+                  DropdownMenuItem(value: 15, child: Text('15 / hal', style: TextStyle(fontSize: 12))),
+                  DropdownMenuItem(value: 30, child: Text('30 / hal', style: TextStyle(fontSize: 12))),
+                  DropdownMenuItem(value: 50, child: Text('50 / hal', style: TextStyle(fontSize: 12))),
+                ],
+                onChanged: (val) {
+                  if (val != null) onItemsPerPageChanged(val);
+                },
+              ),
+            ],
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.first_page, size: 18),
+                tooltip: 'Halaman Pertama',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                onPressed: currentPage > 1 ? () => onPageChanged(1) : null,
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_left, size: 20),
+                tooltip: 'Sebelumnya',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                onPressed: currentPage > 1 ? () => onPageChanged(currentPage - 1) : null,
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '$currentPage / $totalPages',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right, size: 20),
+                tooltip: 'Berikutnya',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                onPressed: currentPage < totalPages ? () => onPageChanged(currentPage + 1) : null,
+              ),
+              IconButton(
+                icon: const Icon(Icons.last_page, size: 18),
+                tooltip: 'Halaman Terakhir',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                onPressed: currentPage < totalPages ? () => onPageChanged(totalPages) : null,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -202,56 +378,90 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
             ? [const Color(0xFFE65100), const Color(0xFFF57C00)]
             : [const Color(0xFF0288D1), const Color(0xFF29B6F6)]);
 
-    final cashOutGradient = [const Color(0xFFD84315), const Color(0xFFFF7043)];
+    final systemCashGradient = [const Color(0xFF1565C0), const Color(0xFF1E88E5)]; // Royal Blue
+    final actualCashGradient = [const Color(0xFF00695C), const Color(0xFF00897B)]; // Emerald Teal
+    final cashOutGradient = [const Color(0xFFD84315), const Color(0xFFFF7043)]; // Deep Orange
 
     if (isLarge) {
-      return Row(
+      return Column(
         children: [
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(right: 12.0),
-              child: _buildStatCard(
-                context: context,
-                title: 'Akurasi Kas',
-                value: '${accuracy.toStringAsFixed(1)}%',
-                icon: Icons.percent,
-                gradientColors: accuracyGradient,
-                accuracy: accuracy,
+          // Row 1: The 3 Core Cash Figures (Kas Sistem, Fisik Laci, Kas Keluar)
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatCard(
+                  context: context,
+                  title: 'Total Kas Sistem',
+                  value: currencyFormatter.format(state.totalSystemRevenue),
+                  subtitle: 'Kas masuk bersih sistem',
+                  icon: Icons.computer_rounded,
+                  gradientColors: systemCashGradient,
+                ),
               ),
-            ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(right: 12.0),
-              child: _buildStatCard(
-                context: context,
-                title: 'Total Kas Keluar',
-                value: currencyFormatter.format(state.totalCashOut),
-                icon: Icons.output_rounded,
-                gradientColors: cashOutGradient,
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildStatCard(
+                  context: context,
+                  title: 'Total Uang Fisik Laci',
+                  value: currencyFormatter.format(state.totalActualDrawerCash),
+                  subtitle: 'Fisik terhitung tutup kasir',
+                  icon: Icons.payments_rounded,
+                  gradientColors: actualCashGradient,
+                ),
               ),
-            ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(right: 12.0),
-              child: _buildStatCard(
-                context: context,
-                title: 'Selisih Kas',
-                value: '${state.totalDiscrepancyCount} kali',
-                icon: Icons.error_outline,
-                gradientColors: discrepancyGradient,
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildStatCard(
+                  context: context,
+                  title: 'Total Kas Keluar',
+                  value: currencyFormatter.format(state.totalCashOut),
+                  subtitle: 'Pengeluaran laci (petty cash)',
+                  icon: Icons.output_rounded,
+                  gradientColors: cashOutGradient,
+                ),
               ),
-            ),
+            ],
           ),
-          Expanded(
-            child: _buildStatCard(
-              context: context,
-              title: 'Akumulasi Selisih',
-              value: (state.totalDifference > 0 ? '+' : '') + currencyFormatter.format(state.totalDifference),
-              icon: Icons.account_balance_wallet,
-              gradientColors: differenceGradient,
-            ),
+          const SizedBox(height: 12),
+          // Row 2: Audit & Quality Metrics (Selisih, Akurasi, Frekuensi)
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatCard(
+                  context: context,
+                  title: 'Akumulasi Selisih',
+                  value: (state.totalDifference > 0 ? '+' : '') + currencyFormatter.format(state.totalDifference),
+                  subtitle: state.totalDifference == 0
+                      ? 'Kas seimbang (cocok)'
+                      : (state.totalDifference < 0 ? 'Fisik kurang dari sistem' : 'Fisik lebih dari sistem'),
+                  icon: Icons.balance_rounded,
+                  gradientColors: differenceGradient,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildStatCard(
+                  context: context,
+                  title: 'Rata-rata Akurasi',
+                  value: '${accuracy.toStringAsFixed(1)}%',
+                  subtitle: 'Tingkat kesesuaian fisik kas',
+                  icon: Icons.percent_rounded,
+                  gradientColors: accuracyGradient,
+                  accuracy: accuracy,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildStatCard(
+                  context: context,
+                  title: 'Frekuensi Selisih',
+                  value: '${state.totalDiscrepancyCount} kali',
+                  subtitle: 'Dari ${state.totalReconciliations} kali tutup kasir',
+                  icon: Icons.difference_rounded,
+                  gradientColors: discrepancyGradient,
+                ),
+              ),
+            ],
           ),
         ],
       );
@@ -263,11 +473,10 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
               Expanded(
                 child: _buildStatCard(
                   context: context,
-                  title: 'Akurasi',
-                  value: '${accuracy.toStringAsFixed(1)}%',
-                  icon: Icons.percent,
-                  gradientColors: accuracyGradient,
-                  accuracy: accuracy,
+                  title: 'Kas Sistem',
+                  value: currencyFormatter.format(state.totalSystemRevenue),
+                  icon: Icons.computer_rounded,
+                  gradientColors: systemCashGradient,
                   isCompact: true,
                 ),
               ),
@@ -275,10 +484,10 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
               Expanded(
                 child: _buildStatCard(
                   context: context,
-                  title: 'Kas Keluar',
-                  value: currencyFormatter.format(state.totalCashOut),
-                  icon: Icons.output_rounded,
-                  gradientColors: cashOutGradient,
+                  title: 'Fisik Laci',
+                  value: currencyFormatter.format(state.totalActualDrawerCash),
+                  icon: Icons.payments_rounded,
+                  gradientColors: actualCashGradient,
                   isCompact: true,
                 ),
               ),
@@ -290,10 +499,10 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
               Expanded(
                 child: _buildStatCard(
                   context: context,
-                  title: 'Selisih Kas',
-                  value: '${state.totalDiscrepancyCount} kali',
-                  icon: Icons.error_outline,
-                  gradientColors: discrepancyGradient,
+                  title: 'Kas Keluar',
+                  value: currencyFormatter.format(state.totalCashOut),
+                  icon: Icons.output_rounded,
+                  gradientColors: cashOutGradient,
                   isCompact: true,
                 ),
               ),
@@ -301,10 +510,37 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
               Expanded(
                 child: _buildStatCard(
                   context: context,
-                  title: 'Akumulasi Selisih',
+                  title: 'Selisih Kas',
                   value: (state.totalDifference > 0 ? '+' : '') + currencyFormatter.format(state.totalDifference),
-                  icon: Icons.account_balance_wallet,
+                  icon: Icons.balance_rounded,
                   gradientColors: differenceGradient,
+                  isCompact: true,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatCard(
+                  context: context,
+                  title: 'Akurasi',
+                  value: '${accuracy.toStringAsFixed(1)}%',
+                  icon: Icons.percent_rounded,
+                  gradientColors: accuracyGradient,
+                  accuracy: accuracy,
+                  isCompact: true,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildStatCard(
+                  context: context,
+                  title: 'Frekuensi Beda',
+                  value: '${state.totalDiscrepancyCount} kali',
+                  icon: Icons.difference_rounded,
+                  gradientColors: discrepancyGradient,
                   isCompact: true,
                 ),
               ),
@@ -322,6 +558,7 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
     required IconData icon,
     required List<Color> gradientColors,
     double? accuracy,
+    String? subtitle,
     bool isCompact = false,
   }) {
     Widget progressWidget;
@@ -387,11 +624,11 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
               ),
             ),
             Padding(
-              padding: EdgeInsets.all(isCompact ? 12.0 : 18.0),
+              padding: EdgeInsets.all(isCompact ? 12.0 : 16.0),
               child: Row(
                 children: [
                   progressWidget,
-                  SizedBox(width: isCompact ? 10 : 16),
+                  SizedBox(width: isCompact ? 10 : 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -400,13 +637,13 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
                         Text(
                           title,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.8),
-                            fontSize: isCompact ? 11 : 13,
-                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withOpacity(0.85),
+                            fontSize: isCompact ? 10 : 12,
+                            fontWeight: FontWeight.w600,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 3),
                         Text(
                           value,
                           style: TextStyle(
@@ -416,6 +653,17 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
+                        if (subtitle != null && !isCompact) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitle,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 10,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -431,6 +679,12 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
   // --- RECONCILIATION DESKTOP TABLE ---
   Widget _buildDesktopTable(
       ReconciliationState state, NumberFormat currencyFormatter, DateFormat dateFormatter) {
+    final totalItems = state.filteredReconciliations.length;
+    final totalPages = (totalItems / _recPerPage).ceil().clamp(1, 999999);
+    final safePage = _recPage.clamp(1, totalPages);
+    final startIndex = (safePage - 1) * _recPerPage;
+    final paginatedList = state.filteredReconciliations.skip(startIndex).take(_recPerPage).toList();
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -439,51 +693,68 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.vertical,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              headingRowColor: WidgetStateProperty.all(Colors.grey.withOpacity(0.03)),
-              columns: const [
-                DataColumn(label: Text('Tanggal & Waktu', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Kasir', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Kas Sistem (Seharusnya)', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Uang Fisik Laci', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Selisih', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Akurasi', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Catatan', style: TextStyle(fontWeight: FontWeight.bold))),
-              ],
-              rows: state.filteredReconciliations.map((rec) {
-                return DataRow(
-                  cells: [
-                    DataCell(Text(dateFormatter.format(rec.date))),
-                    DataCell(Text(rec.cashierName)),
-                    DataCell(Text(currencyFormatter.format(rec.systemRevenue))),
-                    DataCell(Text(currencyFormatter.format(rec.actualDrawerCash))),
-                    DataCell(Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4.0),
-                      child: _buildDifferenceBadge(rec.difference, currencyFormatter),
-                    )),
-                    DataCell(Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4.0),
-                      child: _buildAccuracyBadge(rec.accuracyRate),
-                    )),
-                    DataCell(
-                      SizedBox(
-                        width: 200,
-                        child: Text(
-                          rec.notes.isEmpty ? '-' : rec.notes,
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        ),
-                      ),
-                    ),
+        child: Column(
+          children: [
+            SingleChildScrollView(
+              scrollDirection: Axis.vertical,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  headingRowColor: WidgetStateProperty.all(Colors.grey.withOpacity(0.03)),
+                  columns: const [
+                    DataColumn(label: Text('Tanggal & Waktu', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Kasir', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Kas Sistem (Seharusnya)', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Uang Fisik Laci', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Selisih', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Akurasi', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Catatan', style: TextStyle(fontWeight: FontWeight.bold))),
                   ],
-                );
-              }).toList(),
+                  rows: paginatedList.map((rec) {
+                    return DataRow(
+                      cells: [
+                        DataCell(Text(dateFormatter.format(rec.date))),
+                        DataCell(Text(rec.cashierName)),
+                        DataCell(Text(currencyFormatter.format(rec.systemRevenue))),
+                        DataCell(Text(currencyFormatter.format(rec.actualDrawerCash))),
+                        DataCell(Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4.0),
+                          child: _buildDifferenceBadge(rec.difference, currencyFormatter),
+                        )),
+                        DataCell(Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4.0),
+                          child: _buildAccuracyBadge(rec.accuracyRate),
+                        )),
+                        DataCell(
+                          SizedBox(
+                            width: 200,
+                            child: Text(
+                              rec.notes.isEmpty ? '-' : rec.notes,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
             ),
-          ),
+            _buildGenericPaginationBar(
+              currentPage: safePage,
+              totalPages: totalPages,
+              totalItems: totalItems,
+              itemsPerPage: _recPerPage,
+              startIndex: startIndex,
+              itemTypeLabel: 'tutup kasir',
+              onPageChanged: (p) => setState(() => _recPage = p),
+              onItemsPerPageChanged: (n) => setState(() {
+                _recPerPage = n;
+                _recPage = 1;
+              }),
+            ),
+          ],
         ),
       ),
     );
@@ -865,31 +1136,7 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
   }
 }
 
-class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
-  final Widget child;
-  final double height;
 
-  _StickyHeaderDelegate({
-    required this.child,
-    required this.height,
-  });
-
-  @override
-  double get minExtent => height;
-
-  @override
-  double get maxExtent => height;
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return SizedBox.expand(child: child);
-  }
-
-  @override
-  bool shouldRebuild(_StickyHeaderDelegate oldDelegate) {
-    return height != oldDelegate.height || child != oldDelegate.child;
-  }
-}
 
 class _ReconciliationFiltersBar extends ConsumerStatefulWidget {
   const _ReconciliationFiltersBar({Key? key}) : super(key: key);
@@ -956,6 +1203,17 @@ class _ReconciliationFiltersBarState extends ConsumerState<_ReconciliationFilter
                 },
               ),
               _buildFilterChip(
+                label: 'Kemarin',
+                isSelected: state.filterType == 'yesterday',
+                onSelected: () {
+                  setState(() {
+                    _customStart = null;
+                    _customEnd = null;
+                  });
+                  ref.read(reconciliationProvider.notifier).setFilterType('yesterday');
+                },
+              ),
+              _buildFilterChip(
                 label: '7 Hari',
                 isSelected: state.filterType == 'weekly',
                 onSelected: () {
@@ -963,11 +1221,11 @@ class _ReconciliationFiltersBarState extends ConsumerState<_ReconciliationFilter
                     _customStart = null;
                     _customEnd = null;
                   });
-                  ref.read(reconciliationProvider.notifier).setFilterType('weekly');
+                  ref.read(reconciliationProvider.notifier).setFilterType('today');
                 },
               ),
               _buildFilterChip(
-                label: 'Bulan Ini',
+                label: '1 Bulan',
                 isSelected: state.filterType == 'monthly',
                 onSelected: () {
                   setState(() {
@@ -978,9 +1236,31 @@ class _ReconciliationFiltersBarState extends ConsumerState<_ReconciliationFilter
                 },
               ),
               _buildFilterChip(
+                label: 'Bulan Ini',
+                isSelected: state.filterType == 'thismonth',
+                onSelected: () {
+                  setState(() {
+                    _customStart = null;
+                    _customEnd = null;
+                  });
+                  ref.read(reconciliationProvider.notifier).setFilterType('thismonth');
+                },
+              ),
+              _buildFilterChip(
+                label: 'Semua',
+                isSelected: state.filterType == 'all',
+                onSelected: () {
+                  setState(() {
+                    _customStart = null;
+                    _customEnd = null;
+                  });
+                  ref.read(reconciliationProvider.notifier).setFilterType('all');
+                },
+              ),
+              _buildFilterChip(
                 label: isCustom && state.customStartDate != null && state.customEndDate != null
                     ? '${DateFormat('dd/MM').format(state.customStartDate!)} - ${DateFormat('dd/MM').format(state.customEndDate!)}'
-                    : 'Kustom',
+                    : 'Pilih Rentang...',
                 isSelected: isCustom,
                 icon: Icons.calendar_today_rounded,
                 onSelected: () => _pickDateRange(context),

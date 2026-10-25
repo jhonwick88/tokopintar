@@ -178,8 +178,8 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
     } catch (_) {}
   }
 
-  Future<void> updateItemBarcode(String itemNo, String barcode) async {
-    await _itemsRepository.updateItemBarcode(itemNo, barcode);
+  Future<void> updateItemBarcode(String itemNo, String barcode, {String? userId, String? username}) async {
+    await _itemsRepository.updateItemBarcode(itemNo, barcode, userId: userId, username: username);
     final updated = state.items.map((i) {
       if (i.itemNo == itemNo) {
         return ItemModel(

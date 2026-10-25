@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../data/models/item_model.dart';
 import '../providers/items_provider.dart';
 import '../widgets/main_layout.dart';
@@ -325,7 +326,14 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       return;
     }
     try {
-      await ref.read(itemsNotifierProvider.notifier).updateItemBarcode(item.itemNo, barcode);
+      final user = ref.read(authNotifierProvider).currentUser;
+      final staffName = user?.username.isNotEmpty == true ? user!.username : (user?.fullname.isNotEmpty == true ? user!.fullname : 'Admin');
+      await ref.read(itemsNotifierProvider.notifier).updateItemBarcode(
+        item.itemNo,
+        barcode,
+        userId: user?.uid,
+        username: staffName,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -471,6 +479,11 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
           title: const Text('Manajemen Produk', style: TextStyle(fontWeight: FontWeight.bold)),
           centerTitle: false,
           actions: [
+            IconButton(
+              icon: const Icon(Icons.qr_code_scanner),
+              tooltip: 'Laporan Rekam Barcode',
+              onPressed: () => context.push('/barcode-report'),
+            ),
             IconButton(
               icon: const Icon(Icons.file_download_outlined),
               tooltip: 'Export ke Excel',
