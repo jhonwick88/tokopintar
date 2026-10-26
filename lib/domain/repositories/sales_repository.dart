@@ -8,7 +8,7 @@ abstract class SalesRepository {
   Future<void> updateSaleStatus(String invoiceNo, String status, {String? reason, String? user});
   Future<void> saveCashReconciliation(CashReconciliationModel reconciliation);
   Future<List<CashReconciliationModel>> getCashReconciliations();
-  Future<List<CashMovementModel>> getCashMovements({DateTime? startDate, DateTime? endDate});
+  Future<List<CashMovementModel>> getCashMovements({DateTime? startDate, DateTime? endDate, int? limit, int? offset});
   Future<CashMovementModel> saveCashMovement(CashMovementModel movement);
   Future<void> deleteCashMovement(String id);
 }

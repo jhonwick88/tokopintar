@@ -22,8 +22,9 @@ class ApiClient {
       : _baseUrl = baseUrl,
         _dio = Dio(BaseOptions(
           baseUrl: baseUrl,
-          connectTimeout: const Duration(seconds: 5),
-          receiveTimeout: const Duration(seconds: 5),
+          connectTimeout: const Duration(seconds: 15),
+          receiveTimeout: const Duration(seconds: 30),
+          sendTimeout: const Duration(seconds: 15),
         )) {
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) {
@@ -31,7 +32,14 @@ class ApiClient {
         return handler.next(options);
       },
       onResponse: (response, handler) {
-        dev.log('API Response [${response.statusCode}]: ${response.data}');
+        final path = response.requestOptions.path;
+        final data = response.data;
+        final sizeInfo = data is List
+            ? '(${data.length} items)'
+            : (data is Map && data['data'] is List
+                ? '(${(data['data'] as List).length} items)'
+                : '');
+        dev.log('API Response [${response.statusCode}] $path $sizeInfo');
         return handler.next(response);
       },
       onError: (DioException e, handler) {
@@ -423,7 +431,17 @@ class ApiClient {
       if (startDate != null) queryParams['start_date'] = startDate;
       if (endDate != null) queryParams['end_date'] = endDate;
 
-      final response = await _dio.get('/api/sales', queryParameters: queryParams);
+      // Failsafe: Jika tidak ada filter tanggal sama sekali, batasi ke 30 hari terakhir agar tidak membebani server
+      if (startDate == null && endDate == null) {
+        final defaultStart = DateTime.now().subtract(const Duration(days: 30));
+        queryParams['start_date'] = defaultStart.toIso8601String().substring(0, 10);
+      }
+
+      final response = await _dio.get(
+        '/api/sales',
+        queryParameters: queryParams,
+        options: Options(receiveTimeout: const Duration(seconds: 60)),
+      );
       if (response.statusCode == 200 && response.data != null) {
         final success = response.data['success'] as bool? ?? false;
         if (success) {
@@ -506,9 +524,22 @@ class ApiClient {
 
   // --- Cash Movements (Petty Cash / Kas Keluar) ---
 
-  Future<List<CashMovementModel>> getCashMovements({DateTime? startDate, DateTime? endDate}) async {
+  Future<List<CashMovementModel>> getCashMovements({
+    DateTime? startDate,
+    DateTime? endDate,
+    int? limit,
+    int? offset,
+  }) async {
     try {
-      final queryParams = <String, dynamic>{'limit': '999999'};
+      final queryParams = <String, dynamic>{};
+      if (limit != null) {
+        queryParams['limit'] = limit.toString();
+      } else {
+        queryParams['limit'] = '1000'; // Sensible limit rather than unbounded
+      }
+      if (offset != null) {
+        queryParams['offset'] = offset.toString();
+      }
       if (startDate != null) {
         queryParams['start_date'] = startDate.toIso8601String().substring(0, 10);
       }
@@ -552,9 +583,11 @@ class ApiClient {
   Future<void> deleteCashMovement(String id) async {
     try {
       final response = await _dio.delete('/api/cash-movements/$id');
-      if (response.statusCode != 200) {
-        throw Exception(response.data?['message'] ?? 'Gagal menghapus pengeluaran kas');
+      if (response.statusCode == 200 && response.data != null) {
+        final success = response.data['success'] as bool? ?? false;
+        if (success) return;
       }
+      throw Exception(response.data?['message'] ?? 'Gagal menghapus pengeluaran kas');
     } catch (e) {
       dev.log('Error in deleteCashMovement: $e');
       rethrow;
@@ -856,8 +889,16 @@ class ApiClient {
   Future<List<UnitModel>> getUnits() async {
     try {
       final response = await _dio.get('/api/units');
-      final data = response.data['data'] as List;
-      return data.map((json) => UnitModel.fromJson(json)).toList();
+      if (response.statusCode == 200 && response.data != null) {
+        final success = response.data['success'] as bool? ?? false;
+        if (success) {
+          final list = response.data['data'] as List?;
+          if (list != null) {
+            return list.map((json) => UnitModel.fromJson(json as Map<String, dynamic>)).toList();
+          }
+        }
+      }
+      return [];
     } catch (e) {
       dev.log('Error in getUnits: $e');
       rethrow;
@@ -867,7 +908,10 @@ class ApiClient {
   Future<UnitModel> createUnit(String name) async {
     try {
       final response = await _dio.post('/api/units', data: {'name': name});
-      return UnitModel.fromJson(response.data['data']);
+      if (response.statusCode == 200 && response.data != null && response.data['data'] != null) {
+        return UnitModel.fromJson(response.data['data'] as Map<String, dynamic>);
+      }
+      throw Exception(response.data?['message'] ?? 'Gagal membuat satuan');
     } catch (e) {
       dev.log('Error in createUnit: $e');
       rethrow;
@@ -877,7 +921,10 @@ class ApiClient {
   Future<UnitModel> updateUnit(int id, String name) async {
     try {
       final response = await _dio.put('/api/units/$id', data: {'name': name});
-      return UnitModel.fromJson(response.data['data']);
+      if (response.statusCode == 200 && response.data != null && response.data['data'] != null) {
+        return UnitModel.fromJson(response.data['data'] as Map<String, dynamic>);
+      }
+      throw Exception(response.data?['message'] ?? 'Gagal memperbarui satuan');
     } catch (e) {
       dev.log('Error in updateUnit: $e');
       rethrow;
@@ -888,11 +935,42 @@ class ApiClient {
     try {
       final response = await _dio.delete('/api/units/$id');
       if (response.statusCode != 200) {
-        throw Exception('Gagal menghapus satuan');
+        throw Exception(response.data?['message'] ?? 'Gagal menghapus satuan');
       }
     } catch (e) {
       dev.log('Error in deleteUnit: $e');
       rethrow;
     }
+  }
+
+  /// Helper untuk menerjemahkan DioException ke pesan Bahasa Indonesia yang ramah pengguna
+  static String getReadableErrorMessage(dynamic error) {
+    if (error is DioException) {
+      switch (error.type) {
+        case DioExceptionType.connectionTimeout:
+          return 'Koneksi ke server kasir timeout. Pastikan jaringan/WiFi kasir stabil.';
+        case DioExceptionType.sendTimeout:
+          return 'Waktu pengiriman data ke server habis. Periksa koneksi internet/LAN.';
+        case DioExceptionType.receiveTimeout:
+          return 'Server membutuhkan waktu terlalu lama untuk memproses (Database sedang sibuk).';
+        case DioExceptionType.badResponse:
+          final resData = error.response?.data;
+          if (resData is Map) {
+            final msg = resData['message'] ?? resData['error'];
+            if (msg != null && msg.toString().isNotEmpty) {
+              return msg.toString();
+            }
+          }
+          final status = error.response?.statusCode;
+          return 'Server kasir mengembalikan kesalahan (HTTP $status).';
+        case DioExceptionType.connectionError:
+          return 'Tidak dapat terhubung ke server kasir. Pastikan komputer server utama aktif dan terhubung ke jaringan yang sama.';
+        case DioExceptionType.cancel:
+          return 'Permintaan ke server dibatalkan.';
+        default:
+          return error.message ?? 'Terjadi kesalahan komunikasi dengan server kasir.';
+      }
+    }
+    return error.toString();
   }
 }

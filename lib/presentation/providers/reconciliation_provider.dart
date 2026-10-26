@@ -47,6 +47,11 @@ class ReconciliationState {
     } else if (filterType == 'thismonth') {
       // Bulan Kalender Ini
       start = DateTime(now.year, now.month, 1);
+      end = DateTime(now.year, now.month + 1, 0, 23, 59, 59, 999);
+    } else if (filterType == 'lastmonth') {
+      // Bulan Kalender Lalu
+      start = DateTime(now.year, now.month - 1, 1);
+      end = DateTime(now.year, now.month, 0, 23, 59, 59, 999);
     } else {
       // custom
       if (customStartDate == null || customEndDate == null) {
@@ -148,13 +153,22 @@ class ReconciliationState {
   }
 
   double get totalCashOut {
-    return latestCashOutMovementsPerDay.values.fold(0.0, (sum, m) => sum + m.amount);
+    return filteredCashMovements
+        .where((m) => m.type == 'OUT')
+        .fold(0.0, (sum, m) => sum + m.amount);
   }
+
+  int get totalCashOutCount => filteredCashMovements.where((m) => m.type == 'OUT').length;
 
   double get todayCashOut {
     final now = DateTime.now();
-    final todayKey = '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    return latestCashOutMovementsPerDay[todayKey]?.amount ?? 0.0;
+    return cashMovements
+        .where((m) => m.type == 'OUT')
+        .where((m) {
+          final d = m.date.toLocal();
+          return d.year == now.year && d.month == now.month && d.day == now.day;
+        })
+        .fold(0.0, (sum, m) => sum + m.amount);
   }
 
   ReconciliationState copyWith({
@@ -235,6 +249,7 @@ class ReconciliationNotifier extends StateNotifier<ReconciliationState> {
   }
 
   void setFilterType(String type) {
+    if (type == 'all') return;
     state = state.copyWith(filterType: type, clearCustomDates: type != 'custom');
   }
 

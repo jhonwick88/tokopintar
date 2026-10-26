@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../providers/sales_history_provider.dart';
 import '../widgets/main_layout.dart';
@@ -26,6 +27,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    initializeDateFormatting('id_ID', null);
     _scrollController = ScrollController()..addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndPromptPermissions();
@@ -33,7 +35,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     });
   }
 
+  String _formatDate(String pattern, DateTime date, [String? locale]) {
+    try {
+      return DateFormat(pattern, locale).format(date);
+    } catch (_) {
+      return DateFormat(pattern).format(date);
+    }
+  }
+
   void _applyDatePreset(String preset) {
+    if (preset == 'all') return;
+
     setState(() {
       _selectedPreset = preset;
       _leaderboardLimit = 10;
@@ -66,6 +78,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         break;
       case 'thismonth':
         start = DateTime(now.year, now.month, 1, 0, 0, 0, 0);
+        end = DateTime(now.year, now.month + 1, 0, 23, 59, 59, 999);
+        break;
+      case 'lastmonth':
+        start = DateTime(now.year, now.month - 1, 1, 0, 0, 0, 0);
+        end = DateTime(now.year, now.month, 0, 23, 59, 59, 999);
         break;
       case 'custom':
         if (_customDateRange != null) {
@@ -290,13 +307,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
       DateTime curM = startMonth;
       while (!curM.isAfter(endMonth)) {
-        final key = DateFormat('MMM yy', 'id_ID').format(curM);
+        final key = _formatDate('MMM yy', curM, 'id_ID');
         chartData[key] = 0.0;
         curM = DateTime(curM.year, curM.month + 1, 1);
       }
 
       for (var sale in completedSales) {
-        final key = DateFormat('MMM yy', 'id_ID').format(sale.date.toLocal());
+        final key = _formatDate('MMM yy', sale.date.toLocal(), 'id_ID');
         if (chartData.containsKey(key)) {
           chartData[key] = chartData[key]! + sale.grandTotal;
         }
@@ -313,18 +330,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     String dateRangeStr = 'Semua Waktu';
     if (_selectedPreset == 'today') {
-      dateRangeStr = 'Hari Ini (${DateFormat('dd MMM yyyy', 'id_ID').format(now)})';
+      dateRangeStr = 'Hari Ini (${_formatDate('dd MMM yyyy', now, 'id_ID')})';
     } else if (_selectedPreset == 'yesterday') {
       final y = now.subtract(const Duration(days: 1));
-      dateRangeStr = 'Kemarin (${DateFormat('dd MMM yyyy', 'id_ID').format(y)})';
+      dateRangeStr = 'Kemarin (${_formatDate('dd MMM yyyy', y, 'id_ID')})';
     } else if (_selectedPreset == 'last7days') {
       dateRangeStr = '7 Hari Terakhir';
     } else if (_selectedPreset == 'last30days') {
       dateRangeStr = '30 Hari Terakhir';
     } else if (_selectedPreset == 'thismonth') {
-      dateRangeStr = 'Bulan Ini (${DateFormat('MMMM yyyy', 'id_ID').format(now)})';
+      dateRangeStr = 'Bulan Ini (${_formatDate('MMMM yyyy', now, 'id_ID')})';
     } else if (salesState.startDate != null && salesState.endDate != null) {
-      dateRangeStr = '${DateFormat('dd MMM yyyy', 'id_ID').format(salesState.startDate!)} - ${DateFormat('dd MMM yyyy', 'id_ID').format(salesState.endDate!)}';
+      dateRangeStr = '${_formatDate('dd MMM yyyy', salesState.startDate!, 'id_ID')} - ${_formatDate('dd MMM yyyy', salesState.endDate!, 'id_ID')}';
     }
 
     final width = MediaQuery.of(context).size.width;
@@ -625,7 +642,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               context: context,
               label: 'Semua',
               isSelected: _selectedPreset == 'all',
-              onTap: () => _applyDatePreset('all'),
+              isEnabled: false,
+              onTap: null,
             ),
             _buildSegmentItem(
               context: context,
@@ -712,34 +730,43 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     required BuildContext context,
     required String label,
     required bool isSelected,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
+    bool isEnabled = true,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? Theme.of(context).colorScheme.surface : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  )
-                ]
-              : null,
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            color: isSelected
-                ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).colorScheme.onSurfaceVariant,
+    return Tooltip(
+      message: isEnabled ? '' : 'Filter $label dinonaktifkan sementara',
+      child: GestureDetector(
+        onTap: isEnabled ? onTap : null,
+        child: Opacity(
+          opacity: isEnabled ? 1.0 : 0.4,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: (isSelected && isEnabled) ? Theme.of(context).colorScheme.surface : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: (isSelected && isEnabled)
+                  ? [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      )
+                    ]
+                  : null,
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: (isSelected && isEnabled) ? FontWeight.bold : FontWeight.w500,
+                color: !isEnabled
+                    ? Colors.grey
+                    : (isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            ),
           ),
         ),
       ),

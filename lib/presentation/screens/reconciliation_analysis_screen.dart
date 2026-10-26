@@ -425,7 +425,7 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
                   context: context,
                   title: 'Total Kas Keluar',
                   value: currencyFormatter.format(state.totalCashOut),
-                  subtitle: 'Kas keluar jam terakhir',
+                  subtitle: '${state.totalCashOutCount} transaksi kas keluar',
                   icon: Icons.output_rounded,
                   gradientColors: cashOutGradient,
                 ),
@@ -800,6 +800,12 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
   // --- KAS KELUAR DESKTOP TABLE ---
   Widget _buildCashMovementsDesktopTable(
       ReconciliationState state, NumberFormat currencyFormatter, DateFormat dateFormatter) {
+    final totalItems = state.filteredCashMovements.length;
+    final totalPages = (totalItems / _movPerPage).ceil().clamp(1, 999999);
+    final safePage = _movPage.clamp(1, totalPages);
+    final startIndex = (safePage - 1) * _movPerPage;
+    final paginatedList = state.filteredCashMovements.skip(startIndex).take(_movPerPage).toList();
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -808,81 +814,98 @@ class _ReconciliationAnalysisScreenState extends ConsumerState<ReconciliationAna
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.vertical,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              headingRowColor: WidgetStateProperty.all(Colors.grey.withOpacity(0.03)),
-              columns: const [
-                DataColumn(label: Text('Tanggal & Waktu', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Kategori', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Nominal', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Kasir / Operator', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Keperluan / Catatan', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Aksi', style: TextStyle(fontWeight: FontWeight.bold))),
-              ],
-              rows: state.filteredCashMovements.map((mov) {
-                final isLatest = state.isLatestCashOut(mov);
-                return DataRow(
-                  cells: [
-                    DataCell(
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(dateFormatter.format(mov.date)),
-                          if (isLatest) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.shade50,
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: Colors.orange.shade200),
-                              ),
-                              child: Text(
-                                'Jam Terakhir',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.orange.shade900,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    DataCell(_buildCategoryBadge(mov.category)),
-                    DataCell(
-                      Text(
-                        currencyFormatter.format(mov.amount),
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepOrange),
-                      ),
-                    ),
-                    DataCell(Text(mov.cashierName)),
-                    DataCell(
-                      SizedBox(
-                        width: 250,
-                        child: Text(
-                          mov.notes.isEmpty ? '-' : mov.notes,
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        ),
-                      ),
-                    ),
-                    DataCell(
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
-                        tooltip: 'Hapus Catatan',
-                        onPressed: () => _confirmDeleteCashMovement(context, mov),
-                      ),
-                    ),
+        child: Column(
+          children: [
+            SingleChildScrollView(
+              scrollDirection: Axis.vertical,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  headingRowColor: WidgetStateProperty.all(Colors.grey.withOpacity(0.03)),
+                  columns: const [
+                    DataColumn(label: Text('Tanggal & Waktu', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Kategori', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Nominal', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Kasir / Operator', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Keperluan / Catatan', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Aksi', style: TextStyle(fontWeight: FontWeight.bold))),
                   ],
-                );
-              }).toList(),
+                  rows: paginatedList.map((mov) {
+                    final isLatest = state.isLatestCashOut(mov);
+                    return DataRow(
+                      cells: [
+                        DataCell(
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(dateFormatter.format(mov.date)),
+                              if (isLatest) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.shade50,
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: Colors.orange.shade200),
+                                  ),
+                                  child: Text(
+                                    'Jam Terakhir',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.orange.shade900,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        DataCell(_buildCategoryBadge(mov.category)),
+                        DataCell(
+                          Text(
+                            currencyFormatter.format(mov.amount),
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepOrange),
+                          ),
+                        ),
+                        DataCell(Text(mov.cashierName)),
+                        DataCell(
+                          SizedBox(
+                            width: 250,
+                            child: Text(
+                              mov.notes.isEmpty ? '-' : mov.notes,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ),
+                        DataCell(
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                            tooltip: 'Hapus Catatan',
+                            onPressed: () => _confirmDeleteCashMovement(context, mov),
+                          ),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
             ),
-          ),
+            _buildGenericPaginationBar(
+              currentPage: safePage,
+              totalPages: totalPages,
+              totalItems: totalItems,
+              itemsPerPage: _movPerPage,
+              startIndex: startIndex,
+              itemTypeLabel: 'kas keluar',
+              onPageChanged: (p) => setState(() => _movPage = p),
+              onItemsPerPageChanged: (n) => setState(() {
+                _movPerPage = n;
+                _movPage = 1;
+              }),
+            ),
+          ],
         ),
       ),
     );
@@ -1312,6 +1335,8 @@ class _ReconciliationFiltersBarState extends ConsumerState<_ReconciliationFilter
                   setState(() {
                     _customStart = null;
                     _customEnd = null;
+                    _recPage = 1;
+                    _movPage = 1;
                   });
                   ref.read(reconciliationProvider.notifier).setFilterType('today');
                 },
@@ -1323,6 +1348,8 @@ class _ReconciliationFiltersBarState extends ConsumerState<_ReconciliationFilter
                   setState(() {
                     _customStart = null;
                     _customEnd = null;
+                    _recPage = 1;
+                    _movPage = 1;
                   });
                   ref.read(reconciliationProvider.notifier).setFilterType('yesterday');
                 },
@@ -1334,8 +1361,10 @@ class _ReconciliationFiltersBarState extends ConsumerState<_ReconciliationFilter
                   setState(() {
                     _customStart = null;
                     _customEnd = null;
+                    _recPage = 1;
+                    _movPage = 1;
                   });
-                  ref.read(reconciliationProvider.notifier).setFilterType('today');
+                  ref.read(reconciliationProvider.notifier).setFilterType('weekly');
                 },
               ),
               _buildFilterChip(
@@ -1345,6 +1374,8 @@ class _ReconciliationFiltersBarState extends ConsumerState<_ReconciliationFilter
                   setState(() {
                     _customStart = null;
                     _customEnd = null;
+                    _recPage = 1;
+                    _movPage = 1;
                   });
                   ref.read(reconciliationProvider.notifier).setFilterType('monthly');
                 },
@@ -1356,20 +1387,30 @@ class _ReconciliationFiltersBarState extends ConsumerState<_ReconciliationFilter
                   setState(() {
                     _customStart = null;
                     _customEnd = null;
+                    _recPage = 1;
+                    _movPage = 1;
                   });
                   ref.read(reconciliationProvider.notifier).setFilterType('thismonth');
                 },
               ),
               _buildFilterChip(
-                label: 'Semua',
-                isSelected: state.filterType == 'all',
+                label: 'Bulan Lalu',
+                isSelected: state.filterType == 'lastmonth',
                 onSelected: () {
                   setState(() {
                     _customStart = null;
                     _customEnd = null;
+                    _recPage = 1;
+                    _movPage = 1;
                   });
-                  ref.read(reconciliationProvider.notifier).setFilterType('all');
+                  ref.read(reconciliationProvider.notifier).setFilterType('lastmonth');
                 },
+              ),
+              _buildFilterChip(
+                label: 'Semua',
+                isSelected: state.filterType == 'all',
+                isEnabled: false,
+                onSelected: () {},
               ),
               _buildFilterChip(
                 label: isCustom && state.customStartDate != null && state.customEndDate != null
@@ -1387,6 +1428,8 @@ class _ReconciliationFiltersBarState extends ConsumerState<_ReconciliationFilter
                 setState(() {
                   _customStart = null;
                   _customEnd = null;
+                  _recPage = 1;
+                  _movPage = 1;
                 });
                 ref.read(reconciliationProvider.notifier).setFilterType('weekly');
               },
@@ -1403,24 +1446,30 @@ class _ReconciliationFiltersBarState extends ConsumerState<_ReconciliationFilter
     required bool isSelected,
     required VoidCallback onSelected,
     IconData? icon,
+    bool isEnabled = true,
   }) {
-    return ChoiceChip(
-      avatar: icon != null
-          ? Icon(
-              icon,
-              size: 14,
-              color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey[700],
-            )
-          : null,
-      label: Text(label),
-      selected: isSelected,
-      selectedColor: Theme.of(context).colorScheme.primaryContainer,
-      labelStyle: TextStyle(
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey[800],
-        fontSize: 12,
+    return Tooltip(
+      message: isEnabled ? '' : 'Filter $label dinonaktifkan sementara',
+      child: ChoiceChip(
+        avatar: icon != null
+            ? Icon(
+                icon,
+                size: 14,
+                color: (isSelected && isEnabled) ? Theme.of(context).colorScheme.primary : Colors.grey[700],
+              )
+            : null,
+        label: Text(label),
+        selected: isSelected && isEnabled,
+        selectedColor: Theme.of(context).colorScheme.primaryContainer,
+        labelStyle: TextStyle(
+          fontWeight: (isSelected && isEnabled) ? FontWeight.bold : FontWeight.normal,
+          color: !isEnabled
+              ? Colors.grey
+              : ((isSelected && isEnabled) ? Theme.of(context).colorScheme.primary : Colors.grey[800]),
+          fontSize: 12,
+        ),
+        onSelected: isEnabled ? (_) => onSelected() : null,
       ),
-      onSelected: (_) => onSelected(),
     );
   }
 }

@@ -38,8 +38,8 @@ class SalesRepositoryImpl implements SalesRepository {
   }
 
   @override
-  Future<List<CashMovementModel>> getCashMovements({DateTime? startDate, DateTime? endDate}) {
-    return _apiClient.getCashMovements(startDate: startDate, endDate: endDate);
+  Future<List<CashMovementModel>> getCashMovements({DateTime? startDate, DateTime? endDate, int? limit, int? offset}) {
+    return _apiClient.getCashMovements(startDate: startDate, endDate: endDate, limit: limit, offset: offset);
   }
 
   @override

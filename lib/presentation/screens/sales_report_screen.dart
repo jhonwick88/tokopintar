@@ -51,6 +51,8 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
   }
 
   void _applyDatePreset(String preset) {
+    if (preset == 'all') return;
+
     setState(() {
       _selectedDateRangePreset = preset;
       _productPage = 1;
@@ -83,6 +85,11 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
         break;
       case 'thismonth':
         start = DateTime(now.year, now.month, 1, 0, 0, 0);
+        end = DateTime(now.year, now.month + 1, 0, 23, 59, 59, 999);
+        break;
+      case 'lastmonth':
+        start = DateTime(now.year, now.month - 1, 1, 0, 0, 0);
+        end = DateTime(now.year, now.month, 0, 23, 59, 59, 999);
         break;
       case 'custom':
         if (_customDateRange != null) {
@@ -448,7 +455,8 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
                                               _buildDateChip('7 Hari', 'last7days'),
                                               _buildDateChip('1 Bulan', 'last30days'),
                                               _buildDateChip('Bulan Ini', 'thismonth'),
-                                              _buildDateChip('Semua', 'all'),
+                                              _buildDateChip('Bulan Lalu', 'lastmonth'),
+                                              _buildDateChip('Semua', 'all', isEnabled: false),
                                       ActionChip(
                                         avatar: const Icon(Icons.date_range, size: 16),
                                         label: Text(
@@ -1025,16 +1033,27 @@ class _SalesReportScreenState extends ConsumerState<SalesReportScreen> {
     );
   }
 
-  Widget _buildDateChip(String label, String presetKey) {
+  Widget _buildDateChip(String label, String presetKey, {bool isEnabled = true}) {
     final isSelected = _selectedDateRangePreset == presetKey;
     return Padding(
       padding: const EdgeInsets.only(right: 8.0),
-      child: ChoiceChip(
-        label: Text(label, style: const TextStyle(fontSize: 12)),
-        selected: isSelected,
-        onSelected: (selected) {
-          if (selected) _applyDatePreset(presetKey);
-        },
+      child: Tooltip(
+        message: isEnabled ? '' : 'Filter $label dinonaktifkan sementara',
+        child: ChoiceChip(
+          label: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: !isEnabled ? Colors.grey : null,
+            ),
+          ),
+          selected: isSelected && isEnabled,
+          onSelected: isEnabled
+              ? (selected) {
+                  if (selected) _applyDatePreset(presetKey);
+                }
+              : null,
+        ),
       ),
     );
   }

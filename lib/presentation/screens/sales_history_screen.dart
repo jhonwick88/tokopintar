@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import '../../data/models/sale_model.dart';
 import '../providers/sales_history_provider.dart';
 import '../providers/settings_provider.dart';
@@ -173,6 +174,7 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
   @override
   void initState() {
     super.initState();
+    initializeDateFormatting('id_ID', null);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _applyDatePreset('today');
       ref.read(reconciliationProvider.notifier).fetchData();
@@ -180,6 +182,8 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
   }
 
   void _applyDatePreset(String preset) {
+    if (preset == 'all') return;
+
     setState(() {
       _selectedDateRangePreset = preset;
       _currentPage = 1;
@@ -212,6 +216,11 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
         break;
       case 'thismonth':
         start = DateTime(now.year, now.month, 1, 0, 0, 0);
+        end = DateTime(now.year, now.month + 1, 0, 23, 59, 59, 999);
+        break;
+      case 'lastmonth':
+        start = DateTime(now.year, now.month - 1, 1, 0, 0, 0);
+        end = DateTime(now.year, now.month, 0, 23, 59, 59, 999);
         break;
       case 'custom':
         if (_customDateRange != null) {
@@ -572,13 +581,13 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                   icon: const Icon(Icons.clear),
                   onPressed: () {
                     setState(() {
-                      _selectedDateRangePreset = 'all';
+                      _selectedDateRangePreset = 'today';
                       _customDateRange = null;
                       _currentPage = 1;
                     });
-                    ref.read(salesHistoryNotifierProvider.notifier).updateDateFilter(null, null);
+                    _applyDatePreset('today');
                   },
-                  tooltip: 'Reset Filter Tanggal (Tampilkan Semua)',
+                  tooltip: 'Reset Filter Tanggal (Hari Ini)',
                 ),
             ],
           ],
@@ -727,7 +736,8 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
                                     _buildDateChip('7 Hari', 'last7days'),
                                     _buildDateChip('1 Bulan', 'last30days'),
                                     _buildDateChip('Bulan Ini', 'thismonth'),
-                                    _buildDateChip('Semua', 'all'),
+                                    _buildDateChip('Bulan Lalu', 'lastmonth'),
+                                    _buildDateChip('Semua', 'all', isEnabled: false),
                                     _buildDateChip(
                                       _selectedDateRangePreset == 'custom' && _customDateRange != null
                                           ? '${DateFormat('dd/MM').format(_customDateRange!.start)} - ${DateFormat('dd/MM').format(_customDateRange!.end)}'
@@ -1086,6 +1096,8 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
         return '1 Bulan Terakhir';
       case 'thismonth':
         return 'Bulan Ini';
+      case 'lastmonth':
+        return 'Bulan Lalu';
       case 'all':
         return 'Semua Transaksi';
       case 'custom':
@@ -1478,33 +1490,40 @@ class _SalesHistoryScreenState extends ConsumerState<SalesHistoryScreen> {
     }
   }
 
-  Widget _buildDateChip(String label, String preset, {IconData? icon}) {
+  Widget _buildDateChip(String label, String preset, {IconData? icon, bool isEnabled = true}) {
     final isSelected = _selectedDateRangePreset == preset;
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(right: 6.0),
-      child: ChoiceChip(
-        avatar: icon != null
-            ? Icon(icon, size: 14, color: isSelected ? Colors.white : theme.colorScheme.primary)
-            : null,
-        label: Text(label),
-        labelStyle: TextStyle(
-          fontSize: 11,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          color: isSelected ? Colors.white : Colors.grey.shade800,
+      child: Tooltip(
+        message: isEnabled ? '' : 'Filter $label dinonaktifkan sementara',
+        child: ChoiceChip(
+          avatar: icon != null
+              ? Icon(icon, size: 14, color: (isSelected && isEnabled) ? Colors.white : theme.colorScheme.primary)
+              : null,
+          label: Text(label),
+          labelStyle: TextStyle(
+            fontSize: 11,
+            fontWeight: (isSelected && isEnabled) ? FontWeight.bold : FontWeight.normal,
+            color: !isEnabled
+                ? Colors.grey
+                : ((isSelected && isEnabled) ? Colors.white : Colors.grey.shade800),
+          ),
+          selected: isSelected && isEnabled,
+          selectedColor: theme.colorScheme.primary,
+          backgroundColor: theme.cardColor,
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+          onSelected: isEnabled
+              ? (_) {
+                  if (preset == 'custom') {
+                    _pickCustomDateRange();
+                  } else {
+                    _applyDatePreset(preset);
+                  }
+                }
+              : null,
         ),
-        selected: isSelected,
-        selectedColor: theme.colorScheme.primary,
-        backgroundColor: theme.cardColor,
-        visualDensity: VisualDensity.compact,
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
-        onSelected: (_) {
-          if (preset == 'custom') {
-            _pickCustomDateRange();
-          } else {
-            _applyDatePreset(preset);
-          }
-        },
       ),
     );
   }
