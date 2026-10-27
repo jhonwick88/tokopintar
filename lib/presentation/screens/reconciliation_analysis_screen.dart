@@ -1335,8 +1335,6 @@ class _ReconciliationFiltersBarState extends ConsumerState<_ReconciliationFilter
                   setState(() {
                     _customStart = null;
                     _customEnd = null;
-                    _recPage = 1;
-                    _movPage = 1;
                   });
                   ref.read(reconciliationProvider.notifier).setFilterType('today');
                 },
@@ -1348,8 +1346,6 @@ class _ReconciliationFiltersBarState extends ConsumerState<_ReconciliationFilter
                   setState(() {
                     _customStart = null;
                     _customEnd = null;
-                    _recPage = 1;
-                    _movPage = 1;
                   });
                   ref.read(reconciliationProvider.notifier).setFilterType('yesterday');
                 },
@@ -1361,8 +1357,6 @@ class _ReconciliationFiltersBarState extends ConsumerState<_ReconciliationFilter
                   setState(() {
                     _customStart = null;
                     _customEnd = null;
-                    _recPage = 1;
-                    _movPage = 1;
                   });
                   ref.read(reconciliationProvider.notifier).setFilterType('weekly');
                 },
@@ -1374,8 +1368,6 @@ class _ReconciliationFiltersBarState extends ConsumerState<_ReconciliationFilter
                   setState(() {
                     _customStart = null;
                     _customEnd = null;
-                    _recPage = 1;
-                    _movPage = 1;
                   });
                   ref.read(reconciliationProvider.notifier).setFilterType('monthly');
                 },
@@ -1387,8 +1379,6 @@ class _ReconciliationFiltersBarState extends ConsumerState<_ReconciliationFilter
                   setState(() {
                     _customStart = null;
                     _customEnd = null;
-                    _recPage = 1;
-                    _movPage = 1;
                   });
                   ref.read(reconciliationProvider.notifier).setFilterType('thismonth');
                 },
@@ -1400,8 +1390,6 @@ class _ReconciliationFiltersBarState extends ConsumerState<_ReconciliationFilter
                   setState(() {
                     _customStart = null;
                     _customEnd = null;
-                    _recPage = 1;
-                    _movPage = 1;
                   });
                   ref.read(reconciliationProvider.notifier).setFilterType('lastmonth');
                 },
@@ -1428,8 +1416,6 @@ class _ReconciliationFiltersBarState extends ConsumerState<_ReconciliationFilter
                 setState(() {
                   _customStart = null;
                   _customEnd = null;
-                  _recPage = 1;
-                  _movPage = 1;
                 });
                 ref.read(reconciliationProvider.notifier).setFilterType('weekly');
               },
